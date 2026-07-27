@@ -28,15 +28,6 @@ struct MouseSeed {
   int dpi;
 };
 
-// A button's factory binding is the action it is named for.
-std::string DefaultAction(const std::string& button) {
-  if (button == "left") return "left_click";
-  if (button == "right") return "right_click";
-  if (button == "wheel") return "middle_click";
-  if (button == "gesture") return "mission_control";
-  return button;
-}
-
 void AddMouse(DeviceStack& stack, const MouseSeed& seed) {
   Device device;
   device.set_id(seed.id);
@@ -60,9 +51,6 @@ void AddMouse(DeviceStack& stack, const MouseSeed& seed) {
 
   for (const std::string& button : seed.buttons) {
     spec->add_buttons(button);
-    Binding* binding = mouse->add_bindings();
-    binding->set_control(button);
-    binding->set_action(DefaultAction(button));
   }
 
   stack.Add(device, settings);

@@ -61,8 +61,8 @@ src/renderer/   React interface
 
 ## Download
 
-You can download the app from the
-[releases page](https://github.com/mo-browser-apps/device/releases).
+You can download the app from the [releases page](https://github.com/mo-browser-apps/device/releases).
+Release builds are code-signed; macOS releases are notarized by Apple.
 
 ## License
 
