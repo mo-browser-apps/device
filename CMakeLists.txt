@@ -14,7 +14,13 @@ cmake_path(ABSOLUTE_PATH PROJECT_ROOT_DIR NORMALIZE)
 include(${PROJECT_ROOT_DIR}/node_modules/@mobrowser/native/cmake/MoBrowser.cmake)
 
 # The source files of your app.
-set(APP_SOURCES src/native/main.cc)
+set(APP_SOURCES
+        src/native/main.cc
+        src/native/device_stack.h
+        src/native/device_stack.cc
+        src/native/simulator.h
+        src/native/simulator.cc
+)
 
 # Defines the main target of the application.
 add_library(mobrowser_lib STATIC ${APP_SOURCES} ${GENERATED_SOURCES})

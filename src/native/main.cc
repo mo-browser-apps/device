@@ -1,3 +1,8 @@
-#include "rpc.h"
+#include "device_stack.h"
+#include "simulator.h"
 
-void launch() {}
+void launch() {
+  auto* stack = new DeviceStack();
+  SeedDevices(*stack);
+  RegisterDeviceStackService(*stack);
+}
