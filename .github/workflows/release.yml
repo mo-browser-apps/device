@@ -1,0 +1,278 @@
+# Build production artifacts on macOS, Windows, and Linux, then draft a GitHub Release.
+#
+# Requires a committed package-lock.json (npm ci).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  build-macos:
+    environment: production
+    runs-on: macos-latest
+
+    env:
+      # Base64-encoded Developer ID Application certificate (.p12).
+      MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
+      # Password used to export the .p12 certificate from Keychain Access.
+      MAC_CERTIFICATE_PWD: ${{ secrets.MAC_CERTIFICATE_PWD }}
+      # Password for the temporary CI keychain created during the build.
+      MAC_KEYCHAIN_PWD: ${{ secrets.MAC_KEYCHAIN_PWD }}
+      # Signing identity string, e.g. "Developer ID Application: Your Name (TEAMID)".
+      MAC_CODESIGN_IDENTITY: ${{ secrets.MAC_CODESIGN_IDENTITY }}
+      # Apple Developer Team ID (10-character string found in developer.apple.com).
+      MAC_TEAM_ID: ${{ secrets.MAC_TEAM_ID }}
+      # Apple ID email used for notarization.
+      MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
+      # App-specific password generated at appleid.apple.com for notarization.
+      MAC_APPLE_PASSWORD: ${{ secrets.MAC_APPLE_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify macOS signing secrets
+        run: |
+          set -euo pipefail
+          if [ -z "${MAC_CERTIFICATE:-}" ]; then
+            echo "MAC_CERTIFICATE not set — code signing will be skipped."
+            exit 0
+          fi
+          missing=()
+          [ -z "${MAC_CERTIFICATE_PWD:-}" ]    && missing+=(MAC_CERTIFICATE_PWD)
+          [ -z "${MAC_KEYCHAIN_PWD:-}" ]        && missing+=(MAC_KEYCHAIN_PWD)
+          [ -z "${MAC_CODESIGN_IDENTITY:-}" ]   && missing+=(MAC_CODESIGN_IDENTITY)
+          [ -z "${MAC_TEAM_ID:-}" ]             && missing+=(MAC_TEAM_ID)
+          [ -z "${MAC_APPLE_ID:-}" ]            && missing+=(MAC_APPLE_ID)
+          [ -z "${MAC_APPLE_PASSWORD:-}" ]      && missing+=(MAC_APPLE_PASSWORD)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "MAC_CERTIFICATE is set but the following required secrets are missing: ${missing[*]}"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up macOS code signing (optional)
+        run: |
+          set -euo pipefail
+          if [ -z "${MAC_CERTIFICATE:-}" ]; then
+            echo "Skipping macOS code signing (no MAC_CERTIFICATE secret). Build will produce an unsigned DMG."
+            # Clear all other MAC_* signing vars so the build doesn't attempt to sign
+            # with a partially-configured identity that happens to be set in secrets.
+            {
+              echo "MAC_CERTIFICATE_PWD="
+              echo "MAC_KEYCHAIN_PWD="
+              echo "MAC_CODESIGN_IDENTITY="
+              echo "MAC_TEAM_ID="
+              echo "MAC_APPLE_ID="
+              echo "MAC_APPLE_PASSWORD="
+            } >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "$MAC_KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$MAC_KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+
+          curl -fsSL https://www.apple.com/certificateauthority/AppleRootCA-G3.cer -o AppleRootCA-G3.cer
+          curl -fsSL https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer -o AppleWWDRCAG6.cer
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o DeveloperIDG2CA.cer
+
+          security import ./AppleRootCA-G3.cer -k "$KEYCHAIN_PATH"
+          security import ./AppleWWDRCAG6.cer -k "$KEYCHAIN_PATH"
+          security import ./DeveloperIDG2CA.cer -k "$KEYCHAIN_PATH"
+
+          echo "$MAC_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN_PATH" -P "$MAC_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$MAC_KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+      - name: Build release package
+        run: npm run build -- --verbose
+
+      - name: Build DMG and auto-update packages
+        run: npm run pack -- --verbose
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-mac-arm64
+          path: |
+            build/dist/mac-arm64/pack/*.dmg
+            build/dist/mac-arm64/pack/*.nupkg
+            build/dist/mac-arm64/pack/releases.osx.json
+          if-no-files-found: error
+
+  build-windows:
+    # To securely authenticate GitHub Actions with Azure using federated credentials we need
+    # an environment-based approach that can be triggered by any event (including version tags).
+    environment: production
+    runs-on: windows-latest
+
+    env:
+      # Azure Artifact Signing account name (Artifact Signing resource in the Azure portal).
+      AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+      # Certificate profile name within the Artifact Signing account.
+      AZURE_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+      # Azure Artifact Signing endpoint URL (e.g. "https://weu.codesigning.azure.net/").
+      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+      # Service principal client ID (app registration) used by DefaultAzureCredential.
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      # Azure Active Directory tenant ID of the service principal.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # Azure subscription ID of the service principal.
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Windows signing secrets
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ACCOUNT_NAME)) {
+            Write-Host "AZURE_SIGNING_ACCOUNT_NAME not set — code signing will be skipped."
+            exit 0
+          }
+          $missing = @()
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_CERTIFICATE_PROFILE_NAME)) { $missing += "AZURE_CERTIFICATE_PROFILE_NAME" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ENDPOINT))          { $missing += "AZURE_SIGNING_ENDPOINT" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID))                 { $missing += "AZURE_CLIENT_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_TENANT_ID))                 { $missing += "AZURE_TENANT_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_SUBSCRIPTION_ID))             { $missing += "AZURE_SUBSCRIPTION_ID" }
+          if ($missing.Count -gt 0) {
+            Write-Error "AZURE_SIGNING_ACCOUNT_NAME is set but the following required secrets are missing: $($missing -join ', ')"
+            exit 1
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Azure login (for code signing)
+        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+        uses: azure/login@v3
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build release package
+        run: npm run build -- --verbose
+
+      - name: Sign Windows binaries (optional)
+        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ env.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\build\dist\win-x64\bin
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Build installer and auto-update packages
+        id: pack
+        shell: pwsh
+        run: npm run pack -- --verbose
+
+      - name: Sign installer (optional)
+        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ env.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\build\dist\win-x64\pack
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-win-x64
+          path: |
+            build/dist/win-x64/pack/*.exe
+            build/dist/win-x64/pack/*.nupkg
+            build/dist/win-x64/pack/releases.win.json
+          if-no-files-found: error
+
+  build-linux:
+    environment: production
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release package
+        run: npm run build -- --verbose
+
+      # Linux production builds have no installer yet; ship the bin tree for distribution or CI.
+      - name: Pack Linux binaries
+        run: tar -czvf linux-x64-bin.tar.gz -C build/dist/linux-x64/bin .
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-linux-x64
+          path: linux-x64-bin.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release draft
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build-macos
+      - build-windows
+      - build-linux
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Create GitHub Release draft
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        with:
+          files: |
+            dist/artifacts-mac-arm64/**/*.dmg
+            dist/artifacts-mac-arm64/**/*.nupkg
+            dist/artifacts-mac-arm64/**/releases.osx.json
+            dist/artifacts-win-x64/**/*.exe
+            dist/artifacts-win-x64/**/*.nupkg
+            dist/artifacts-win-x64/**/releases.win.json
+            dist/artifacts-linux-x64/**/*.tar.gz
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: true
+
+      - name: List release artifacts
+        run: ls -R dist

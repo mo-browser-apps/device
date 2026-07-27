@@ -1,0 +1,14 @@
+# Node dependencies.
+node_modules/
+
+# Build output.
+build/
+dist/
+out/
+.idea/
+
+# Generated code.
+gen/
+
+# macOS metadata.
+.DS_Store
