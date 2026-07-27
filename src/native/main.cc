@@ -5,4 +5,5 @@ void launch() {
   auto* stack = new DeviceStack();
   SeedDevices(*stack);
   RegisterDeviceStackService(*stack);
+  RegisterSimulatorService(*stack);
 }

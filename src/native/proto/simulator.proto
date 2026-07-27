@@ -1,0 +1,8 @@
+// DEMO ONLY. Stands in for hardware activity; delete with the rest of the simulator.
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+service SimulatorService {
+  rpc Tick(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "gen/devices.rpc.h"
+#include "gen/events.rpc.h"
 #include "rpc.h"
 
 using google::protobuf::Empty;
@@ -76,6 +77,17 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
     return false;
   }
   entry->settings = settings;
+  return true;
+}
+
+// Also refuses a change of device kind, for the reason ApplySettings refuses one.
+bool DeviceStack::UpdateDevice(const Device& device) {
+  auto entry = FindById(entries_, device.id());
+  if (entry == entries_.end() || entry->device.spec_case() != device.spec_case()) {
+    return false;
+  }
+  entry->device = device;
+  mo::rpc::device_events.Changed(List(), [](mo::rpc::Result<Empty>) {});
   return true;
 }
 

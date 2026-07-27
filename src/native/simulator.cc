@@ -1,12 +1,20 @@
-// DEMO ONLY. See docs/PLAN.md §5.
+// DEMO ONLY. Stands in for hardware activity; delete with the rest of the simulator.
 #include "simulator.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "device_stack.h"
+#include "gen/simulator.rpc.h"
+#include "rpc.h"
+
+using google::protobuf::Empty;
+using mo::rpc::Callback;
 
 namespace {
+
+constexpr int kMinBattery = 1;
 
 struct MouseSeed {
   std::string id;
@@ -95,6 +103,28 @@ void AddKeyboard(DeviceStack& stack) {
   stack.Add(device, settings);
 }
 
+class SimulatorServiceImpl : public SimulatorService {
+ public:
+  explicit SimulatorServiceImpl(DeviceStack& stack) : stack_(stack) {}
+
+  void Tick(const Empty*, Callback<Empty> done) override {
+    // Iterate a snapshot: UpdateDevice sends an event that can reenter the stack.
+    const DeviceList devices = stack_.List();
+    for (const Device& device : devices.devices()) {
+      if (!device.connected() || !device.has_battery() || device.battery() <= kMinBattery) {
+        continue;
+      }
+      Device drained = device;
+      drained.set_battery(drained.battery() - 1);
+      stack_.UpdateDevice(drained);
+    }
+    std::move(done).Complete(Empty());
+  }
+
+ private:
+  DeviceStack& stack_;
+};
+
 }  // namespace
 
 void SeedDevices(DeviceStack& stack) {
@@ -123,4 +153,8 @@ void SeedDevices(DeviceStack& stack) {
                   });
 
   AddKeyboard(stack);
+}
+
+void RegisterSimulatorService(DeviceStack& stack) {
+  mo::rpc::RegisterService(new SimulatorServiceImpl(stack));
 }

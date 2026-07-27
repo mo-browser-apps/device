@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+import "devices.proto";
+import "google/protobuf/empty.proto";
+
+// Carries the whole list, so an added or removed device needs no separate event.
+service DeviceEventsService {
+  rpc Changed(DeviceList) returns (google.protobuf.Empty);
+}

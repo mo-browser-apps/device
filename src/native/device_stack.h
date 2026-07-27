@@ -16,6 +16,9 @@ class DeviceStack {
   std::optional<Settings> GetSettings(const std::string& device_id) const;
   bool ApplySettings(const Settings& settings);
 
+  // Replaces a device and broadcasts the list. The only place Changed is sent.
+  bool UpdateDevice(const Device& device);
+
  private:
   struct Entry {
     Device device;
