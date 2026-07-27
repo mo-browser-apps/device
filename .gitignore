@@ -5,7 +5,9 @@ node_modules/
 build/
 dist/
 out/
+
 .idea/
+docs/
 
 # Generated code.
 gen/
