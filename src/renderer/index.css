@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 @config '../../tailwind.config.js';
 
-/* Amber marks what is actionable; saturated colour is reserved for live hardware state. */
+/* Amber marks what is actionable; saturated color is reserved for live hardware state. */
 @layer base {
     :root {
         --background: 40 10% 97%;

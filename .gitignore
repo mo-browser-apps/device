@@ -9,11 +9,12 @@ out/
 .idea/
 docs/
 
-# Agent session state — holds a live session token.
+# Agent session state.
 .mobrowser/
 
 # Generated code.
 gen/
+*.tsbuildinfo
 
 # macOS metadata.
 .DS_Store
