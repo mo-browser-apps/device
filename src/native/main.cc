@@ -1,3 +1,4 @@
+#include "device_service.h"
 #include "device_stack.h"
 #include "simulator.h"
 

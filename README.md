@@ -1,26 +1,32 @@
-# MōDevice — configure your mice and keyboards
+# MōDevice — a peripherals configuration demo
 
-MōDevice is a desktop app for configuring computer peripherals. It shows connected mice and
-keyboards, remaps their buttons and keys, tunes pointer and scroll behaviour, and controls keyboard
-backlighting.
+MōDevice is a cross-platform reference application for configuring computer peripherals, built with
+[MōBrowser](https://teamdev.com/mobrowser/). It demonstrates how a manufacturer can connect a native
+C++ device layer to a responsive web interface in a desktop application for Windows and macOS.
 
-Built with [MōBrowser](https://teamdev.com/mobrowser/).
+The project is intentionally focused: it presents a polished mouse and keyboard configuration
+experience without the complexity of a production device suite.
 
-## What it does
+## Demo experience
 
-* Lists connected devices with battery level, connection type, and firmware version.
-* Reassigns mouse buttons to actions such as copy, paste, back, forward, and volume.
-* Adjusts pointer sensitivity, DPI, scroll speed, and scroll direction.
-* Remaps keyboard keys and controls backlight effect, color, and brightness.
-* Reacts live as devices connect and disconnect, and warns when a battery runs low.
+The simulated device catalog supports the primary workflows expected from peripheral software:
+
+- Browse mice and keyboards with connection, battery, and firmware information.
+- Assign actions to mouse buttons and adjust pointer and scrolling behaviour.
+- Remap keyboard keys and configure backlight effects, color, and brightness.
+- Observe the interface react to connection and battery changes in real time.
+
+MōDevice does not access peripherals connected to the host computer. Its devices and settings are
+provided by an in-memory C++ simulator, making the demo deterministic and portable across supported
+platforms.
 
 ## Requirements
 
-* macOS 14 (Apple Silicon) or later, or Windows 10 (64-bit) or later.
-* [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
-* [MōBrowser](https://teamdev.com/mobrowser/) 2.13.0 or later.
+- macOS 14 or later on Apple silicon, or Windows 10 or later on 64-bit systems.
+- [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
+- MōBrowser 2.13.0 or later.
 
-No accounts, API keys, or third-party services are required. The app sends no data anywhere.
+The demo requires no account, API key, or external service, and it does not transmit user data.
 
 ## Setup
 
@@ -40,23 +46,12 @@ npm run dev
 npm run build
 ```
 
-## Usage
+## Project structure
 
-Open the app to see the connected devices. Select a device to configure it: mice offer **Buttons**
-and **Pointer & Scroll**, keyboards offer **Keys** and **Backlight**, and both offer **Info**.
-
-### Simulator
-
-The device layer is simulated rather than talking to real hardware, so the app runs the same on Windows and
-macOS and can be driven live from a built-in **Simulator** panel. Use it to add and edit devices, change battery
-levels, and connect or disconnect a device to watch the interface react.
-
-## Project layout
-
-```
-src/native/     C++ device stack — the layer a manufacturer replaces with their own SDK
-src/main/       main process — window, menu, tray, notifications, preferences
-src/renderer/   React interface
+```text
+src/native/     C++ device stack, simulator, and MōBrowser RPC adapter
+src/main/       TypeScript application process and desktop integration
+src/renderer/   React interface and MōBrowser IPC client
 ```
 
 ## Download
