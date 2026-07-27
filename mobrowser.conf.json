@@ -6,9 +6,9 @@
       "minor": "0",
       "patch": "0"
     },
-    "author": "",
-    "copyright": "",
-    "description": "",
+    "author": "TeamDev",
+    "copyright": "Copyright © 2026 TeamDev",
+    "description": "Configure your mice and keyboards.",
     "locales": [
       "en-US"
     ],
@@ -17,7 +17,7 @@
     "bundle": {
       "macOS": {
         "icon": "assets/app.icns",
-        "bundleID": "com.company.MoDevice",
+        "bundleID": "com.teamdev.MoDevice",
         "codesignIdentity": "${MAC_CODESIGN_IDENTITY}",
         "codesignEntitlements": "assets/entitlements.plist",
         "teamID": "${MAC_TEAM_ID}",
