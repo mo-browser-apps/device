@@ -1,6 +1,6 @@
 import type { Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
-import { DeviceStatus } from '@/components/device-status';
+import { DeviceBatteryStatus, DeviceConnectionIcon } from '@/components/device-status';
 import { cn } from '@/lib/utils';
 
 function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) {
@@ -27,8 +27,13 @@ function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) 
       </span>
 
       <span className="flex flex-col items-center gap-2.5">
-        <span className="text-[15px] font-medium tracking-tight">{device.model}</span>
-        <DeviceStatus device={device} />
+        <span className="inline-flex items-center gap-1.5 text-[15px] font-medium tracking-tight">
+          <span>{device.model}</span>
+          <DeviceConnectionIcon device={device} />
+        </span>
+        <span className="flex min-h-4 items-center">
+          <DeviceBatteryStatus device={device} />
+        </span>
       </span>
     </button>
   );
