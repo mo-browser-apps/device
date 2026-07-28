@@ -29,12 +29,15 @@ const ART: Record<string, Art> = {
   'compact-keyboard': {
     detail: '/device-art/compact-keyboard.webp',
     home: '/device-art/compact-keyboard-home.webp',
-    alt: 'Graphite compact backlit keyboard',
+    alt: 'Graphite compact keyboard',
     aspect: '821 / 479',
   },
 };
 
-function artFor(device: Device): Art {
+function artFor(device: Device): Art | null {
+  if (!device.mouse && !device.keyboard) {
+    return null;
+  }
   if (ART[device.id]) {
     return ART[device.id];
   }
@@ -60,6 +63,8 @@ export function DeviceArt({
   className?: string;
 }) {
   const art = artFor(device);
+  if (!art) return null;
+
   const offline = !device.connected && 'grayscale opacity-45';
 
   if (variant === 'home') {

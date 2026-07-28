@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
@@ -12,6 +12,7 @@ function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) 
     <button
       type="button"
       data-device-card
+      data-device-id={device.id}
       onClick={onOpen}
       className={cn(
         'group flex w-64 shrink-0 snap-center flex-col items-center gap-5 rounded-2xl px-6 py-7',
@@ -75,10 +76,14 @@ function CarouselControl({
 
 export function Home({
   devices,
+  initialScrollLeft,
+  restoreFocusId,
   onOpen,
 }: {
   devices: Device[];
-  onOpen: (deviceId: string) => void;
+  initialScrollLeft: number;
+  restoreFocusId: string | null;
+  onOpen: (deviceId: string, scrollLeft: number) => void;
 }) {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [canScroll, setCanScroll] = useState({ previous: false, next: false });
@@ -96,6 +101,21 @@ export function Home({
       current.previous === next.previous && current.next === next.next ? current : next,
     );
   }, []);
+
+  useLayoutEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+
+    carousel.scrollLeft = initialScrollLeft;
+    updateScrollState();
+
+    if (restoreFocusId) {
+      const card = Array.from(
+        carousel.querySelectorAll<HTMLElement>('[data-device-card]'),
+      ).find((element) => element.dataset.deviceId === restoreFocusId);
+      card?.focus({ preventScroll: true });
+    }
+  }, [initialScrollLeft, restoreFocusId, updateScrollState]);
 
   useEffect(() => {
     const carousel = carouselRef.current;
@@ -153,7 +173,11 @@ export function Home({
             className="flex w-max min-w-full justify-center gap-4 px-12 pb-12"
           >
             {devices.map((device) => (
-              <DeviceCard key={device.id} device={device} onOpen={() => onOpen(device.id)} />
+              <DeviceCard
+                key={device.id}
+                device={device}
+                onOpen={() => onOpen(device.id, carouselRef.current?.scrollLeft ?? 0)}
+              />
             ))}
           </div>
         </div>

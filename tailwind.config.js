@@ -23,6 +23,10 @@ export default {
           DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
           foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
         },
+        status: {
+          charging: "hsl(var(--status-charging) / <alpha-value>)",
+          low: "hsl(var(--status-low) / <alpha-value>)",
+        },
         muted: {
           DEFAULT: "hsl(var(--muted) / <alpha-value>)",
           foreground: "hsl(var(--muted-foreground) / <alpha-value>)",

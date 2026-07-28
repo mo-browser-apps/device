@@ -9,7 +9,12 @@ const isMac = navigator.userAgent.includes('Mac');
 export default function App() {
   const { devices, failed } = useDevices();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [homeState, setHomeState] = useState<{ scrollLeft: number; focusId: string | null }>({
+    scrollLeft: 0,
+    focusId: null,
+  });
   const mainRef = useRef<HTMLElement>(null);
+  const restoreHomeFocus = useRef(false);
 
   const openDevice = devices?.find((device) => device.id === openId) ?? null;
   const screenKey = openDevice?.id ?? 'devices';
@@ -19,6 +24,10 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (screenKey === 'devices' && restoreHomeFocus.current) {
+      restoreHomeFocus.current = false;
+      return;
+    }
     mainRef.current?.focus();
   }, [screenKey]);
 
@@ -37,10 +46,21 @@ export default function App() {
               <DeviceView
                 key={openDevice.id}
                 device={openDevice}
-                onBack={() => setOpenId(null)}
+                onBack={() => {
+                  restoreHomeFocus.current = true;
+                  setOpenId(null);
+                }}
               />
             ) : (
-              <Home devices={devices} onOpen={setOpenId} />
+              <Home
+                devices={devices}
+                initialScrollLeft={homeState.scrollLeft}
+                restoreFocusId={homeState.focusId}
+                onOpen={(deviceId, scrollLeft) => {
+                  setHomeState({ scrollLeft, focusId: deviceId });
+                  setOpenId(deviceId);
+                }}
+              />
             ))}
         </main>
       </div>

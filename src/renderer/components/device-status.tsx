@@ -5,6 +5,7 @@ import {
   BatteryMedium,
   Bluetooth,
   Cable,
+  CircleHelp,
   Usb,
   type LucideIcon,
 } from 'lucide-react';
@@ -14,10 +15,12 @@ import { cn } from '@/lib/utils';
 const LOW_BATTERY = 20;
 const FULL_BATTERY = 90;
 
-const RECEIVER = { label: 'USB receiver', Icon: Usb };
-const CONNECTIONS: Partial<Record<LinkType, { label: string; Icon: LucideIcon }>> = {
+const UNKNOWN_CONNECTION = { label: 'Unknown connection', Icon: CircleHelp };
+const CONNECTIONS: Record<LinkType, { label: string; Icon: LucideIcon }> = {
+  [LinkType.RECEIVER]: { label: 'USB receiver', Icon: Usb },
   [LinkType.BLUETOOTH]: { label: 'Bluetooth', Icon: Bluetooth },
   [LinkType.WIRED]: { label: 'Wired', Icon: Cable },
+  [LinkType.UNRECOGNIZED]: UNKNOWN_CONNECTION,
 };
 
 function batteryOf(
@@ -27,14 +30,14 @@ function batteryOf(
   if (charging) {
     return {
       Icon: BatteryCharging,
-      tone: 'text-[hsl(145_38%_32%)] dark:text-[hsl(145_30%_58%)]',
+      tone: 'text-status-charging',
       label: `Battery ${level}%, charging`,
     };
   }
   if (level <= LOW_BATTERY) {
     return {
       Icon: BatteryLow,
-      tone: 'text-[hsl(4_42%_42%)] dark:text-[hsl(4_38%_62%)]',
+      tone: 'text-status-low',
       label: `Battery low, ${level}%`,
     };
   }
@@ -53,7 +56,7 @@ function batteryOf(
 }
 
 export function DeviceConnectionIcon({ device }: { device: Device }) {
-  const connection = CONNECTIONS[device.link] ?? RECEIVER;
+  const connection = CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION;
   const label = device.connected ? connection.label : `${connection.label}, disconnected`;
 
   return (
