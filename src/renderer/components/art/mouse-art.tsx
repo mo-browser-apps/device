@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export type MouseArtProfile = 'performance' | 'travel';
@@ -45,7 +44,6 @@ export function MouseArt({
   onControlSelect?: (control: string) => void;
   className?: string;
 }) {
-  const [hovered, setHovered] = useState<string | null>(null);
   const hotspots = HOTSPOTS[profile];
 
   return (
@@ -63,21 +61,22 @@ export function MouseArt({
 
         const name = MOUSE_LABELS[id] ?? id;
         const selected = selectedControl === id;
-        const active = selected || hovered === id;
         const anchor =
           spot.side === 'right'
             ? { left: `${spot.x}%`, top: `${spot.labelY}%` }
             : { right: `${100 - spot.x}%`, top: `${spot.labelY}%` };
 
         return (
-          <span key={id}>
+          <span key={id} className="group">
             <span
               aria-hidden="true"
               style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
               className={cn(
                 'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
-                'border border-background/70 transition-transform duration-200',
-                active ? 'scale-125 bg-primary' : 'bg-foreground/45',
+                'border border-background/70 transition duration-200',
+                'group-hover:scale-125 group-hover:bg-primary',
+                'group-focus-within:scale-125 group-focus-within:bg-primary',
+                selected ? 'scale-125 bg-primary' : 'bg-foreground/45',
               )}
             />
 
@@ -87,10 +86,6 @@ export function MouseArt({
               aria-pressed={selected}
               aria-label={`${name}, ${value}`}
               onClick={() => onControlSelect?.(id)}
-              onPointerEnter={() => setHovered(id)}
-              onPointerLeave={() => setHovered(null)}
-              onFocus={() => setHovered(id)}
-              onBlur={() => setHovered(null)}
               className={cn(
                 'absolute flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap',
                 'rounded-lg border px-2.5 py-1.5 text-xs backdrop-blur-sm',

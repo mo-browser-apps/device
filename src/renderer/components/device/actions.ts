@@ -1,4 +1,4 @@
-const ACTION_LABELS: Record<string, string | undefined> = {
+export const ACTIONS: Record<string, string> = {
   'middle-click': 'Middle click',
   back: 'Back',
   forward: 'Forward',
@@ -10,23 +10,11 @@ const ACTION_LABELS: Record<string, string | undefined> = {
   'play-pause': 'Play / pause',
   'volume-up': 'Volume up',
   'volume-down': 'Volume down',
-  disabled: 'Disabled',
 };
 
-export const ACTIONS = [
-  'middle-click',
-  'back',
-  'forward',
-  'overview',
-  'show-desktop',
-  'copy',
-  'paste',
-  'undo',
-  'play-pause',
-  'volume-up',
-  'volume-down',
-] as const;
+export const DISABLED = 'disabled';
 
 export function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action;
+  if (action === DISABLED) return 'Disabled';
+  return ACTIONS[action] ?? action;
 }

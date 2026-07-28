@@ -1,44 +1,39 @@
-import type { MouseSettings, Settings } from '@/gen/devices';
+import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
 import { MOUSE_LABELS } from '@/components/art/mouse-art';
 import { cn } from '@/lib/utils';
-import { ACTIONS, actionLabel } from './actions';
+import { ACTIONS, DISABLED } from './actions';
 
 const DPI_STEP = 100;
-const MIN_SCROLL_SPEED = 1;
-const MAX_SCROLL_SPEED = 5;
-const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Balanced', 'Fast', 'Very fast'];
-const PANEL_CLASS =
-  'rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border/70 dark:bg-card/45 dark:shadow-none';
+const SCROLL_SPEEDS = ['Very slow', 'Slow', 'Balanced', 'Fast', 'Very fast'];
+const PANEL = 'min-w-0 rounded-xl border bg-card p-4 shadow-sm';
 
 function Slider({
   label,
-  value,
   display,
+  value,
   min,
   max,
   step,
   minLabel,
   maxLabel,
   description,
-  disabled,
   onPreview,
   onCommit,
 }: {
   label: string;
-  value: number;
   display: string;
+  value: number;
   min: number;
   max: number;
   step: number;
-  minLabel?: string;
-  maxLabel?: string;
+  minLabel: string;
+  maxLabel: string;
   description?: string;
-  disabled: boolean;
   onPreview: (value: number) => void;
   onCommit: () => void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium">{label}</span>
         <span className="font-mono text-xs tabular-nums text-foreground/80">{display}</span>
@@ -50,7 +45,6 @@ function Slider({
         min={min}
         max={max}
         step={step}
-        disabled={disabled}
         onChange={(event) => onPreview(Number(event.target.value))}
         onPointerUp={onCommit}
         onKeyUp={onCommit}
@@ -64,12 +58,10 @@ function Slider({
           'focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         )}
       />
-      {(minLabel || maxLabel) && (
-        <div className="flex justify-between text-[11px] text-muted-foreground">
-          <span>{minLabel}</span>
-          <span>{maxLabel}</span>
-        </div>
-      )}
+      <div className="flex justify-between text-[11px] text-muted-foreground">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
       {description && (
         <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
       )}
@@ -80,12 +72,10 @@ function Slider({
 function Switch({
   label,
   checked,
-  disabled,
   onChange,
 }: {
   label: string;
   checked: boolean;
-  disabled: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
@@ -95,7 +85,6 @@ function Switch({
         type="checkbox"
         role="switch"
         checked={checked}
-        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className={cn(
           'relative h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full bg-input',
@@ -111,86 +100,75 @@ function Switch({
   );
 }
 
+function ActionOption({
+  action,
+  label,
+  selected,
+  onSelect,
+}: {
+  action: string;
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={cn(
+        'flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-xs',
+        'transition-colors has-disabled:cursor-default has-disabled:opacity-50',
+        selected ? 'border-primary/70 bg-primary/10' : 'border-transparent hover:bg-accent',
+      )}
+    >
+      <input
+        type="radio"
+        name="action"
+        value={action}
+        checked={selected}
+        onChange={onSelect}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className={cn(
+          'size-3 shrink-0 rounded-full border',
+          selected ? 'border-primary bg-primary' : 'border-muted-foreground/40',
+          'peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
+          'peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
+        )}
+      />
+      {label}
+    </label>
+  );
+}
+
 function ActionList({
   action,
-  disabled,
   onChange,
 }: {
   action: string;
-  disabled: boolean;
   onChange: (action: string) => void;
 }) {
   return (
-    <fieldset disabled={disabled}>
+    <fieldset className="min-w-0">
       <legend className="sr-only">Button action</legend>
       <div className="grid grid-cols-2 gap-1.5">
-        {ACTIONS.map((candidate) => (
-          <label
-            key={candidate}
-            className={cn(
-              'flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-xs',
-              'transition-colors has-disabled:cursor-default has-disabled:opacity-50',
-              candidate === action
-                ? 'border-primary/70 bg-primary/10'
-                : 'border-transparent hover:bg-accent',
-            )}
-          >
-            <input
-              type="radio"
-              name="action"
-              value={candidate}
-              checked={candidate === action}
-              disabled={disabled}
-              onChange={() => onChange(candidate)}
-              className="peer sr-only"
-            />
-            <span
-              aria-hidden="true"
-              className={cn(
-                'size-3 shrink-0 rounded-full border',
-                candidate === action
-                  ? 'border-primary bg-primary'
-                  : 'border-muted-foreground/35 dark:border-input',
-                'peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
-                'peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
-              )}
-            />
-            {actionLabel(candidate)}
-          </label>
+        {Object.entries(ACTIONS).map(([id, label]) => (
+          <ActionOption
+            key={id}
+            action={id}
+            label={label}
+            selected={id === action}
+            onSelect={() => onChange(id)}
+          />
         ))}
       </div>
-      <div className="mt-3 border-t border-border/60 pt-3">
-        <label
-          className={cn(
-            'flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-xs',
-            'transition-colors has-disabled:cursor-default has-disabled:opacity-50',
-            action === 'disabled'
-              ? 'border-primary/70 bg-primary/10'
-              : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
-          )}
-        >
-          <input
-            type="radio"
-            name="action"
-            value="disabled"
-            checked={action === 'disabled'}
-            disabled={disabled}
-            onChange={() => onChange('disabled')}
-            className="peer sr-only"
-          />
-          <span
-            aria-hidden="true"
-            className={cn(
-              'size-3 shrink-0 rounded-full border',
-              action === 'disabled'
-                ? 'border-primary bg-primary'
-                : 'border-muted-foreground/35 dark:border-input',
-              'peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
-              'peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
-            )}
-          />
-          Disable button
-        </label>
+      <div className="mt-3 border-t pt-3">
+        <ActionOption
+          action={DISABLED}
+          label="Disable button"
+          selected={action === DISABLED}
+          onSelect={() => onChange(DISABLED)}
+        />
       </div>
     </fieldset>
   );
@@ -199,8 +177,7 @@ function ActionList({
 export function ControlEditor({
   settings,
   mouse,
-  minDpi,
-  maxDpi,
+  spec,
   selected,
   segment,
   disabled,
@@ -209,8 +186,7 @@ export function ControlEditor({
 }: {
   settings: Settings;
   mouse: MouseSettings;
-  minDpi: number;
-  maxDpi: number;
+  spec: MouseSpec;
   selected: string | null;
   segment: 'buttons' | 'movement';
   disabled: boolean;
@@ -225,72 +201,65 @@ export function ControlEditor({
   if (segment === 'buttons') {
     if (!selected) return null;
 
-    const binding = mouse.bindings.find((entry) => entry.control === selected);
+    const action = mouse.bindings.find((entry) => entry.control === selected)?.action ?? '';
     return (
-      <div className={PANEL_CLASS}>
+      <fieldset disabled={disabled} className={PANEL}>
         <h2 className="mb-4 text-sm font-medium">{MOUSE_LABELS[selected] ?? selected}</h2>
         <ActionList
-          action={binding?.action ?? ''}
-          disabled={disabled}
-          onChange={(action) =>
+          action={action}
+          onChange={(next) =>
             onCommit(
               withMouse({
                 bindings: mouse.bindings.map((entry) =>
-                  entry.control === selected ? { ...entry, action } : entry,
+                  entry.control === selected ? { ...entry, action: next } : entry,
                 ),
               }),
             )
           }
         />
-      </div>
+      </fieldset>
     );
   }
 
-  const scrollSpeedIndex =
-    Math.min(MAX_SCROLL_SPEED, Math.max(MIN_SCROLL_SPEED, mouse.scrollSpeed)) - MIN_SCROLL_SPEED;
-  const scrollSpeed = SCROLL_SPEED_LABELS[scrollSpeedIndex];
+  // Sliders preview on every change, so `settings` already holds the value to commit.
+  const commitPreviewed = () => onCommit(settings);
 
   return (
-    <div className={PANEL_CLASS}>
-      <div className="space-y-5">
+    <fieldset disabled={disabled} className={cn(PANEL, 'flex flex-col gap-5')}>
+      <Slider
+        label="Pointer speed"
+        display={`${mouse.dpi} DPI`}
+        value={mouse.dpi}
+        min={spec.minDpi}
+        max={spec.maxDpi}
+        step={DPI_STEP}
+        minLabel={`${spec.minDpi} DPI`}
+        maxLabel={`${spec.maxDpi} DPI`}
+        description="Higher values move the pointer farther with less hand movement."
+        onPreview={(dpi) => onPreview(withMouse({ dpi }))}
+        onCommit={commitPreviewed}
+      />
+      <div className="border-t pt-5">
         <Slider
-          label="Pointer speed"
-          value={mouse.dpi}
-          display={`${mouse.dpi} DPI`}
-          min={minDpi}
-          max={maxDpi}
-          step={DPI_STEP}
-          minLabel={`${minDpi} DPI`}
-          maxLabel={`${maxDpi} DPI`}
-          description="Higher values move the pointer farther with less hand movement."
-          disabled={disabled}
-          onPreview={(dpi) => onPreview(withMouse({ dpi }))}
-          onCommit={() => onCommit(settings)}
+          label="Wheel speed"
+          display={SCROLL_SPEEDS[mouse.scrollSpeed - 1] ?? `${mouse.scrollSpeed}`}
+          value={mouse.scrollSpeed}
+          min={1}
+          max={SCROLL_SPEEDS.length}
+          step={1}
+          minLabel="Slower"
+          maxLabel="Faster"
+          onPreview={(scrollSpeed) => onPreview(withMouse({ scrollSpeed }))}
+          onCommit={commitPreviewed}
         />
-        <div className="border-t border-border/60 pt-5">
-          <Slider
-            label="Wheel speed"
-            value={mouse.scrollSpeed}
-            display={scrollSpeed}
-            min={MIN_SCROLL_SPEED}
-            max={MAX_SCROLL_SPEED}
-            step={1}
-            minLabel="Slower"
-            maxLabel="Faster"
-            disabled={disabled}
-            onPreview={(scrollSpeed) => onPreview(withMouse({ scrollSpeed }))}
-            onCommit={() => onCommit(settings)}
-          />
-        </div>
-        <div className="border-t border-border/60 pt-5">
-          <Switch
-            label="Reverse wheel direction"
-            checked={mouse.naturalScroll}
-            disabled={disabled}
-            onChange={(naturalScroll) => onCommit(withMouse({ naturalScroll }))}
-          />
-        </div>
       </div>
-    </div>
+      <div className="border-t pt-5">
+        <Switch
+          label="Reverse wheel direction"
+          checked={mouse.naturalScroll}
+          onChange={(naturalScroll) => onCommit(withMouse({ naturalScroll }))}
+        />
+      </div>
+    </fieldset>
   );
 }

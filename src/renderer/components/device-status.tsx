@@ -15,8 +15,6 @@ import { cn } from '@/lib/utils';
 const LOW_BATTERY = 20;
 const FULL_BATTERY = 90;
 
-type StatusSize = 'compact' | 'large';
-
 const UNKNOWN_CONNECTION = { label: 'Unknown connection', Icon: CircleHelp };
 const CONNECTIONS: Record<LinkType, { label: string; Icon: LucideIcon }> = {
   [LinkType.RECEIVER]: { label: 'USB receiver', Icon: Usb },
@@ -52,10 +50,10 @@ function batteryOf(
 
 export function DeviceConnectionIcon({
   device,
-  size = 'compact',
+  className,
 }: {
   device: Device;
-  size?: StatusSize;
+  className?: string;
 }) {
   const connection = CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION;
   const label = device.connected ? connection.label : `${connection.label}, disconnected`;
@@ -65,19 +63,22 @@ export function DeviceConnectionIcon({
       role="img"
       aria-label={label}
       title={label}
-      className={device.connected ? 'text-muted-foreground/70' : 'text-muted-foreground/35'}
+      className={cn(
+        device.connected ? 'text-muted-foreground/70' : 'text-muted-foreground/35',
+        className,
+      )}
     >
-      <connection.Icon className={size === 'large' ? 'size-5' : 'size-3.5'} strokeWidth={1.75} />
+      <connection.Icon className="size-3.5" strokeWidth={1.75} />
     </span>
   );
 }
 
 export function DeviceBatteryStatus({
   device,
-  size = 'compact',
+  className,
 }: {
   device: Device;
-  size?: StatusSize;
+  className?: string;
 }) {
   if (!device.connected || !device.hasBattery || device.link === LinkType.WIRED) return null;
 
@@ -88,29 +89,19 @@ export function DeviceBatteryStatus({
       role="img"
       aria-label={battery.label}
       title={battery.label}
-      className={cn(
-        'flex items-center',
-        size === 'large' ? 'gap-2 text-sm' : 'gap-1.5 text-xs',
-        battery.tone,
-      )}
+      className={cn('flex items-center gap-1.5 text-xs', battery.tone, className)}
     >
-      <battery.Icon className={size === 'large' ? 'size-5' : 'size-4'} strokeWidth={1.75} />
+      <battery.Icon className="size-4" strokeWidth={1.75} />
       <span className="font-mono tabular-nums">{device.battery}%</span>
     </span>
   );
 }
 
-export function DeviceStatus({
-  device,
-  size = 'compact',
-}: {
-  device: Device;
-  size?: StatusSize;
-}) {
+export function DeviceStatus({ device }: { device: Device }) {
   return (
-    <span className={cn('flex items-center', size === 'large' ? 'gap-4' : 'gap-3')}>
-      <DeviceConnectionIcon device={device} size={size} />
-      <DeviceBatteryStatus device={device} size={size} />
+    <span className="flex items-center gap-4">
+      <DeviceConnectionIcon device={device} className="[&_svg]:size-5" />
+      <DeviceBatteryStatus device={device} className="gap-2 text-sm [&_svg]:size-5" />
     </span>
   );
 }

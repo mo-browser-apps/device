@@ -1,61 +1,18 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { DeviceArt } from '@/components/art/device-art';
-import type { Callout } from '@/components/art/mouse-art';
 import { DeviceStatus } from '@/components/device-status';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useDeviceSettings } from '@/gateway/devices';
-import type { Device, MouseSettings } from '@/gen/devices';
-import { cn } from '@/lib/utils';
+import type { Device } from '@/gen/devices';
 import { actionLabel } from './actions';
 import { ControlEditor } from './control-editor';
 
 type Segment = 'buttons' | 'movement';
 
-const SEGMENTS: { id: Segment; label: string }[] = [
-  { id: 'buttons', label: 'Buttons' },
-  { id: 'movement', label: 'Movement' },
-];
-
-function buttonCalloutsFor(device: Device, mouse: MouseSettings): Callout[] {
-  return (device.mouse?.buttons ?? []).map((control) => ({
-    id: control,
-    value: actionLabel(mouse.bindings.find((entry) => entry.control === control)?.action ?? ''),
-  }));
-}
-
-function SegmentedControl({
-  segment,
-  onSelect,
-}: {
-  segment: Segment;
-  onSelect: (segment: Segment) => void;
-}) {
-  return (
-    <div
-      role="tablist"
-      className="mx-auto flex w-fit gap-1 rounded-lg border border-border bg-muted/80 p-1 shadow-sm dark:border-transparent dark:bg-muted/60 dark:shadow-none"
-    >
-      {SEGMENTS.map(({ id, label }) => (
-        <button
-          key={id}
-          role="tab"
-          type="button"
-          aria-selected={segment === id}
-          onClick={() => onSelect(id)}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-sm transition-colors',
-            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-            segment === id
-              ? 'bg-card text-foreground shadow-sm dark:bg-background'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const SEGMENT_ITEM =
+  'px-3 text-muted-foreground hover:bg-transparent hover:text-foreground ' +
+  'data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm';
 
 export function DeviceView({ device, onBack }: { device: Device; onBack: () => void }) {
   const [segment, setSegment] = useState<Segment>('buttons');
@@ -65,7 +22,16 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
   const { settings, preview, commit } = useDeviceSettings(device.id);
 
   const mouse = settings?.mouse;
-  const buttonCallouts = mouse ? buttonCalloutsFor(device, mouse) : [];
+  const spec = device.mouse;
+  const callouts =
+    segment === 'buttons'
+      ? (spec?.buttons ?? []).map((control) => ({
+          id: control,
+          value: actionLabel(
+            mouse?.bindings.find((entry) => entry.control === control)?.action ?? '',
+          ),
+        }))
+      : [];
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-8 pb-10">
@@ -80,19 +46,32 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
         </button>
         <h1 className="text-xl font-semibold tracking-tight">{device.model}</h1>
         <span className="ml-auto">
-          <DeviceStatus device={device} size="large" />
+          <DeviceStatus device={device} />
         </span>
       </div>
 
-      {mouse && settings ? (
+      {settings && mouse && spec ? (
         <>
-          <SegmentedControl segment={segment} onSelect={setSegment} />
+          <ToggleGroup
+            type="single"
+            value={segment}
+            onValueChange={(value) => value && setSegment(value as Segment)}
+            aria-label="Settings section"
+            className="mx-auto w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
+          >
+            <ToggleGroupItem value="buttons" size="sm" className={SEGMENT_ITEM}>
+              Buttons
+            </ToggleGroupItem>
+            <ToggleGroupItem value="movement" size="sm" className={SEGMENT_ITEM}>
+              Movement
+            </ToggleGroupItem>
+          </ToggleGroup>
 
           <div className="grid flex-1 grid-cols-[minmax(0,1fr)_300px] items-start gap-6 py-5">
             <div className="flex min-h-[400px] items-center justify-center">
               <DeviceArt
                 device={device}
-                callouts={segment === 'buttons' ? buttonCallouts : []}
+                callouts={callouts}
                 selectedControl={selectedControl}
                 onControlSelect={segment === 'buttons' ? setSelectedControl : undefined}
               />
@@ -102,8 +81,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
               <ControlEditor
                 settings={settings}
                 mouse={mouse}
-                minDpi={device.mouse?.minDpi ?? 0}
-                maxDpi={device.mouse?.maxDpi ?? 0}
+                spec={spec}
                 selected={selectedControl}
                 segment={segment}
                 disabled={!device.connected}
