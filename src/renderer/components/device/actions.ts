@@ -2,7 +2,6 @@ export const ACTIONS: Record<string, string> = {
   'middle-click': 'Middle click',
   back: 'Back',
   forward: 'Forward',
-  overview: 'Show open windows',
   'show-desktop': 'Show desktop',
   copy: 'Copy',
   paste: 'Paste',
@@ -10,11 +9,5 @@ export const ACTIONS: Record<string, string> = {
   'play-pause': 'Play / pause',
   'volume-up': 'Volume up',
   'volume-down': 'Volume down',
+  disabled: 'Disabled',
 };
-
-export const DISABLED = 'disabled';
-
-export function actionLabel(action: string): string {
-  if (action === DISABLED) return 'Disabled';
-  return ACTIONS[action] ?? action;
-}

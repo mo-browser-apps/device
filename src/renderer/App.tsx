@@ -37,27 +37,32 @@ export default function App() {
               Lost contact with the device service. Restart the app to reconnect.
             </p>
           )}
-          {devices !== null &&
-            (openDevice ? (
-              <DeviceView
-                key={openDevice.id}
-                device={openDevice}
-                onBack={() => {
-                  restoreHomeFocus.current = true;
-                  setOpenId(null);
-                }}
-              />
-            ) : (
-              <Home
-                devices={devices}
-                initialScrollLeft={homeState.scrollLeft}
-                restoreFocusId={homeState.focusId}
-                onOpen={(deviceId, scrollLeft) => {
-                  setHomeState({ scrollLeft, focusId: deviceId });
-                  setOpenId(deviceId);
-                }}
-              />
-            ))}
+          {devices !== null && (
+            <div
+              key={screenKey}
+              className="h-full animate-in fade-in duration-200 motion-reduce:animate-none"
+            >
+              {openDevice ? (
+                <DeviceView
+                  device={openDevice}
+                  onBack={() => {
+                    restoreHomeFocus.current = true;
+                    setOpenId(null);
+                  }}
+                />
+              ) : (
+                <Home
+                  devices={devices}
+                  initialScrollLeft={homeState.scrollLeft}
+                  restoreFocusId={homeState.focusId}
+                  onOpen={(deviceId, scrollLeft) => {
+                    setHomeState({ scrollLeft, focusId: deviceId });
+                    setOpenId(deviceId);
+                  }}
+                />
+              )}
+            </div>
+          )}
         </main>
       </div>
     </ThemeProvider>

@@ -3,6 +3,8 @@
 
 @layer base {
     :root {
+        color-scheme: light;
+
         --background: 40 10% 97%;
         --foreground: 30 8% 12%;
 
@@ -38,6 +40,8 @@
     }
 
     .dark {
+        color-scheme: dark;
+
         --background: 30 6% 7%;
         --foreground: 40 8% 92%;
 

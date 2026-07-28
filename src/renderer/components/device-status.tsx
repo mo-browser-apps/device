@@ -64,11 +64,12 @@ export function DeviceConnectionIcon({
       aria-label={label}
       title={label}
       className={cn(
+        '[&_svg]:size-3.5',
         device.connected ? 'text-muted-foreground/70' : 'text-muted-foreground/35',
         className,
       )}
     >
-      <connection.Icon className="size-3.5" strokeWidth={1.75} />
+      <connection.Icon strokeWidth={1.75} />
     </span>
   );
 }
@@ -89,9 +90,9 @@ export function DeviceBatteryStatus({
       role="img"
       aria-label={battery.label}
       title={battery.label}
-      className={cn('flex items-center gap-1.5 text-xs', battery.tone, className)}
+      className={cn('flex items-center gap-1.5 text-xs [&_svg]:size-4', battery.tone, className)}
     >
-      <battery.Icon className="size-4" strokeWidth={1.75} />
+      <battery.Icon strokeWidth={1.75} />
       <span className="font-mono tabular-nums">{device.battery}%</span>
     </span>
   );

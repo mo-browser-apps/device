@@ -5,7 +5,7 @@ import { DeviceStatus } from '@/components/device-status';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useDeviceSettings } from '@/gateway/devices';
 import type { Device } from '@/gen/devices';
-import { actionLabel } from './actions';
+import { ACTIONS } from './actions';
 import { ControlEditor } from './control-editor';
 
 type Segment = 'buttons' | 'movement';
@@ -25,17 +25,15 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
   const spec = device.mouse;
   const callouts =
     segment === 'buttons'
-      ? (spec?.buttons ?? []).map((control) => ({
-          id: control,
-          value: actionLabel(
-            mouse?.bindings.find((entry) => entry.control === control)?.action ?? '',
-          ),
-        }))
+      ? (spec?.buttons ?? []).map((control) => {
+          const action = mouse?.bindings.find((entry) => entry.control === control)?.action ?? '';
+          return { id: control, value: ACTIONS[action] ?? action };
+        })
       : [];
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-8 pb-10">
-      <div className="mb-4 flex items-center gap-3">
+    <div className="flex h-full flex-col">
+      <div className="mb-4 flex items-center gap-3 px-8">
         <button
           type="button"
           onClick={onBack}
@@ -57,18 +55,19 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
             value={segment}
             onValueChange={(value) => value && setSegment(value as Segment)}
             aria-label="Settings section"
-            className="mx-auto w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
+            size="sm"
+            className="mx-auto mb-5 w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
           >
-            <ToggleGroupItem value="buttons" size="sm" className={SEGMENT_ITEM}>
+            <ToggleGroupItem value="buttons" className={SEGMENT_ITEM}>
               Buttons
             </ToggleGroupItem>
-            <ToggleGroupItem value="movement" size="sm" className={SEGMENT_ITEM}>
+            <ToggleGroupItem value="movement" className={SEGMENT_ITEM}>
               Movement
             </ToggleGroupItem>
           </ToggleGroup>
 
-          <div className="grid flex-1 grid-cols-[minmax(0,1fr)_300px] items-start gap-6 py-5">
-            <div className="flex min-h-[400px] items-center justify-center">
+          <div className="mx-auto flex min-h-0 w-full max-w-[920px] flex-1 gap-8 px-8">
+            <div className="flex min-w-0 flex-1 items-center justify-center pb-10">
               <DeviceArt
                 device={device}
                 callouts={callouts}
@@ -77,7 +76,10 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
               />
             </div>
 
-            <aside>
+            <aside
+              key={segment}
+              className="w-[300px] shrink-0 animate-in overflow-y-auto pb-4 fade-in duration-200 motion-reduce:animate-none"
+            >
               <ControlEditor
                 settings={settings}
                 mouse={mouse}

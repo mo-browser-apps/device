@@ -137,7 +137,7 @@ void SeedDevices(DeviceStack& stack) {
                       .buttons = {{"wheel", "middle-click"},
                                   {"back", "back"},
                                   {"forward", "forward"},
-                                  {"gesture", "overview"}},
+                                  {"gesture", "show-desktop"}},
                       .min_dpi = 400,
                       .max_dpi = 8000,
                       .dpi = 1600,
