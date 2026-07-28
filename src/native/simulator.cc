@@ -1,4 +1,3 @@
-// DEMO ONLY. Stands in for hardware activity; delete with the rest of the simulator.
 #include "simulator.h"
 
 #include <string>
@@ -22,6 +21,7 @@ struct MouseSeed {
   LinkType link;
   std::string firmware;
   int battery;
+  bool charging;
   std::vector<std::string> buttons;
   int min_dpi;
   int max_dpi;
@@ -37,6 +37,7 @@ void AddMouse(DeviceStack& stack, const MouseSeed& seed) {
   device.set_connected(true);
   device.set_has_battery(true);
   device.set_battery(seed.battery);
+  device.set_charging(seed.charging);
 
   MouseSpec* spec = device.mutable_mouse();
   spec->set_min_dpi(seed.min_dpi);
@@ -56,7 +57,6 @@ void AddMouse(DeviceStack& stack, const MouseSeed& seed) {
   stack.Add(device, settings);
 }
 
-// The 60% layout minus `fn`, which is fixed in firmware.
 const char* const kRemappableKeys[] = {
     "esc", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "minus", "equal", "backspace",
     "tab", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "bracketleft", "bracketright",
@@ -68,8 +68,8 @@ const char* const kRemappableKeys[] = {
 
 void AddKeyboard(DeviceStack& stack) {
   Device device;
-  device.set_id("aero-k1");
-  device.set_model("Aero K1 Backlit");
+  device.set_id("compact-keyboard");
+  device.set_model("Compact Keyboard");
   device.set_link(WIRED);
   device.set_firmware("2.0.5");
   device.set_connected(true);
@@ -82,7 +82,7 @@ void AddKeyboard(DeviceStack& stack) {
   }
 
   Settings settings;
-  settings.set_device_id("aero-k1");
+  settings.set_device_id("compact-keyboard");
   KeyboardSettings* keyboard = settings.mutable_keyboard();
   keyboard->set_effect(STATIC);
   keyboard->set_hue(35);
@@ -96,15 +96,18 @@ class SimulatorServiceImpl : public SimulatorService {
   explicit SimulatorServiceImpl(DeviceStack& stack) : stack_(stack) {}
 
   void Tick(const Empty*, Callback<Empty> done) override {
-    // Iterate a snapshot: UpdateDevice sends an event that can reenter the stack.
     const DeviceList devices = stack_.List();
     for (const Device& device : devices.devices()) {
-      if (!device.connected() || !device.has_battery() || device.battery() <= kMinBattery) {
+      if (!device.connected() || !device.has_battery()) {
         continue;
       }
-      Device drained = device;
-      drained.set_battery(drained.battery() - 1);
-      stack_.UpdateDevice(drained);
+      const int level = device.charging() ? device.battery() + 1 : device.battery() - 1;
+      if (level < kMinBattery || level > 100) {
+        continue;
+      }
+      Device changed = device;
+      changed.set_battery(level);
+      stack_.UpdateDevice(changed);
     }
     std::move(done).Complete(Empty());
   }
@@ -117,11 +120,12 @@ class SimulatorServiceImpl : public SimulatorService {
 
 void SeedDevices(DeviceStack& stack) {
   AddMouse(stack, {
-                      .id = "aero-m1",
-                      .model = "Aero M1 Wireless",
+                      .id = "performance-mouse",
+                      .model = "Performance Mouse",
                       .link = RECEIVER,
                       .firmware = "3.2.1",
                       .battery = 82,
+                      .charging = true,
                       .buttons = {"left", "right", "wheel", "back", "forward", "gesture"},
                       .min_dpi = 400,
                       .max_dpi = 8000,
@@ -129,11 +133,12 @@ void SeedDevices(DeviceStack& stack) {
                   });
 
   AddMouse(stack, {
-                      .id = "aero-m2",
-                      .model = "Aero M2 Travel",
+                      .id = "travel-mouse",
+                      .model = "Travel Mouse",
                       .link = BLUETOOTH,
                       .firmware = "1.4.0",
                       .battery = 45,
+                      .charging = false,
                       .buttons = {"left", "right", "wheel"},
                       .min_dpi = 800,
                       .max_dpi = 3200,

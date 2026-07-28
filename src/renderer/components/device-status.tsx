@@ -1,8 +1,19 @@
-import { Bluetooth, Cable, Usb, type LucideIcon } from 'lucide-react';
+import {
+  BatteryCharging,
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
+  Bluetooth,
+  Cable,
+  Unplug,
+  Usb,
+  type LucideIcon,
+} from 'lucide-react';
 import { LinkType, type Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
 
 const LOW_BATTERY = 20;
+const FULL_BATTERY = 90;
 
 const RECEIVER = { label: 'Receiver', Icon: Usb };
 const LINKS: Partial<Record<LinkType, { label: string; Icon: LucideIcon }>> = {
@@ -10,41 +21,49 @@ const LINKS: Partial<Record<LinkType, { label: string; Icon: LucideIcon }>> = {
   [LinkType.WIRED]: { label: 'Wired', Icon: Cable },
 };
 
-export function DeviceStatus({ device }: { device: Device }) {
-  const { label, Icon } = LINKS[device.link] ?? RECEIVER;
-  return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <Icon className="size-3.5" strokeWidth={1.75} />
-      {device.connected ? label : 'Disconnected'}
-    </span>
-  );
+function batteryOf(level: number, charging: boolean): { Icon: LucideIcon; tone: string } {
+  if (charging) {
+    return { Icon: BatteryCharging, tone: 'text-foreground' };
+  }
+  if (level <= LOW_BATTERY) {
+    return { Icon: BatteryLow, tone: 'text-destructive' };
+  }
+  if (level >= FULL_BATTERY) {
+    return { Icon: BatteryFull, tone: 'text-foreground' };
+  }
+  return { Icon: BatteryMedium, tone: 'text-muted-foreground' };
 }
 
-export function BatteryMeter({ device }: { device: Device }) {
-  if (!device.hasBattery || !device.connected) {
-    return null;
-  }
-  const low = device.battery <= LOW_BATTERY;
+export function DeviceStatus({ device }: { device: Device }) {
+  const link = device.connected
+    ? (LINKS[device.link] ?? RECEIVER)
+    : { label: 'Disconnected', Icon: Unplug };
+  const battery =
+    device.connected && device.hasBattery ? batteryOf(device.battery, device.charging) : null;
+  const batteryLabel = `Battery ${device.battery}%${device.charging ? ', charging' : ''}`;
+
   return (
-    <span
-      role="img"
-      aria-label={`Battery ${device.battery}%${low ? ', low' : ''}`}
-      className="flex items-center gap-2"
-    >
-      <span className="h-1 w-12 overflow-hidden rounded-full bg-muted">
-        <span
-          className={cn('block h-full rounded-full', low ? 'bg-destructive' : 'bg-foreground/55')}
-          style={{ width: `${device.battery}%` }}
-        />
-      </span>
+    <span className="flex items-center gap-3 text-xs">
       <span
-        className={cn(
-          'font-mono text-xs tabular-nums',
-          low ? 'text-destructive' : 'text-muted-foreground',
-        )}
+        role="img"
+        aria-label={link.label}
+        title={link.label}
+        className="text-muted-foreground"
       >
-        {device.battery}%
+        <link.Icon className="size-4" strokeWidth={1.75} />
       </span>
+
+      {battery && (
+        <span
+          role="img"
+          aria-label={batteryLabel}
+          title={batteryLabel}
+          className={cn('flex items-center gap-1.5', battery.tone)}
+        >
+          <battery.Icon className="size-4" strokeWidth={1.75} />
+          <span className="font-mono tabular-nums">{device.battery}%</span>
+        </span>
+      )}
     </span>
   );
 }

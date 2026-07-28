@@ -33,6 +33,7 @@ message Device {
   bool connected = 5;
   bool has_battery = 6;
   int32 battery = 7;
+  bool charging = 10;
   oneof spec {
     MouseSpec mouse = 8;
     KeyboardSpec keyboard = 9;

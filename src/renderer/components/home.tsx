@@ -1,39 +1,35 @@
-import { Keyboard, Mouse } from 'lucide-react';
 import type { Device } from '@/gen/devices';
-import { BatteryMeter, DeviceStatus } from '@/components/device-status';
+import { DeviceArt } from '@/components/art/device-art';
+import { DeviceStatus } from '@/components/device-status';
 import { cn } from '@/lib/utils';
 
 function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) {
-  const Art = device.keyboard ? Keyboard : Mouse;
   return (
     <button
       type="button"
       onClick={onOpen}
       className={cn(
-        'group flex flex-col items-center gap-3 rounded-xl border border-border/60 bg-card/40 p-4',
-        'transition-colors hover:border-border hover:bg-card',
+        'group flex w-64 shrink-0 flex-col items-center gap-5 rounded-2xl px-6 py-7',
+        'transition-colors hover:bg-foreground/[0.045]',
         'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
         'focus-visible:ring-offset-2 focus-visible:ring-offset-background',
       )}
     >
-      <span
-        className={cn(
-          'flex h-24 w-full items-center justify-center rounded-lg bg-muted/40',
-          !device.connected && 'opacity-50',
-        )}
-      >
-        <Art
-          className="size-14 text-foreground/75 transition-transform duration-200 motion-safe:group-hover:scale-105"
-          strokeWidth={1.25}
+      <span className="flex h-44 w-full items-center justify-center">
+        <DeviceArt
+          device={device}
+          variant="home"
+          className={cn(
+            'max-h-full transition-transform duration-300 ease-out',
+            'motion-safe:group-hover:scale-[1.06]',
+          )}
         />
       </span>
 
-      <span className="flex flex-col items-center gap-1">
-        <span className="text-sm font-medium">{device.model}</span>
+      <span className="flex flex-col items-center gap-2.5">
+        <span className="text-[15px] font-medium tracking-tight">{device.model}</span>
         <DeviceStatus device={device} />
       </span>
-
-      <BatteryMeter device={device} />
     </button>
   );
 }
@@ -45,18 +41,25 @@ export function Home({
   devices: Device[];
   onOpen: (deviceId: string) => void;
 }) {
+  if (devices.length === 0) {
+    return (
+      <p className="px-8 pt-10 text-center text-sm text-muted-foreground">
+        No devices are connected.
+      </p>
+    );
+  }
+
   return (
-    <div className="mx-auto w-full max-w-3xl px-8 pb-10">
-      <h1 className="mb-6 text-xl font-semibold tracking-tight">Devices</h1>
-      {devices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No devices are connected.</p>
-      ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
+    <div className="flex min-h-full flex-col">
+      <h1 className="px-8 text-lg font-semibold tracking-tight">Devices</h1>
+
+      <div className="flex flex-1 items-center overflow-x-auto">
+        <div className="mx-auto flex w-max gap-4 px-8 pb-12">
           {devices.map((device) => (
             <DeviceCard key={device.id} device={device} onOpen={() => onOpen(device.id)} />
           ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

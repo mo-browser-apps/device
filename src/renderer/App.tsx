@@ -14,12 +14,10 @@ export default function App() {
   const openDevice = devices?.find((device) => device.id === openId) ?? null;
   const screenKey = openDevice?.id ?? 'devices';
 
-  // Adjusted during render so a vanished device cannot reopen its view later.
   if (openId !== null && devices !== null && openDevice === null) {
     setOpenId(null);
   }
 
-  // Focus is otherwise lost with the screen that unmounts.
   useEffect(() => {
     mainRef.current?.focus();
   }, [screenKey]);
@@ -36,7 +34,11 @@ export default function App() {
           )}
           {devices !== null &&
             (openDevice ? (
-              <DeviceView device={openDevice} onBack={() => setOpenId(null)} />
+              <DeviceView
+                key={openDevice.id}
+                device={openDevice}
+                onBack={() => setOpenId(null)}
+              />
             ) : (
               <Home devices={devices} onOpen={setOpenId} />
             ))}
