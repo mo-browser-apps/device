@@ -15,6 +15,11 @@ namespace {
 
 constexpr int kMinBattery = 1;
 
+struct ButtonSeed {
+  std::string control;
+  std::string action;
+};
+
 struct MouseSeed {
   std::string id;
   std::string model;
@@ -22,7 +27,7 @@ struct MouseSeed {
   std::string firmware;
   int battery;
   bool charging;
-  std::vector<std::string> buttons;
+  std::vector<ButtonSeed> buttons;
   int min_dpi;
   int max_dpi;
   int dpi;
@@ -50,8 +55,11 @@ void AddMouse(DeviceStack& stack, const MouseSeed& seed) {
   mouse->set_scroll_speed(3);
   mouse->set_natural_scroll(false);
 
-  for (const std::string& button : seed.buttons) {
-    spec->add_buttons(button);
+  for (const ButtonSeed& button : seed.buttons) {
+    spec->add_buttons(button.control);
+    Binding* binding = mouse->add_bindings();
+    binding->set_control(button.control);
+    binding->set_action(button.action);
   }
 
   stack.Add(device, settings);
@@ -126,7 +134,10 @@ void SeedDevices(DeviceStack& stack) {
                       .firmware = "3.2.1",
                       .battery = 82,
                       .charging = true,
-                      .buttons = {"left", "right", "wheel", "back", "forward", "gesture"},
+                      .buttons = {{"wheel", "middle-click"},
+                                  {"back", "back"},
+                                  {"forward", "forward"},
+                                  {"gesture", "overview"}},
                       .min_dpi = 400,
                       .max_dpi = 8000,
                       .dpi = 1600,
@@ -139,7 +150,7 @@ void SeedDevices(DeviceStack& stack) {
                       .firmware = "1.4.0",
                       .battery = 45,
                       .charging = false,
-                      .buttons = {"left", "right", "wheel"},
+                      .buttons = {{"wheel", "middle-click"}},
                       .min_dpi = 800,
                       .max_dpi = 3200,
                       .dpi = 1200,

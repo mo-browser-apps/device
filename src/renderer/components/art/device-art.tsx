@@ -1,7 +1,7 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
 import { KeyboardArt } from './keyboard-art';
-import { MouseArt, type MouseArtProfile } from './mouse-art';
+import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
 
 type Art = {
   detail: string;
@@ -51,6 +51,7 @@ export function DeviceArt({
   device,
   variant = 'detail',
   interactive = false,
+  callouts = [],
   selectedControl,
   onControlSelect,
   className,
@@ -58,6 +59,7 @@ export function DeviceArt({
   device: Device;
   variant?: 'home' | 'detail';
   interactive?: boolean;
+  callouts?: Callout[];
   selectedControl?: string | null;
   onControlSelect?: (control: string) => void;
   className?: string;
@@ -101,15 +103,14 @@ export function DeviceArt({
   if (device.mouse) {
     return (
       <MouseArt
-        spec={device.mouse}
         src={art.detail}
         alt={art.alt}
         aspect={art.aspect}
         profile={art.profile ?? 'travel'}
-        interactive={interactive}
+        callouts={callouts}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
-        className={cn('max-w-[560px]', offline, className)}
+        className={cn('max-w-[520px]', offline, className)}
       />
     );
   }

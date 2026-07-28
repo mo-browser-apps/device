@@ -1,55 +1,52 @@
-import type { MouseSpec } from '@/gen/devices';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export type MouseArtProfile = 'performance' | 'travel';
 
-const MOUSE_LABELS: Record<string, string> = {
-  left: 'Left button',
-  right: 'Right button',
-  wheel: 'Middle button',
-  forward: 'Forward button',
-  back: 'Back button',
-  gesture: 'Gesture button',
+export const MOUSE_LABELS: Record<string, string> = {
+  wheel: 'Wheel',
+  back: 'Back',
+  forward: 'Forward',
+  gesture: 'Thumb button',
 };
 
-const HOTSPOTS: Record<MouseArtProfile, { id: string; x: number; y: number }[]> = {
-  performance: [
-    { id: 'left', x: 24, y: 49 },
-    { id: 'right', x: 35, y: 57 },
-    { id: 'wheel', x: 33, y: 42 },
-    { id: 'forward', x: 55, y: 49 },
-    { id: 'back', x: 62, y: 43 },
-    { id: 'gesture', x: 52, y: 63 },
-  ],
-  travel: [
-    { id: 'left', x: 30, y: 51 },
-    { id: 'right', x: 47, y: 58 },
-    { id: 'wheel', x: 39, y: 48 },
-  ],
+type Hotspot = { x: number; y: number; side: 'left' | 'right'; labelY: number };
+
+const HOTSPOTS: Record<MouseArtProfile, Record<string, Hotspot>> = {
+  performance: {
+    wheel: { x: 33, y: 43, side: 'left', labelY: 36 },
+    back: { x: 62, y: 42, side: 'right', labelY: 37 },
+    forward: { x: 55, y: 49, side: 'right', labelY: 52 },
+    gesture: { x: 52, y: 63, side: 'right', labelY: 66 },
+  },
+  travel: {
+    wheel: { x: 39, y: 51, side: 'left', labelY: 44 },
+  },
 };
+
+export type Callout = { id: string; value: string };
 
 export function MouseArt({
-  spec,
   src,
   alt,
   aspect,
   profile,
-  interactive = false,
+  callouts,
   selectedControl,
   onControlSelect,
   className,
 }: {
-  spec: MouseSpec;
   src: string;
   alt: string;
   aspect: string;
   profile: MouseArtProfile;
-  interactive?: boolean;
+  callouts: Callout[];
   selectedControl?: string | null;
   onControlSelect?: (control: string) => void;
   className?: string;
 }) {
-  const available = new Set(spec.buttons);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const hotspots = HOTSPOTS[profile];
 
   return (
     <span className={cn('relative block w-full', className)} style={{ aspectRatio: aspect }}>
@@ -60,44 +57,61 @@ export function MouseArt({
         className="pointer-events-none size-full select-none object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.24)]"
       />
 
-      {interactive &&
-        HOTSPOTS[profile]
-          .filter(({ id }) => available.has(id))
-          .map(({ id, x, y }) => {
-            const selected = selectedControl === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                aria-label={MOUSE_LABELS[id] ?? id}
-                aria-pressed={selected}
-                onClick={() => onControlSelect?.(id)}
-                style={{ left: `${x}%`, top: `${y}%` }}
-                className="group absolute flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-hidden"
-              >
-                <span
-                  className={cn(
-                    'size-3.5 rounded-full border-2 border-background/70 bg-primary shadow-sm',
-                    'transition-transform group-hover:scale-125 group-focus-visible:scale-125',
-                    selected
-                      ? 'scale-125 ring-2 ring-ring ring-offset-2 ring-offset-background'
-                      : 'opacity-85',
-                  )}
-                />
-                <span
-                  className={cn(
-                    'pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2',
-                    'whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1',
-                    'text-xs text-popover-foreground shadow-md transition-opacity',
-                    'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
-                    selected && 'opacity-100',
-                  )}
-                >
-                  {MOUSE_LABELS[id] ?? id}
-                </span>
-              </button>
-            );
-          })}
+      {callouts.map(({ id, value }) => {
+        const spot = hotspots[id];
+        if (!spot) return null;
+
+        const name = MOUSE_LABELS[id] ?? id;
+        const selected = selectedControl === id;
+        const active = selected || hovered === id;
+        const anchor =
+          spot.side === 'right'
+            ? { left: `${spot.x}%`, top: `${spot.labelY}%` }
+            : { right: `${100 - spot.x}%`, top: `${spot.labelY}%` };
+
+        return (
+          <span key={id}>
+            <span
+              aria-hidden="true"
+              style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+              className={cn(
+                'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
+                'border border-background/70 transition-transform duration-200',
+                active ? 'scale-125 bg-primary' : 'bg-foreground/45',
+              )}
+            />
+
+            <button
+              type="button"
+              style={anchor}
+              aria-pressed={selected}
+              aria-label={`${name}, ${value}`}
+              onClick={() => onControlSelect?.(id)}
+              onPointerEnter={() => setHovered(id)}
+              onPointerLeave={() => setHovered(null)}
+              onFocus={() => setHovered(id)}
+              onBlur={() => setHovered(null)}
+              className={cn(
+                'absolute flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap',
+                'rounded-lg border px-2.5 py-1.5 text-xs backdrop-blur-sm',
+                'transition-colors focus-visible:outline-hidden focus-visible:ring-2',
+                'focus-visible:ring-ring focus-visible:ring-offset-2',
+                'focus-visible:ring-offset-background',
+                spot.side === 'right' ? 'translate-x-3' : '-translate-x-3',
+                selected
+                  ? 'border-primary/70 bg-primary/15 text-foreground'
+                  : 'border-border/60 bg-background/80 hover:border-border',
+              )}
+            >
+              <span className={selected ? 'opacity-80' : 'text-muted-foreground'}>{name}</span>
+              <span aria-hidden="true" className="opacity-40">
+                ·
+              </span>
+              <span className="font-medium">{value}</span>
+            </button>
+          </span>
+        );
+      })}
     </span>
   );
 }

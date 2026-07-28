@@ -19,8 +19,8 @@ startSimulator();
 
 const win = new BrowserWindow();
 win.browser.loadUrl(app.url);
-win.setSize({ width: 1000, height: 700 });
-win.setMinimumSize({ width: 860, height: 600 });
+win.setSize({ width: 1000, height: 620 });
+win.setMinimumSize({ width: 1000, height: 620 });
 win.setWindowTitleVisible(false);
 win.setWindowTitlebarVisible(!isMac);
 win.centerWindow();
