@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 export type MouseArtProfile = 'performance' | 'travel';
 
-export const MOUSE_LABELS: Record<string, string> = {
+const MOUSE_LABELS: Record<string, string> = {
   left: 'Left button',
   right: 'Right button',
   wheel: 'Middle button',

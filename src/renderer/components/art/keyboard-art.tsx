@@ -10,7 +10,7 @@ const ROWS = [
   'ctrlleft:1.25 metaleft:1.25 altleft:1.25 space:6.25 altright:1.25 fn:1.25 metaright:1.25 ctrlright:1.25',
 ];
 
-export const KEY_LABELS: Record<string, string> = {
+const KEY_LABELS: Record<string, string> = {
   esc: 'Esc',
   minus: '−',
   equal: '=',

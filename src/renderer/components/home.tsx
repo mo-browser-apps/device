@@ -47,9 +47,11 @@ function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) 
 
 function CarouselControl({
   direction,
+  disabled,
   onClick,
 }: {
   direction: 'previous' | 'next';
+  disabled: boolean;
   onClick: () => void;
 }) {
   const previous = direction === 'previous';
@@ -58,14 +60,16 @@ function CarouselControl({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => !disabled && onClick()}
+      aria-disabled={disabled}
       aria-label={`${previous ? 'Previous' : 'Next'} devices`}
       aria-controls="device-carousel"
       className={cn(
         'absolute top-1/2 z-20 -translate-y-1/2 rounded-full border border-border/60',
         'bg-background/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm',
-        'transition-colors hover:bg-accent/80 hover:text-foreground',
+        'transition-[color,background-color,opacity]',
         'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+        disabled ? 'opacity-30' : 'hover:bg-accent/80 hover:text-foreground',
         previous ? 'left-4' : 'right-4',
       )}
     >
@@ -86,20 +90,18 @@ export function Home({
   onOpen: (deviceId: string, scrollLeft: number) => void;
 }) {
   const carouselRef = useRef<HTMLDivElement>(null);
-  const [canScroll, setCanScroll] = useState({ previous: false, next: false });
+  const [overflows, setOverflows] = useState(false);
+  const [canPrevious, setCanPrevious] = useState(false);
+  const [canNext, setCanNext] = useState(false);
 
   const updateScrollState = useCallback(() => {
     const carousel = carouselRef.current;
     if (!carousel) return;
 
     const maxScrollLeft = Math.max(0, carousel.scrollWidth - carousel.clientWidth);
-    const next = {
-      previous: carousel.scrollLeft > SCROLL_EDGE_TOLERANCE,
-      next: carousel.scrollLeft < maxScrollLeft - SCROLL_EDGE_TOLERANCE,
-    };
-    setCanScroll((current) =>
-      current.previous === next.previous && current.next === next.next ? current : next,
-    );
+    setOverflows(maxScrollLeft > SCROLL_EDGE_TOLERANCE);
+    setCanPrevious(carousel.scrollLeft > SCROLL_EDGE_TOLERANCE);
+    setCanNext(carousel.scrollLeft < maxScrollLeft - SCROLL_EDGE_TOLERANCE);
   }, []);
 
   useLayoutEffect(() => {
@@ -165,13 +167,9 @@ export function Home({
         <div
           id="device-carousel"
           ref={carouselRef}
-          data-device-carousel
           className="w-full snap-x snap-proximity overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          <div
-            data-device-track
-            className="flex w-max min-w-full justify-center gap-4 px-12 pb-12"
-          >
+          <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
             {devices.map((device) => (
               <DeviceCard
                 key={device.id}
@@ -182,23 +180,28 @@ export function Home({
           </div>
         </div>
 
-        {canScroll.previous && (
-          <>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
-            />
-            <CarouselControl direction="previous" onClick={() => scrollByCard(-1)} />
-          </>
+        {canPrevious && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
+          />
         )}
 
-        {canScroll.next && (
+        {canNext && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
+          />
+        )}
+
+        {overflows && (
           <>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
+            <CarouselControl
+              direction="previous"
+              disabled={!canPrevious}
+              onClick={() => scrollByCard(-1)}
             />
-            <CarouselControl direction="next" onClick={() => scrollByCard(1)} />
+            <CarouselControl direction="next" disabled={!canNext} onClick={() => scrollByCard(1)} />
           </>
         )}
       </div>
