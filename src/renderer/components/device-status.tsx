@@ -41,15 +41,8 @@ function batteryOf(
       label: `Battery low, ${level}%`,
     };
   }
-  if (level >= FULL_BATTERY) {
-    return {
-      Icon: BatteryFull,
-      tone: 'text-foreground/70',
-      label: `Battery ${level}%`,
-    };
-  }
   return {
-    Icon: BatteryMedium,
+    Icon: level >= FULL_BATTERY ? BatteryFull : BatteryMedium,
     tone: 'text-foreground/70',
     label: `Battery ${level}%`,
   };

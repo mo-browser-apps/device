@@ -6,7 +6,6 @@ import { DeviceStatus } from '@/components/device-status';
 
 export function DeviceView({ device, onBack }: { device: Device; onBack: () => void }) {
   const [selectedControl, setSelectedControl] = useState<string | null>(null);
-  const isKeyboard = device.keyboard !== undefined;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-8 pb-10">
@@ -31,7 +30,6 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
           interactive={device.connected}
           selectedControl={selectedControl}
           onControlSelect={setSelectedControl}
-          className={isKeyboard ? 'max-w-3xl' : 'max-w-[560px]'}
         />
       </div>
     </div>

@@ -1,17 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
 import { DeviceBatteryStatus, DeviceConnectionIcon } from '@/components/device-status';
+import { useCarousel } from '@/lib/use-carousel';
 import { cn } from '@/lib/utils';
-
-const SCROLL_EDGE_TOLERANCE = 2;
 
 function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) {
   return (
     <button
       type="button"
-      data-device-card
       data-device-id={device.id}
       onClick={onOpen}
       className={cn(
@@ -89,67 +87,22 @@ export function Home({
   restoreFocusId: string | null;
   onOpen: (deviceId: string, scrollLeft: number) => void;
 }) {
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [overflows, setOverflows] = useState(false);
-  const [canPrevious, setCanPrevious] = useState(false);
-  const [canNext, setCanNext] = useState(false);
-
-  const updateScrollState = useCallback(() => {
-    const carousel = carouselRef.current;
-    if (!carousel) return;
-
-    const maxScrollLeft = Math.max(0, carousel.scrollWidth - carousel.clientWidth);
-    setOverflows(maxScrollLeft > SCROLL_EDGE_TOLERANCE);
-    setCanPrevious(carousel.scrollLeft > SCROLL_EDGE_TOLERANCE);
-    setCanNext(carousel.scrollLeft < maxScrollLeft - SCROLL_EDGE_TOLERANCE);
-  }, []);
+  const {
+    ref: carouselRef,
+    overflows,
+    canPrevious,
+    canNext,
+    scrollByItem,
+  } = useCarousel(initialScrollLeft, devices.length);
 
   useLayoutEffect(() => {
-    const carousel = carouselRef.current;
-    if (!carousel) return;
+    if (!restoreFocusId) return;
 
-    carousel.scrollLeft = initialScrollLeft;
-    updateScrollState();
-
-    if (restoreFocusId) {
-      const card = Array.from(
-        carousel.querySelectorAll<HTMLElement>('[data-device-card]'),
-      ).find((element) => element.dataset.deviceId === restoreFocusId);
-      card?.focus({ preventScroll: true });
-    }
-  }, [initialScrollLeft, restoreFocusId, updateScrollState]);
-
-  useEffect(() => {
-    const carousel = carouselRef.current;
-    if (!carousel) return;
-
-    const track = carousel.firstElementChild;
-    const resizeObserver = new ResizeObserver(updateScrollState);
-    resizeObserver.observe(carousel);
-    if (track) resizeObserver.observe(track);
-
-    carousel.addEventListener('scroll', updateScrollState, { passive: true });
-    updateScrollState();
-
-    return () => {
-      resizeObserver.disconnect();
-      carousel.removeEventListener('scroll', updateScrollState);
-    };
-  }, [devices.length, updateScrollState]);
-
-  const scrollByCard = (direction: -1 | 1) => {
-    const carousel = carouselRef.current;
-    const card = carousel?.querySelector<HTMLElement>('[data-device-card]');
-    const track = card?.parentElement;
-    if (!carousel || !card || !track) return;
-
-    const gap = Number.parseFloat(getComputedStyle(track).columnGap) || 0;
-    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    carousel.scrollBy({
-      left: direction * (card.getBoundingClientRect().width + gap),
-      behavior: reducedMotion ? 'auto' : 'smooth',
-    });
-  };
+    const card = carouselRef.current?.querySelector<HTMLElement>(
+      `[data-device-id="${CSS.escape(restoreFocusId)}"]`,
+    );
+    card?.focus({ preventScroll: true });
+  }, [carouselRef, restoreFocusId]);
 
   if (devices.length === 0) {
     return (
@@ -199,9 +152,9 @@ export function Home({
             <CarouselControl
               direction="previous"
               disabled={!canPrevious}
-              onClick={() => scrollByCard(-1)}
+              onClick={() => scrollByItem(-1)}
             />
-            <CarouselControl direction="next" disabled={!canNext} onClick={() => scrollByCard(1)} />
+            <CarouselControl direction="next" disabled={!canNext} onClick={() => scrollByItem(1)} />
           </>
         )}
       </div>

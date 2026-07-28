@@ -93,7 +93,7 @@ export function DeviceArt({
         interactive={interactive}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
-        className={cn(offline, className)}
+        className={cn('max-w-3xl', offline, className)}
       />
     );
   }
@@ -109,7 +109,7 @@ export function DeviceArt({
         interactive={interactive}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
-        className={cn(offline, className)}
+        className={cn('max-w-[560px]', offline, className)}
       />
     );
   }

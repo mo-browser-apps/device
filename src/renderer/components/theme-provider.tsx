@@ -1,73 +1,48 @@
-import React, {createContext, useEffect, useState} from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { ipc } from '@/gen/ipc';
 
-type Theme = "dark" | "light" | "system"
+type Theme = 'light' | 'dark' | 'system';
 
-type ThemeProviderProps = {
-    children: React.ReactNode
-    defaultTheme?: Theme
-    storageKey?: string
-}
+const STORAGE_KEY = 'theme';
 
-type ThemeProviderState = {
-    theme: Theme
-    setTheme: (theme: Theme) => void
-}
-
-const initialState: ThemeProviderState = {
-    theme: "system",
-    setTheme: () => null,
-}
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
+const ThemeContext = createContext<{ theme: Theme; setTheme: (theme: Theme) => void }>({
+  theme: 'system',
+  setTheme: () => {},
+});
 
 export function useTheme() {
-    return React.useContext(ThemeProviderContext)
+  return useContext(ThemeContext);
 }
 
-export function ThemeProvider({
-                                  children,
-                                  defaultTheme = "system",
-                                  storageKey = "vite-ui-theme",
-                                  ...props
-                              }: ThemeProviderProps) {
-    const [theme, setThemeState] = useState<Theme>(
-        () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-    )
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(
+    () => (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'system',
+  );
 
-    useEffect(() => {
-        const root = window.document.documentElement
+  useEffect(() => {
+    const media = matchMedia('(prefers-color-scheme: dark)');
 
-        root.classList.remove("light", "dark")
+    const apply = () => {
+      const resolved = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(resolved);
+    };
 
-        if (theme === "system") {
-            const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-            const systemTheme = mediaQuery.matches ? "dark" : "light"
-            
-            root.classList.add(systemTheme)
+    apply();
+    void ipc.app.SetTheme({ theme }).catch((error: unknown) => {
+      console.warn('Could not apply the native theme.', error);
+    });
 
-            const listener = (e: MediaQueryListEvent) => {
-                root.classList.remove("light", "dark")
-                root.classList.add(e.matches ? "dark" : "light")
-            }
+    if (theme !== 'system') return;
 
-            mediaQuery.addEventListener("change", listener)
-            return () => mediaQuery.removeEventListener("change", listener)
-        }
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [theme]);
 
-        root.classList.add(theme)
-    }, [theme])
+  const setTheme = (next: Theme) => {
+    localStorage.setItem(STORAGE_KEY, next);
+    setThemeState(next);
+  };
 
-    const value = {
-        theme,
-        setTheme: (newTheme: Theme) => {
-            localStorage.setItem(storageKey, newTheme)
-            setThemeState(newTheme)
-        },
-    }
-
-    return (
-        <ThemeProviderContext.Provider {...props} value={value}>
-            {children}
-        </ThemeProviderContext.Provider>
-    )
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
