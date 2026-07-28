@@ -32,8 +32,6 @@ std::optional<Settings> DeviceStack::GetSettings(const std::string& device_id) c
   return entry->settings;
 }
 
-// Rejects settings whose kind does not match the device, so a stray write cannot
-// put mouse settings on a keyboard or blank a device with an unset oneof.
 bool DeviceStack::ApplySettings(const Settings& settings) {
   auto entry = FindById(entries_, settings.device_id());
   if (entry == entries_.end() || entry->settings.kind_case() != settings.kind_case()) {
@@ -43,7 +41,6 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
   return true;
 }
 
-// Also refuses a change of device kind, for the reason ApplySettings refuses one.
 bool DeviceStack::UpdateDevice(const Device& device) {
   auto entry = FindById(entries_, device.id());
   if (entry == entries_.end() || entry->device.spec_case() != device.spec_case()) {

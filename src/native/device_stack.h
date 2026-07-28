@@ -20,7 +20,6 @@ class DeviceStack {
   std::optional<Settings> GetSettings(const std::string& device_id) const;
   bool ApplySettings(const Settings& settings);
 
-  // Replaces a device and notifies the registered change handler.
   bool UpdateDevice(const Device& device);
 
   void SetDevicesChangedHandler(DevicesChangedHandler handler) {
