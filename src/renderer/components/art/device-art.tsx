@@ -1,7 +1,7 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
-import { KEY_LABELS, KeyboardArt } from './keyboard-art';
-import { MOUSE_LABELS, MouseArt, type MouseArtProfile } from './mouse-art';
+import { KeyboardArt } from './keyboard-art';
+import { MouseArt, type MouseArtProfile } from './mouse-art';
 
 type Art = {
   detail: string;
@@ -42,13 +42,6 @@ function artFor(device: Device): Art {
     return ART['compact-keyboard'];
   }
   return (device.mouse?.buttons.length ?? 0) > 3 ? ART['performance-mouse'] : ART['travel-mouse'];
-}
-
-export function controlLabel(device: Device, control: string): string {
-  if (device.keyboard) {
-    return `${KEY_LABELS[control] || control} key`;
-  }
-  return MOUSE_LABELS[control] ?? control;
 }
 
 export function DeviceArt({
