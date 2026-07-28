@@ -31,7 +31,10 @@ function SegmentedControl({
   onSelect: (segment: Segment) => void;
 }) {
   return (
-    <div role="tablist" className="mx-auto flex w-fit gap-1 rounded-lg bg-muted/60 p-1">
+    <div
+      role="tablist"
+      className="mx-auto flex w-fit gap-1 rounded-lg border border-border bg-muted/80 p-1 shadow-sm dark:border-transparent dark:bg-muted/60 dark:shadow-none"
+    >
       {SEGMENTS.map(({ id, label }) => (
         <button
           key={id}
@@ -43,7 +46,7 @@ function SegmentedControl({
             'rounded-md px-3 py-1.5 text-sm transition-colors',
             'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
             segment === id
-              ? 'bg-background text-foreground shadow-sm'
+              ? 'bg-card text-foreground shadow-sm dark:bg-background'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -77,7 +80,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
         </button>
         <h1 className="text-xl font-semibold tracking-tight">{device.model}</h1>
         <span className="ml-auto">
-          <DeviceStatus device={device} />
+          <DeviceStatus device={device} size="large" />
         </span>
       </div>
 

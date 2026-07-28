@@ -114,7 +114,7 @@ export function Home({
 
   return (
     <div className="flex min-h-full flex-col">
-      <h1 className="px-8 text-lg font-semibold tracking-tight">Devices</h1>
+      <h1 className="px-8 text-xl font-semibold tracking-tight">Devices</h1>
 
       <div className="relative flex flex-1 items-center">
         <div

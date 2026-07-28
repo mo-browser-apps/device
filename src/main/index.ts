@@ -19,6 +19,8 @@ startSimulator();
 
 const win = new BrowserWindow();
 win.browser.loadUrl(app.url);
+win.browser.zoom.setEnabled(false);
+
 win.setSize({ width: 1000, height: 620 });
 win.setMinimumSize({ width: 1000, height: 620 });
 win.setWindowTitleVisible(false);

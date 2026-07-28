@@ -7,6 +7,8 @@ const DPI_STEP = 100;
 const MIN_SCROLL_SPEED = 1;
 const MAX_SCROLL_SPEED = 5;
 const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Balanced', 'Fast', 'Very fast'];
+const PANEL_CLASS =
+  'rounded-xl border border-border bg-card p-4 shadow-sm dark:border-border/70 dark:bg-card/45 dark:shadow-none';
 
 function Slider({
   label,
@@ -146,7 +148,9 @@ function ActionList({
               aria-hidden="true"
               className={cn(
                 'size-3 shrink-0 rounded-full border',
-                candidate === action ? 'border-primary bg-primary' : 'border-input',
+                candidate === action
+                  ? 'border-primary bg-primary'
+                  : 'border-muted-foreground/35 dark:border-input',
                 'peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
                 'peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
               )}
@@ -178,7 +182,9 @@ function ActionList({
             aria-hidden="true"
             className={cn(
               'size-3 shrink-0 rounded-full border',
-              action === 'disabled' ? 'border-primary bg-primary' : 'border-input',
+              action === 'disabled'
+                ? 'border-primary bg-primary'
+                : 'border-muted-foreground/35 dark:border-input',
               'peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
               'peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
             )}
@@ -221,7 +227,7 @@ export function ControlEditor({
 
     const binding = mouse.bindings.find((entry) => entry.control === selected);
     return (
-      <div className="rounded-xl border border-border/70 bg-card/45 p-4">
+      <div className={PANEL_CLASS}>
         <h2 className="mb-4 text-sm font-medium">{MOUSE_LABELS[selected] ?? selected}</h2>
         <ActionList
           action={binding?.action ?? ''}
@@ -245,7 +251,7 @@ export function ControlEditor({
   const scrollSpeed = SCROLL_SPEED_LABELS[scrollSpeedIndex];
 
   return (
-    <div className="rounded-xl border border-border/70 bg-card/45 p-4">
+    <div className={PANEL_CLASS}>
       <div className="space-y-5">
         <Slider
           label="Pointer speed"
