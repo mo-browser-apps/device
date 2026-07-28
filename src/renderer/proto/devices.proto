@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+enum LinkType {
+  RECEIVER = 0;
+  BLUETOOTH = 1;
+  WIRED = 2;
+}
+
+enum LightEffect {
+  STATIC = 0;
+  BREATHING = 1;
+  WAVE = 2;
+}
+
+message MouseSpec {
+  repeated string buttons = 1;
+  int32 min_dpi = 2;
+  int32 max_dpi = 3;
+}
+
+message KeyboardSpec {
+  repeated string keys = 1;
+  bool backlight = 2;
+}
+
+message Device {
+  string id = 1;
+  string model = 2;
+  LinkType link = 3;
+  string firmware = 4;
+  bool connected = 5;
+  bool has_battery = 6;
+  int32 battery = 7;
+  oneof spec {
+    MouseSpec mouse = 8;
+    KeyboardSpec keyboard = 9;
+  }
+}
+
+message DeviceId {
+  string id = 1;
+}
+
+message DeviceList {
+  repeated Device devices = 1;
+}
+
+message Binding {
+  string control = 1;
+  string action = 2;
+}
+
+message MouseSettings {
+  repeated Binding bindings = 1;
+  int32 dpi = 2;
+  int32 scroll_speed = 3;
+  bool natural_scroll = 4;
+}
+
+message KeyboardSettings {
+  repeated Binding bindings = 1;
+  LightEffect effect = 2;
+  int32 hue = 3;
+  int32 brightness = 4;
+}
+
+message Settings {
+  string device_id = 1;
+  oneof kind {
+    MouseSettings mouse = 2;
+    KeyboardSettings keyboard = 3;
+  }
+}
+
+service DevicesService {
+  rpc List(google.protobuf.Empty) returns (DeviceList);
+  rpc Watch(google.protobuf.Empty) returns (stream DeviceList);
+  rpc GetSettings(DeviceId) returns (Settings);
+  rpc ApplySettings(Settings) returns (google.protobuf.Empty);
+}
