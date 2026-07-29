@@ -45,18 +45,55 @@ type Key = {
   width: number;
 };
 
-function parseRow(row: string): Key[] {
-  return row.split(' ').map((key) => {
+const KEY_ROWS: Key[][] = ROWS.map((row) =>
+  row.split(' ').map((key) => {
     const [id, width = '1'] = key.split(':');
     return { id, width: Number(width) };
-  });
-}
+  }),
+);
 
 function rowStyle(row: Key[], index: number): CSSProperties {
   return {
     gridTemplateColumns: row.map(({ width }) => `${width}fr`).join(' '),
     marginInline: ROW_INSETS[index],
   };
+}
+
+function KeyCap({
+  id,
+  selectable,
+  selected,
+  onSelect,
+}: {
+  id: string;
+  selectable: boolean;
+  selected: boolean;
+  onSelect?: (control: string) => void;
+}) {
+  const name = KEY_LABELS[id] || id;
+
+  return (
+    <button
+      type="button"
+      disabled={!selectable}
+      aria-label={selectable ? `Select ${name} key` : undefined}
+      aria-pressed={selectable ? selected : undefined}
+      title={selectable ? `${name} key` : 'Fixed in firmware'}
+      onClick={() => onSelect?.(id)}
+      className={cn(
+        'min-w-0 rounded-[14%] border border-transparent bg-transparent',
+        'text-[8px] font-medium leading-none text-white/45',
+        'outline-hidden transition-colors',
+        selectable && 'hover:border-primary/70 hover:bg-primary/15 hover:text-primary-foreground',
+        selectable &&
+          'focus-visible:border-primary focus-visible:bg-primary/20 focus-visible:ring-1 focus-visible:ring-ring',
+        selected && 'border-primary bg-primary/25 text-primary-foreground ring-1 ring-ring',
+        !selectable && 'cursor-default text-white/25',
+      )}
+    >
+      {KEY_LABELS[id] ?? id.toUpperCase()}
+    </button>
+  );
 }
 
 export function KeyboardArt({
@@ -95,40 +132,21 @@ export function KeyboardArt({
           aria-label="Keys"
           className="absolute left-[7.4%] top-[24.1%] flex h-[43.9%] w-[85.2%] flex-col gap-[2.6%]"
         >
-          {ROWS.map(parseRow).map((row, rowIndex) => (
+          {KEY_ROWS.map((row, rowIndex) => (
             <span
               key={rowIndex}
               className="grid min-h-0 flex-1 gap-[0.32%]"
               style={rowStyle(row, rowIndex)}
             >
-              {row.map(({ id }) => {
-                const selectable = available.has(id);
-                const selected = selectedControl === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    disabled={!selectable}
-                    aria-label={selectable ? `Select ${KEY_LABELS[id] || id} key` : undefined}
-                    aria-pressed={selectable ? selected : undefined}
-                    title={selectable ? `${KEY_LABELS[id] || id} key` : 'Fixed in firmware'}
-                    onClick={() => onControlSelect?.(id)}
-                    className={cn(
-                      'min-w-0 rounded-[14%] border border-transparent bg-transparent',
-                      'text-[8px] font-medium leading-none text-white/45',
-                      'outline-hidden transition-colors',
-                      selectable &&
-                        'hover:border-primary/70 hover:bg-primary/15 hover:text-primary-foreground',
-                      selectable &&
-                        'focus-visible:border-primary focus-visible:bg-primary/20 focus-visible:ring-1 focus-visible:ring-ring',
-                      selected && 'border-primary bg-primary/25 text-primary-foreground ring-1 ring-ring',
-                      !selectable && 'cursor-default text-white/25',
-                    )}
-                  >
-                    {KEY_LABELS[id] ?? id.toUpperCase()}
-                  </button>
-                );
-              })}
+              {row.map(({ id }) => (
+                <KeyCap
+                  key={id}
+                  id={id}
+                  selectable={available.has(id)}
+                  selected={selectedControl === id}
+                  onSelect={onControlSelect}
+                />
+              ))}
             </span>
           ))}
         </span>

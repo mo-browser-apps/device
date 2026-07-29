@@ -1,3 +1,5 @@
+import type { MouseSettings } from '@/gen/devices';
+
 export const ACTIONS: Record<string, string> = {
   'middle-click': 'Middle click',
   back: 'Back',
@@ -11,3 +13,11 @@ export const ACTIONS: Record<string, string> = {
   'volume-down': 'Volume down',
   disabled: 'Disabled',
 };
+
+export function boundAction(mouse: MouseSettings, control: string): string {
+  return mouse.bindings.find((entry) => entry.control === control)?.action ?? '';
+}
+
+export function actionLabel(action: string): string {
+  return ACTIONS[action] ?? action;
+}

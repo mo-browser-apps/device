@@ -1,13 +1,13 @@
+import type { ReactNode } from 'react';
 import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
 import { MOUSE_LABELS } from '@/components/art/mouse-art';
 import { cn } from '@/lib/utils';
-import { ACTIONS } from './actions';
-import React from "react";
+import { ACTIONS, boundAction } from './actions';
 
 const DPI_STEP = 100;
 const SCROLL_SPEEDS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-5">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -166,8 +166,8 @@ export function ControlEditor({
   if (segment === 'buttons') {
     if (!selected) return null;
 
-    const action = mouse.bindings.find((entry) => entry.control === selected)?.action ?? '';
-    const select = (next: string) =>
+    const action = boundAction(mouse, selected);
+    const rebind = (next: string) =>
       onCommit(
         withMouse({
           bindings: mouse.bindings.map((entry) =>
@@ -188,7 +188,7 @@ export function ControlEditor({
                 action={id}
                 label={label}
                 selected={id === action}
-                onSelect={() => select(id)}
+                onSelect={() => rebind(id)}
               />
             ))}
           </div>

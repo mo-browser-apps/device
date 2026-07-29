@@ -25,6 +25,67 @@ const HOTSPOTS: Record<MouseArtProfile, Record<string, Hotspot>> = {
 
 export type Callout = { id: string; value: string };
 
+function ControlCallout({
+  id,
+  value,
+  spot,
+  selected,
+  onSelect,
+}: {
+  id: string;
+  value: string;
+  spot: Hotspot;
+  selected: boolean;
+  onSelect?: (control: string) => void;
+}) {
+  const name = MOUSE_LABELS[id] ?? id;
+  const anchor =
+    spot.side === 'right'
+      ? { top: `${spot.labelY}%`, left: `${spot.x}%` }
+      : { top: `${spot.labelY}%`, right: `${100 - spot.x}%` };
+
+  return (
+    <span className="group">
+      <span
+        aria-hidden="true"
+        style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+        className={cn(
+          'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
+          'border border-background/70 transition duration-200',
+          'group-hover:scale-125 group-hover:bg-primary',
+          'group-focus-within:scale-125 group-focus-within:bg-primary',
+          selected ? 'scale-125 bg-primary' : 'bg-foreground/45',
+        )}
+      />
+
+      <button
+        type="button"
+        style={anchor}
+        aria-pressed={selected}
+        aria-label={`${name}, ${value}`}
+        onClick={() => onSelect?.(id)}
+        className={cn(
+          'absolute flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap',
+          'rounded-lg border px-2.5 py-1.5 text-xs backdrop-blur-sm',
+          'transition-colors focus-visible:outline-hidden focus-visible:ring-2',
+          'focus-visible:ring-ring focus-visible:ring-offset-2',
+          'focus-visible:ring-offset-background',
+          spot.side === 'right' ? 'translate-x-3' : '-translate-x-3',
+          selected
+            ? 'border-primary/70 bg-primary/15 text-foreground'
+            : 'border-border/60 bg-background/80 hover:border-border',
+        )}
+      >
+        <span className={selected ? 'opacity-80' : 'text-muted-foreground'}>{name}</span>
+        <span aria-hidden="true" className="opacity-40">
+          ·
+        </span>
+        <span className="font-medium">{value}</span>
+      </button>
+    </span>
+  );
+}
+
 export function MouseArt({
   src,
   alt,
@@ -55,58 +116,19 @@ export function MouseArt({
         className="pointer-events-none size-full select-none object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.24)]"
       />
 
-      {callouts.map(({ id, value }) => {
-        const spot = hotspots[id];
-        if (!spot) return null;
-
-        const name = MOUSE_LABELS[id] ?? id;
-        const selected = selectedControl === id;
-        const anchor =
-          spot.side === 'right'
-            ? { left: `${spot.x}%`, top: `${spot.labelY}%` }
-            : { right: `${100 - spot.x}%`, top: `${spot.labelY}%` };
-
-        return (
-          <span key={id} className="group">
-            <span
-              aria-hidden="true"
-              style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-              className={cn(
-                'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
-                'border border-background/70 transition duration-200',
-                'group-hover:scale-125 group-hover:bg-primary',
-                'group-focus-within:scale-125 group-focus-within:bg-primary',
-                selected ? 'scale-125 bg-primary' : 'bg-foreground/45',
-              )}
+      {callouts.map(
+        ({ id, value }) =>
+          hotspots[id] && (
+            <ControlCallout
+              key={id}
+              id={id}
+              value={value}
+              spot={hotspots[id]}
+              selected={selectedControl === id}
+              onSelect={onControlSelect}
             />
-
-            <button
-              type="button"
-              style={anchor}
-              aria-pressed={selected}
-              aria-label={`${name}, ${value}`}
-              onClick={() => onControlSelect?.(id)}
-              className={cn(
-                'absolute flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap',
-                'rounded-lg border px-2.5 py-1.5 text-xs backdrop-blur-sm',
-                'transition-colors focus-visible:outline-hidden focus-visible:ring-2',
-                'focus-visible:ring-ring focus-visible:ring-offset-2',
-                'focus-visible:ring-offset-background',
-                spot.side === 'right' ? 'translate-x-3' : '-translate-x-3',
-                selected
-                  ? 'border-primary/70 bg-primary/15 text-foreground'
-                  : 'border-border/60 bg-background/80 hover:border-border',
-              )}
-            >
-              <span className={selected ? 'opacity-80' : 'text-muted-foreground'}>{name}</span>
-              <span aria-hidden="true" className="opacity-40">
-                ·
-              </span>
-              <span className="font-medium">{value}</span>
-            </button>
-          </span>
-        );
-      })}
+          ),
+      )}
     </span>
   );
 }

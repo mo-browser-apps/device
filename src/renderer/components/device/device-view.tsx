@@ -5,7 +5,7 @@ import { DeviceStatus } from '@/components/device-status';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useDeviceSettings } from '@/gateway/devices';
 import type { Device } from '@/gen/devices';
-import { ACTIONS } from './actions';
+import { actionLabel, boundAction } from './actions';
 import { ControlEditor } from './control-editor';
 
 type Segment = 'buttons' | 'movement';
@@ -24,11 +24,11 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
   const mouse = settings?.mouse;
   const spec = device.mouse;
   const callouts =
-    segment === 'buttons'
-      ? (spec?.buttons ?? []).map((control) => {
-          const action = mouse?.bindings.find((entry) => entry.control === control)?.action ?? '';
-          return { id: control, value: ACTIONS[action] ?? action };
-        })
+    segment === 'buttons' && mouse && spec
+      ? spec.buttons.map((control) => ({
+          id: control,
+          value: actionLabel(boundAction(mouse, control)),
+        }))
       : [];
 
   return (
@@ -66,7 +66,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
             </ToggleGroupItem>
           </ToggleGroup>
 
-          <div className="mx-auto flex min-h-0 w-full max-w-[920px] flex-1 gap-8 px-8">
+          <div className="mx-auto flex min-h-0 w-full max-w-230 flex-1 gap-8 px-8">
             <div className="flex min-w-0 flex-1 items-center justify-center pb-10">
               <DeviceArt
                 device={device}
@@ -78,7 +78,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
 
             <aside
               key={segment}
-              className="w-[300px] shrink-0 animate-in overflow-y-auto pb-4 fade-in duration-200 motion-reduce:animate-none"
+              className="w-75 shrink-0 animate-in overflow-y-auto pb-4 fade-in duration-200 motion-reduce:animate-none"
             >
               <ControlEditor
                 settings={settings}
