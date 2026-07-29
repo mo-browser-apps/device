@@ -1,6 +1,6 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
-import { KeyboardArt } from './keyboard-art';
+import { KeyboardArt, type Lighting } from './keyboard-art';
 import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
 
 type Art = {
@@ -50,16 +50,16 @@ function artFor(device: Device): Art | null {
 export function DeviceArt({
   device,
   variant = 'detail',
-  interactive = false,
   callouts = [],
+  lighting,
   selectedControl,
   onControlSelect,
   className,
 }: {
   device: Device;
   variant?: 'home' | 'detail';
-  interactive?: boolean;
   callouts?: Callout[];
+  lighting?: Lighting | null;
   selectedControl?: string | null;
   onControlSelect?: (control: string) => void;
   className?: string;
@@ -92,7 +92,7 @@ export function DeviceArt({
         src={art.detail}
         alt={art.alt}
         aspect={art.aspect}
-        interactive={interactive}
+        lighting={lighting}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
         className={cn('max-w-3xl', offline, className)}

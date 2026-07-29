@@ -1,10 +1,34 @@
-import type { ReactNode } from 'react';
-import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
+import type { CSSProperties, ReactNode } from 'react';
+import type {
+  Binding,
+  Device,
+  KeyboardSettings,
+  MouseSettings,
+  MouseSpec,
+  Settings,
+} from '@/gen/devices';
+import { connectionLabel } from '@/components/device-status';
 import { cn, FOCUS_RING } from '@/lib/utils';
-import { ACTIONS, boundAction, controlLabel } from './controls';
+import {
+  EFFECTS,
+  KEY_ACTIONS,
+  MOUSE_ACTIONS,
+  actionLabel,
+  boundAction,
+  controlLabel,
+} from './controls';
+
+export type Segment = 'buttons' | 'movement' | 'keys' | 'lighting' | 'info';
 
 const DPI_STEP = 100;
 const SCROLL_SPEEDS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
+
+/** The hue slider's own track, the one place colour is allowed outside the art. */
+const HUE_TRACK: CSSProperties = {
+  background: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360]
+    .map((hue) => `hsl(${hue} 95% 55%)`)
+    .join(', ')})`,
+};
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -27,18 +51,20 @@ function Slider({
   minLabel,
   maxLabel,
   description,
+  trackStyle,
   onPreview,
   onCommit,
 }: {
   label: string;
-  display: string;
+  display: ReactNode;
   value: number;
   min: number;
   max: number;
   step: number;
-  minLabel: string;
-  maxLabel: string;
+  minLabel?: string;
+  maxLabel?: string;
   description?: string;
+  trackStyle?: CSSProperties;
   onPreview: (value: number) => void;
   onCommit: () => void;
 }) {
@@ -55,6 +81,7 @@ function Slider({
         min={min}
         max={max}
         step={step}
+        style={trackStyle}
         onChange={(event) => onPreview(Number(event.target.value))}
         onPointerUp={onCommit}
         onKeyUp={onCommit}
@@ -66,10 +93,12 @@ function Slider({
           FOCUS_RING,
         )}
       />
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{minLabel}</span>
-        <span>{maxLabel}</span>
-      </div>
+      {minLabel && maxLabel && (
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>{minLabel}</span>
+          <span>{maxLabel}</span>
+        </div>
+      )}
       {description && <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>}
     </div>
   );
@@ -94,13 +123,15 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: b
   );
 }
 
-function ActionOption({
-  action,
+function RadioOption({
+  group,
+  value,
   label,
   selected,
   onSelect,
 }: {
-  action: string;
+  group: string;
+  value: string;
   label: string;
   selected: boolean;
   onSelect: () => void;
@@ -115,8 +146,8 @@ function ActionOption({
     >
       <input
         type="radio"
-        name="action"
-        value={action}
+        name={group}
+        value={value}
         checked={selected}
         onChange={onSelect}
         className="peer sr-only"
@@ -135,7 +166,81 @@ function ActionOption({
   );
 }
 
-export function ControlEditor({
+/** Buttons and Keys differ only in which actions they offer. */
+function BindingEditor({
+  control,
+  bindings,
+  actions,
+  disabled,
+  onRebind,
+}: {
+  control: string;
+  bindings: Binding[];
+  actions: string[];
+  disabled: boolean;
+  onRebind: (bindings: Binding[]) => void;
+}) {
+  const name = controlLabel(control);
+  const current = boundAction(bindings, control);
+
+  const rebind = (action: string) =>
+    onRebind(bindings.map((entry) => (entry.control === control ? { ...entry, action } : entry)));
+
+  return (
+    <fieldset disabled={disabled} className="min-w-0 disabled:opacity-50">
+      <legend className="sr-only">{name} action</legend>
+      <Section title={name}>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          {actions.map((action) => (
+            <RadioOption
+              key={action}
+              group="action"
+              value={action}
+              label={actionLabel(action)}
+              selected={action === current}
+              onSelect={() => rebind(action)}
+            />
+          ))}
+        </div>
+      </Section>
+    </fieldset>
+  );
+}
+
+function Info({ device }: { device: Device }) {
+  const rows: [string, string][] = [
+    ['Connection', connectionLabel(device)],
+    ['Firmware', device.firmware],
+  ];
+
+  if (device.keyboard) {
+    rows.push(
+      ['Remappable keys', String(device.keyboard.keys.length)],
+      ['Lighting', device.keyboard.backlight ? 'Supported' : 'Not supported'],
+    );
+  }
+  if (device.mouse) {
+    rows.push(
+      ['Remappable buttons', String(device.mouse.buttons.length)],
+      ['Sensor', `${device.mouse.minDpi}–${device.mouse.maxDpi} DPI`],
+    );
+  }
+
+  return (
+    <Section title="Info">
+      <dl className="flex flex-col gap-4">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between gap-4 text-sm">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="text-right font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Section>
+  );
+}
+
+function MouseEditor({
   settings,
   mouse,
   spec,
@@ -162,34 +267,14 @@ export function ControlEditor({
   if (segment === 'buttons') {
     if (!selected) return null;
 
-    const action = boundAction(mouse, selected);
-    const rebind = (next: string) =>
-      onCommit(
-        withMouse({
-          bindings: mouse.bindings.map((entry) =>
-            entry.control === selected ? { ...entry, action: next } : entry,
-          ),
-        }),
-      );
-
-    const name = controlLabel(selected);
     return (
-      <fieldset disabled={disabled} className="min-w-0 disabled:opacity-50">
-        <legend className="sr-only">{name} action</legend>
-        <Section title={name}>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {Object.entries(ACTIONS).map(([id, label]) => (
-              <ActionOption
-                key={id}
-                action={id}
-                label={label}
-                selected={id === action}
-                onSelect={() => rebind(id)}
-              />
-            ))}
-          </div>
-        </Section>
-      </fieldset>
+      <BindingEditor
+        control={selected}
+        bindings={mouse.bindings}
+        actions={MOUSE_ACTIONS}
+        disabled={disabled}
+        onRebind={(bindings) => onCommit(withMouse({ bindings }))}
+      />
     );
   }
 
@@ -236,5 +321,149 @@ export function ControlEditor({
         </div>
       </Section>
     </fieldset>
+  );
+}
+
+function KeyboardEditor({
+  settings,
+  keyboard,
+  selected,
+  segment,
+  disabled,
+  onPreview,
+  onCommit,
+}: {
+  settings: Settings;
+  keyboard: KeyboardSettings;
+  selected: string | null;
+  segment: 'keys' | 'lighting';
+  disabled: boolean;
+  onPreview: (settings: Settings) => void;
+  onCommit: (settings: Settings) => void;
+}) {
+  const withKeyboard = (changes: Partial<KeyboardSettings>): Settings => ({
+    ...settings,
+    keyboard: { ...keyboard, ...changes },
+  });
+
+  if (segment === 'keys') {
+    if (!selected) return null;
+
+    return (
+      <BindingEditor
+        control={selected}
+        bindings={keyboard.bindings}
+        actions={KEY_ACTIONS}
+        disabled={disabled}
+        onRebind={(bindings) => onCommit(withKeyboard({ bindings }))}
+      />
+    );
+  }
+
+  const commitPreviewed = () => onCommit(settings);
+
+  return (
+    <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
+      <Section title="Effect">
+        <div className="flex flex-col">
+          {EFFECTS.map(([effect, label]) => (
+            <RadioOption
+              key={effect}
+              group="effect"
+              value={String(effect)}
+              label={label}
+              selected={effect === keyboard.effect}
+              onSelect={() => onCommit(withKeyboard({ effect }))}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Colour">
+        <Slider
+          label="Hue"
+          display={
+            <span
+              aria-hidden="true"
+              className="inline-block size-3.5 rounded-full border border-border/60 align-middle"
+              style={{ background: `hsl(${keyboard.hue} 95% 55%)` }}
+            />
+          }
+          value={keyboard.hue}
+          min={0}
+          max={359}
+          step={1}
+          trackStyle={HUE_TRACK}
+          onPreview={(hue) => onPreview(withKeyboard({ hue }))}
+          onCommit={commitPreviewed}
+        />
+      </Section>
+
+      <Section title="Brightness">
+        <Slider
+          label="Level"
+          display={`${keyboard.brightness}%`}
+          value={keyboard.brightness}
+          min={0}
+          max={100}
+          step={1}
+          minLabel="Off"
+          maxLabel="Bright"
+          onPreview={(brightness) => onPreview(withKeyboard({ brightness }))}
+          onCommit={commitPreviewed}
+        />
+      </Section>
+    </fieldset>
+  );
+}
+
+export function ControlEditor({
+  device,
+  settings,
+  selected,
+  segment,
+  disabled,
+  onPreview,
+  onCommit,
+}: {
+  device: Device;
+  settings: Settings;
+  selected: string | null;
+  segment: Segment;
+  disabled: boolean;
+  onPreview: (settings: Settings) => void;
+  onCommit: (settings: Settings) => void;
+}) {
+  if (segment === 'info') {
+    return <Info device={device} />;
+  }
+
+  if (segment === 'keys' || segment === 'lighting') {
+    if (!settings.keyboard) return null;
+    return (
+      <KeyboardEditor
+        settings={settings}
+        keyboard={settings.keyboard}
+        selected={selected}
+        segment={segment}
+        disabled={disabled}
+        onPreview={onPreview}
+        onCommit={onCommit}
+      />
+    );
+  }
+
+  if (!settings.mouse || !device.mouse) return null;
+  return (
+    <MouseEditor
+      settings={settings}
+      mouse={settings.mouse}
+      spec={device.mouse}
+      selected={selected}
+      segment={segment}
+      disabled={disabled}
+      onPreview={onPreview}
+      onCommit={onCommit}
+    />
   );
 }

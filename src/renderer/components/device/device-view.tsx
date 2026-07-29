@@ -7,31 +7,50 @@ import { useDeviceSettings } from '@/gateway/devices';
 import { cn, FOCUS_RING } from '@/lib/utils';
 import type { Device } from '@/gen/devices';
 import { actionLabel, boundAction, controlLabel } from './controls';
-import { ControlEditor } from './control-editor';
+import { ControlEditor, type Segment } from './control-editor';
 
-type Segment = 'buttons' | 'movement';
+const MOUSE_SEGMENTS: [Segment, string][] = [
+  ['buttons', 'Buttons'],
+  ['movement', 'Movement'],
+  ['info', 'Info'],
+];
+
+/** Panels come from the descriptor: a keyboard without a backlight has no Lighting tab. */
+function segmentsFor(device: Device): [Segment, string][] {
+  if (!device.keyboard) {
+    return MOUSE_SEGMENTS;
+  }
+  const segments: [Segment, string][] = [['keys', 'Keys']];
+  if (device.keyboard.backlight) {
+    segments.push(['lighting', 'Lighting']);
+  }
+  segments.push(['info', 'Info']);
+  return segments;
+}
 
 const SEGMENT_ITEM =
   'px-3 text-muted-foreground hover:bg-transparent hover:text-foreground ' +
   'data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm';
 
 export function DeviceView({ device, onBack }: { device: Device; onBack: () => void }) {
-  const [segment, setSegment] = useState<Segment>('buttons');
+  const segments = segmentsFor(device);
+  const [segment, setSegment] = useState<Segment>(segments[0][0]);
   const [selectedControl, setSelectedControl] = useState<string | null>(
-    () => device.mouse?.buttons[0] ?? null,
+    () => device.mouse?.buttons[0] ?? device.keyboard?.keys[0] ?? null,
   );
   const { settings, preview, commit } = useDeviceSettings(device.id);
 
   const mouse = settings?.mouse;
-  const spec = device.mouse;
   const callouts =
-    segment === 'buttons' && mouse && spec
-      ? spec.buttons.map((control) => ({
+    segment === 'buttons' && mouse && device.mouse
+      ? device.mouse.buttons.map((control) => ({
           id: control,
           name: controlLabel(control),
-          value: actionLabel(boundAction(mouse, control)),
+          value: actionLabel(boundAction(mouse.bindings, control)),
         }))
       : [];
+
+  const selectable = segment === 'buttons' || segment === 'keys';
 
   return (
     <div className="flex h-full flex-col">
@@ -54,7 +73,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
         </span>
       </div>
 
-      {settings && mouse && spec ? (
+      {settings ? (
         <>
           <ToggleGroup
             type="single"
@@ -64,12 +83,11 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
             size="sm"
             className="mx-auto mb-5 w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
           >
-            <ToggleGroupItem value="buttons" className={SEGMENT_ITEM}>
-              Buttons
-            </ToggleGroupItem>
-            <ToggleGroupItem value="movement" className={SEGMENT_ITEM}>
-              Movement
-            </ToggleGroupItem>
+            {segments.map(([value, label]) => (
+              <ToggleGroupItem key={value} value={value} className={SEGMENT_ITEM}>
+                {label}
+              </ToggleGroupItem>
+            ))}
           </ToggleGroup>
 
           <div className="mx-auto flex min-h-0 w-full max-w-230 flex-1 gap-8 px-8">
@@ -77,8 +95,9 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
               <DeviceArt
                 device={device}
                 callouts={callouts}
+                lighting={device.keyboard?.backlight ? settings.keyboard : null}
                 selectedControl={selectedControl}
-                onControlSelect={segment === 'buttons' ? setSelectedControl : undefined}
+                onControlSelect={selectable ? setSelectedControl : undefined}
               />
             </div>
 
@@ -87,9 +106,8 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
               className="w-75 shrink-0 animate-in overflow-y-auto pb-4 fade-in duration-200 motion-reduce:animate-none"
             >
               <ControlEditor
+                device={device}
                 settings={settings}
-                mouse={mouse}
-                spec={spec}
                 selected={selectedControl}
                 segment={segment}
                 disabled={!device.connected}
@@ -101,7 +119,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
         </>
       ) : (
         <div className="flex flex-1 items-center justify-center py-6">
-          <DeviceArt device={device} interactive={device.connected} />
+          <DeviceArt device={device} />
         </div>
       )}
     </div>

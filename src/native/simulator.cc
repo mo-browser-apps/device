@@ -71,7 +71,7 @@ const char* const kRemappableKeys[] = {
     "backslash",
     "capslock", "a", "s", "d", "f", "g", "h", "j", "k", "l", "semicolon", "quote", "enter",
     "shiftleft", "z", "x", "c", "v", "b", "n", "m", "comma", "period", "slash", "shiftright",
-    "ctrlleft", "altleft", "metaleft", "space", "metaright", "altright", "ctrlright",
+    "ctrlleft", "metaleft", "altleft", "space", "altright", "menu", "ctrlright",
 };
 
 void AddKeyboard(DeviceStack& stack) {
@@ -85,9 +85,6 @@ void AddKeyboard(DeviceStack& stack) {
 
   KeyboardSpec* spec = device.mutable_keyboard();
   spec->set_backlight(true);
-  for (const char* key : kRemappableKeys) {
-    spec->add_keys(key);
-  }
 
   Settings settings;
   settings.set_device_id("compact-keyboard");
@@ -95,6 +92,13 @@ void AddKeyboard(DeviceStack& stack) {
   keyboard->set_effect(STATIC);
   keyboard->set_hue(35);
   keyboard->set_brightness(70);
+
+  for (const char* key : kRemappableKeys) {
+    spec->add_keys(key);
+    Binding* binding = keyboard->add_bindings();
+    binding->set_control(key);
+    binding->set_action("default");
+  }
 
   stack.Add(device, settings);
 }

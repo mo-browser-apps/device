@@ -23,6 +23,10 @@ const CONNECTIONS: Record<LinkType, { label: string; Icon: LucideIcon }> = {
   [LinkType.UNRECOGNIZED]: UNKNOWN_CONNECTION,
 };
 
+export function connectionLabel(device: Device): string {
+  return (CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION).label;
+}
+
 function batteryOf(
   level: number,
   charging: boolean,

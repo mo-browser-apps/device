@@ -90,3 +90,12 @@
         -webkit-app-region: drag;
     }
 }
+
+@keyframes key-glow {
+    0%, 100% {
+        opacity: 0.25;
+    }
+    50% {
+        opacity: 1;
+    }
+}

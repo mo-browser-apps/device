@@ -1,15 +1,44 @@
-import type { MouseSettings } from '@/gen/devices';
+import { LightEffect, type Binding } from '@/gen/devices';
 
 /** Names for the controls a mouse reports. */
-export const CONTROLS: Record<string, string> = {
+const CONTROLS: Record<string, string> = {
   wheel: 'Wheel',
   back: 'Back',
   forward: 'Forward',
   gesture: 'Thumb button',
 };
 
+/** Names for the keys whose id does not already read as one. Letters and digits do. */
+const KEYS: Record<string, string> = {
+  esc: 'Esc',
+  minus: 'Minus',
+  equal: 'Equal',
+  backspace: 'Backspace',
+  tab: 'Tab',
+  bracketleft: 'Left bracket',
+  bracketright: 'Right bracket',
+  backslash: 'Backslash',
+  capslock: 'Caps Lock',
+  semicolon: 'Semicolon',
+  quote: 'Quote',
+  enter: 'Enter',
+  shiftleft: 'Left Shift',
+  shiftright: 'Right Shift',
+  comma: 'Comma',
+  period: 'Period',
+  slash: 'Slash',
+  ctrlleft: 'Left Ctrl',
+  ctrlright: 'Right Ctrl',
+  metaleft: 'Win',
+  altleft: 'Left Alt',
+  altright: 'Right Alt',
+  space: 'Space',
+  menu: 'Menu',
+};
+
 /** Actions a control can be bound to. */
-export const ACTIONS: Record<string, string> = {
+const ACTIONS: Record<string, string> = {
+  default: 'Default',
   'middle-click': 'Middle click',
   back: 'Back',
   forward: 'Forward',
@@ -23,8 +52,21 @@ export const ACTIONS: Record<string, string> = {
   disabled: 'Disabled',
 };
 
-export function boundAction(mouse: MouseSettings, control: string): string {
-  return mouse.bindings.find((entry) => entry.control === control)?.action ?? '';
+/** A mouse button always holds an action, so it has nothing to restore to. */
+export const MOUSE_ACTIONS = Object.keys(ACTIONS).filter((id) => id !== 'default');
+
+/** A key types a character unless rebound, so "Default" is what restores it. */
+export const KEY_ACTIONS = Object.keys(ACTIONS).filter((id) => id !== 'middle-click');
+
+/** The selectable light effects, in the order the picker offers them. */
+export const EFFECTS: [LightEffect, string][] = [
+  [LightEffect.STATIC, 'Steady'],
+  [LightEffect.BREATHING, 'Pulse'],
+  [LightEffect.WAVE, 'Wave'],
+];
+
+export function boundAction(bindings: Binding[], control: string): string {
+  return bindings.find((entry) => entry.control === control)?.action ?? '';
 }
 
 export function actionLabel(action: string): string {
@@ -32,5 +74,5 @@ export function actionLabel(action: string): string {
 }
 
 export function controlLabel(control: string): string {
-  return CONTROLS[control] ?? control;
+  return CONTROLS[control] ?? KEYS[control] ?? control.toUpperCase();
 }
