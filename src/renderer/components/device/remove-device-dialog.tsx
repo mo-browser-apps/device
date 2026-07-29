@@ -4,7 +4,15 @@ import { forgetDevice } from '@/gateway/devices';
 import type { Device } from '@/gen/devices';
 import { BUTTON_DESTRUCTIVE, BUTTON_OUTLINE } from '@/lib/utils';
 
-export function RemoveDeviceDialog({ device, onClose }: { device: Device; onClose: () => void }) {
+export function RemoveDeviceDialog({
+  device,
+  onClose,
+  onRemoved,
+}: {
+  device: Device;
+  onClose: () => void;
+  onRemoved?: () => void;
+}) {
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +20,10 @@ export function RemoveDeviceDialog({ device, onClose }: { device: Device; onClos
     setRemoving(true);
     setError(null);
     void forgetDevice(device.id)
-      .then(onClose)
+      .then(() => {
+        onRemoved?.();
+        onClose();
+      })
       .catch(() => {
         setError(`Could not remove ${device.model}.`);
         setRemoving(false);

@@ -45,6 +45,10 @@ export default function App() {
               {openDevice ? (
                 <DeviceView
                   device={openDevice}
+                  onRemoved={() => {
+                    setHomeState((current) => ({ ...current, focusId: null }));
+                    setOpenId(null);
+                  }}
                   onBack={() => {
                     restoreHomeFocus.current = true;
                     setOpenId(null);

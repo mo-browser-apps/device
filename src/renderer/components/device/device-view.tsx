@@ -33,7 +33,15 @@ const SEGMENT_ITEM =
   'px-3 text-muted-foreground hover:bg-transparent hover:text-foreground ' +
   'data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm';
 
-export function DeviceView({ device, onBack }: { device: Device; onBack: () => void }) {
+export function DeviceView({
+  device,
+  onBack,
+  onRemoved,
+}: {
+  device: Device;
+  onBack: () => void;
+  onRemoved: () => void;
+}) {
   const segments = segmentsFor(device);
   const [segment, setSegment] = useState<Segment>(segments[0][0]);
   const [selectedControl, setSelectedControl] = useState<string | null>(
@@ -127,7 +135,11 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
       )}
 
       {removeOpen && (
-        <RemoveDeviceDialog device={device} onClose={() => setRemoveOpen(false)} />
+        <RemoveDeviceDialog
+          device={device}
+          onClose={() => setRemoveOpen(false)}
+          onRemoved={onRemoved}
+        />
       )}
     </div>
   );
