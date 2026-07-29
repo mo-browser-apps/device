@@ -9,16 +9,18 @@ experience without the complexity of a production device suite.
 
 ## Demo experience
 
-The simulated device catalog supports the primary workflows expected from peripheral software:
+The in-memory native device backend supports the primary workflows expected from peripheral
+software:
 
 - Browse mice and keyboards with connection, battery, and firmware information.
+- Discover, add, and remove wireless devices, with the paired roster restored on restart.
 - Assign actions to mouse buttons and adjust pointer and scrolling behaviour.
 - Remap keyboard keys and configure backlight effects, color, and brightness.
-- Observe the interface react to connection and battery changes in real time.
+- Observe the interface react to native device-list changes in real time.
 
 MōDevice does not access peripherals connected to the host computer. Its devices and settings are
-provided by an in-memory C++ simulator, making the demo deterministic and portable across supported
-platforms.
+provided by an in-memory C++ implementation of the same device-stack interface a real hardware
+integration would use, making the demo deterministic and portable across supported platforms.
 
 ## Requirements
 
@@ -49,7 +51,7 @@ npm run build
 ## Project structure
 
 ```text
-src/native/     C++ device stack, simulator, and MōBrowser RPC adapter
+src/native/     C++ device stack and MōBrowser RPC adapter
 src/main/       TypeScript application process and desktop integration
 src/renderer/   React interface and MōBrowser IPC client
 ```

@@ -78,6 +78,9 @@ message Settings {
 service DevicesService {
   rpc List(google.protobuf.Empty) returns (DeviceList);
   rpc Watch(google.protobuf.Empty) returns (stream DeviceList);
+  rpc Discover(google.protobuf.Empty) returns (DeviceList);
+  rpc Pair(DeviceId) returns (google.protobuf.Empty);
+  rpc Forget(DeviceId) returns (google.protobuf.Empty);
   rpc GetSettings(DeviceId) returns (Settings);
   rpc ApplySettings(Settings) returns (google.protobuf.Empty);
 }

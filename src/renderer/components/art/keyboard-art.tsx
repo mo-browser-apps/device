@@ -220,7 +220,7 @@ export function KeyboardArt({
         src={src}
         alt={alt}
         draggable={false}
-        className="pointer-events-none size-full select-none object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.24)]"
+        className="pointer-events-none size-full select-none object-contain drop-shadow-[0_20px_22px_rgba(0,0,0,0.30)]"
       />
 
       <KeyLayer

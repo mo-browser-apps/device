@@ -3,7 +3,6 @@ import { SetThemeRequest } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
 import { buildApplicationMenu } from './menu';
 import { startDevices } from './devices';
-import { startSimulator } from './simulator';
 import * as process from 'node:process';
 
 const isMac = process.platform === 'darwin';
@@ -15,7 +14,6 @@ ipc.registerService(AppServiceDescriptor, {
   },
 });
 startDevices();
-startSimulator();
 
 const win = new BrowserWindow();
 win.browser.loadUrl(app.url);

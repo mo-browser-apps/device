@@ -1,11 +1,18 @@
 import { ipc, prefs } from '@mobrowser/api';
 import { native } from './gen/native';
-import type { DeviceList } from './gen/native/devices';
+import { LinkType, type DeviceList } from './gen/native/devices';
 import { DeviceEventsServiceDescriptor } from './gen/native_service';
 import { DevicesServiceDescriptor } from './gen/ipc_service';
 import { Settings, type DeviceId } from './gen/devices';
 
 const STORED_SETTINGS_KEY = 'devices.settings';
+const STORED_PAIRED_IDS_KEY = 'devices.pairedIds';
+
+function persistPreferences(): void {
+  if (!prefs.persist()) {
+    console.warn('Could not write device preferences.');
+  }
+}
 
 function readStoredSettings(): Record<string, unknown> {
   return prefs.getObject<Record<string, unknown>>(STORED_SETTINGS_KEY, {});
@@ -16,9 +23,39 @@ function storeSettings(settings: Settings): void {
     ...readStoredSettings(),
     [settings.deviceId]: Settings.toJSON(settings),
   });
-  if (!prefs.persist()) {
-    console.warn('Could not write device settings.');
+  persistPreferences();
+}
+
+function storePairedDevices(devices: DeviceList): void {
+  prefs.setArray(
+    STORED_PAIRED_IDS_KEY,
+    devices.devices.map((device) => device.id),
+  );
+  persistPreferences();
+}
+
+async function restorePairedDevices(): Promise<void> {
+  const paired = await native.deviceStack.List({});
+  if (!prefs.hasArray(STORED_PAIRED_IDS_KEY)) {
+    storePairedDevices(paired);
+    return;
   }
+
+  const storedIds = new Set(prefs.getArray<string>(STORED_PAIRED_IDS_KEY, []));
+  const available = await native.deviceStack.Discover({});
+
+  for (const device of available.devices) {
+    if (storedIds.has(device.id)) {
+      await native.deviceStack.Pair({ id: device.id });
+    }
+  }
+  for (const device of paired.devices) {
+    if (!storedIds.has(device.id) && device.link !== LinkType.WIRED) {
+      await native.deviceStack.Forget({ id: device.id });
+    }
+  }
+
+  storePairedDevices(await native.deviceStack.List({}));
 }
 
 async function restoreSettings(): Promise<void> {
@@ -33,18 +70,35 @@ async function restoreSettings(): Promise<void> {
 
 export function startDevices(): void {
   const deviceUpdates = ipc.registerService(DevicesServiceDescriptor);
-  const settingsRestored = restoreSettings();
+  const devicesReady = restorePairedDevices().then(restoreSettings);
 
   ipc.registerService(DevicesServiceDescriptor, {
     async List() {
+      await devicesReady;
       return native.deviceStack.List({});
     },
+    async Discover() {
+      await devicesReady;
+      return native.deviceStack.Discover({});
+    },
+    async Pair(request: DeviceId) {
+      await devicesReady;
+      const result = await native.deviceStack.Pair(request);
+      storePairedDevices(await native.deviceStack.List({}));
+      return result;
+    },
+    async Forget(request: DeviceId) {
+      await devicesReady;
+      const result = await native.deviceStack.Forget(request);
+      storePairedDevices(await native.deviceStack.List({}));
+      return result;
+    },
     async GetSettings(request: DeviceId) {
-      await settingsRestored;
+      await devicesReady;
       return native.deviceStack.GetSettings(request);
     },
     async ApplySettings(request: Settings) {
-      await settingsRestored;
+      await devicesReady;
       await native.deviceStack.ApplySettings(request);
       storeSettings(request);
       return {};

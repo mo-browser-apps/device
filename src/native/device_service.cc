@@ -21,6 +21,26 @@ class DeviceStackServiceImpl : public DeviceStackService {
     std::move(done).Complete(stack_.List());
   }
 
+  void Discover(const Empty*, Callback<DeviceList> done) override {
+    std::move(done).Complete(stack_.Discover());
+  }
+
+  void Pair(const DeviceId* request, Callback<Empty> done) override {
+    if (!stack_.Pair(request->id())) {
+      std::move(done).Reject("Cannot pair device: " + request->id());
+      return;
+    }
+    std::move(done).Complete(Empty());
+  }
+
+  void Forget(const DeviceId* request, Callback<Empty> done) override {
+    if (!stack_.Forget(request->id())) {
+      std::move(done).Reject("Cannot forget device: " + request->id());
+      return;
+    }
+    std::move(done).Complete(Empty());
+  }
+
   void GetSettings(const DeviceId* request, Callback<Settings> done) override {
     std::optional<Settings> settings = stack_.GetSettings(request->id());
     if (!settings.has_value()) {

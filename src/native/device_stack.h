@@ -9,18 +9,20 @@
 
 #include "gen/devices.pb.h"
 
-// Holds the attached devices and their settings. To drive real hardware,
-// replace the body of this class with a vendor HID SDK.
+// Owns discovery, paired devices, and their settings. Replace this in-memory
+// implementation with a vendor HID SDK; the RPC and UI layers stay unchanged.
 class DeviceStack {
  public:
   using DevicesChangedHandler = std::function<void(const DeviceList&)>;
 
-  void Add(const Device& device, const Settings& settings);
+  DeviceStack();
+
   DeviceList List() const;
+  DeviceList Discover() const;
+  bool Pair(const std::string& device_id);
+  bool Forget(const std::string& device_id);
   std::optional<Settings> GetSettings(const std::string& device_id) const;
   bool ApplySettings(const Settings& settings);
-
-  bool UpdateDevice(const Device& device);
 
   void SetDevicesChangedHandler(DevicesChangedHandler handler) {
     devices_changed_ = std::move(handler);
@@ -33,7 +35,10 @@ class DeviceStack {
   };
 
   std::vector<Entry> entries_;
+  std::vector<Entry> available_;
   DevicesChangedHandler devices_changed_;
+
+  void PublishDevicesChanged() const;
 };
 
 #endif  // DEVICE_STACK_H_

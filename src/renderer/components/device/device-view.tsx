@@ -8,6 +8,7 @@ import { cn, FOCUS_RING } from '@/lib/utils';
 import type { Device } from '@/gen/devices';
 import { actionLabel, boundAction, controlLabel } from './controls';
 import { ControlEditor, type Segment } from './control-editor';
+import { RemoveDeviceDialog } from './remove-device-dialog';
 
 const MOUSE_SEGMENTS: [Segment, string][] = [
   ['buttons', 'Buttons'],
@@ -38,6 +39,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
   const [selectedControl, setSelectedControl] = useState<string | null>(
     () => device.mouse?.buttons[0] ?? device.keyboard?.keys[0] ?? null,
   );
+  const [removeOpen, setRemoveOpen] = useState(false);
   const { settings, preview, commit } = useDeviceSettings(device.id);
 
   const mouse = settings?.mouse;
@@ -111,6 +113,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
                 selected={selectedControl}
                 segment={segment}
                 disabled={!device.connected}
+                onRemove={() => setRemoveOpen(true)}
                 onPreview={preview}
                 onCommit={commit}
               />
@@ -121,6 +124,10 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
         <div className="flex flex-1 items-center justify-center py-6">
           <DeviceArt device={device} />
         </div>
+      )}
+
+      {removeOpen && (
+        <RemoveDeviceDialog device={device} onClose={() => setRemoveOpen(false)} />
       )}
     </div>
   );

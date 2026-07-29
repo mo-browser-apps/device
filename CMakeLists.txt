@@ -20,8 +20,6 @@ set(APP_SOURCES
         src/native/device_stack.cc
         src/native/device_service.h
         src/native/device_service.cc
-        src/native/simulator.h
-        src/native/simulator.cc
 )
 
 # Defines the main target of the application.

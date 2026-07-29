@@ -77,7 +77,7 @@ export function DeviceArt({
         draggable={false}
         className={cn(
           'pointer-events-none size-full select-none object-contain',
-          'drop-shadow-[0_14px_14px_rgba(0,0,0,0.22)]',
+          'drop-shadow-[0_16px_18px_rgba(0,0,0,0.28)]',
           offline,
           className,
         )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
-import { Home } from '@/components/home';
+import { Home } from '@/components/home/home';
 import { DeviceView } from '@/components/device/device-view';
 import { useDevices } from '@/gateway/devices';
 

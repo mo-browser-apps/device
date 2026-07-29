@@ -1,14 +1,16 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type {
-  Binding,
-  Device,
-  KeyboardSettings,
-  MouseSettings,
-  MouseSpec,
-  Settings,
+import { Trash2 } from 'lucide-react';
+import {
+  LinkType,
+  type Binding,
+  type Device,
+  type KeyboardSettings,
+  type MouseSettings,
+  type MouseSpec,
+  type Settings,
 } from '@/gen/devices';
 import { connectionLabel } from '@/components/device-status';
-import { cn, FOCUS_RING } from '@/lib/utils';
+import { BUTTON_OUTLINE, cn, FOCUS_RING } from '@/lib/utils';
 import {
   EFFECTS,
   KEY_ACTIONS,
@@ -207,7 +209,7 @@ function BindingEditor({
   );
 }
 
-function Info({ device }: { device: Device }) {
+function Info({ device, onRemove }: { device: Device; onRemove: () => void }) {
   const rows: [string, string][] = [
     ['Connection', connectionLabel(device)],
     ['Firmware', device.firmware],
@@ -227,16 +229,33 @@ function Info({ device }: { device: Device }) {
   }
 
   return (
-    <Section title="Info">
-      <dl className="flex flex-col gap-4">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="text-right font-medium">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </Section>
+    <div className="flex flex-col gap-8">
+      <Section title="Info">
+        <dl className="flex flex-col gap-4">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-baseline justify-between gap-4 text-sm">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd className="text-right font-medium">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </Section>
+
+      {device.link !== LinkType.WIRED && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className={cn(
+            BUTTON_OUTLINE,
+            'w-fit text-muted-foreground hover:border-destructive/35',
+            'hover:bg-destructive/5 hover:text-foreground',
+          )}
+        >
+          <Trash2 className="size-4" strokeWidth={1.75} />
+          Remove device
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -423,6 +442,7 @@ export function ControlEditor({
   selected,
   segment,
   disabled,
+  onRemove,
   onPreview,
   onCommit,
 }: {
@@ -431,11 +451,12 @@ export function ControlEditor({
   selected: string | null;
   segment: Segment;
   disabled: boolean;
+  onRemove: () => void;
   onPreview: (settings: Settings) => void;
   onCommit: (settings: Settings) => void;
 }) {
   if (segment === 'info') {
-    return <Info device={device} />;
+    return <Info device={device} onRemove={onRemove} />;
   }
 
   if (segment === 'keys' || segment === 'lighting') {

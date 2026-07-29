@@ -2,6 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { ipc } from '@/gen/ipc';
 import type { Device, Settings } from '@/gen/devices';
 
+export async function discoverDevices(): Promise<Device[]> {
+  return (await ipc.devices.Discover({})).devices;
+}
+
+export async function pairDevice(deviceId: string): Promise<void> {
+  await ipc.devices.Pair({ id: deviceId });
+}
+
+export async function forgetDevice(deviceId: string): Promise<void> {
+  await ipc.devices.Forget({ id: deviceId });
+}
+
 /**
  * The live device list. `Watch` carries only future snapshots, so the current list
  * is fetched separately, and a snapshot arriving during that call wins.
