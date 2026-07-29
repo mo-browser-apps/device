@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Home } from '@/components/home/home';
+import { Home, type HomeFocusTarget } from '@/components/home/home';
 import { DeviceView } from '@/components/device/device-view';
 import { SettingsView } from '@/components/settings/settings-view';
 import { useDevices } from '@/gateway/devices';
@@ -12,9 +12,12 @@ export default function App() {
   const { settings, update } = useAppSettings();
   /** Either fixed screen, or the id of the device being configured. */
   const [screen, setScreen] = useState('devices');
-  const [homeState, setHomeState] = useState<{ scrollLeft: number; focusId: string | null }>({
+  const [homeState, setHomeState] = useState<{
+    scrollLeft: number;
+    focus: HomeFocusTarget;
+  }>({
     scrollLeft: 0,
-    focusId: null,
+    focus: null,
   });
   const mainRef = useRef<HTMLElement>(null);
   const restoreHomeFocus = useRef(false);
@@ -38,7 +41,15 @@ export default function App() {
     return () => media.removeEventListener('change', apply);
   }, [theme]);
 
-  useOpenDeviceRequests(useCallback((deviceId: string) => setScreen(deviceId), []));
+  useOpenDeviceRequests(
+    useCallback((deviceId: string) => {
+      setHomeState((current) => ({
+        ...current,
+        focus: { type: 'device', id: deviceId },
+      }));
+      setScreen(deviceId);
+    }, []),
+  );
 
   useEffect(() => {
     if (screen === 'devices' && restoreHomeFocus.current) {
@@ -73,7 +84,7 @@ export default function App() {
               <DeviceView
                 device={openDevice}
                 onRemoved={() => {
-                  setHomeState((current) => ({ ...current, focusId: null }));
+                  setHomeState((current) => ({ ...current, focus: null }));
                   setScreen('devices');
                 }}
                 onBack={backToDevices}
@@ -82,12 +93,15 @@ export default function App() {
               <Home
                 devices={devices}
                 initialScrollLeft={homeState.scrollLeft}
-                restoreFocusId={homeState.focusId}
+                restoreFocus={homeState.focus}
                 onOpen={(deviceId, scrollLeft) => {
-                  setHomeState({ scrollLeft, focusId: deviceId });
+                  setHomeState({ scrollLeft, focus: { type: 'device', id: deviceId } });
                   setScreen(deviceId);
                 }}
-                onOpenSettings={() => setScreen('settings')}
+                onOpenSettings={(scrollLeft) => {
+                  setHomeState({ scrollLeft, focus: { type: 'settings' } });
+                  setScreen('settings');
+                }}
               />
             )}
           </div>

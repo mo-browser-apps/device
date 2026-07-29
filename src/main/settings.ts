@@ -45,7 +45,7 @@ function isLow(device: Device): boolean {
 
 /** Notifies for devices that have just entered a low-battery episode. */
 export function checkBatteries(devices: DeviceList): void {
-  const alertsOn = prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, true);
+  const alertsOn = prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false);
 
   for (const device of devices.devices) {
     if (isLow(device)) {
@@ -69,7 +69,7 @@ export function startSettings(win: BrowserWindow): void {
       return {
         theme: prefs.getString(THEME_KEY, 'system'),
         launchAtLogin: app.loginItemSettings.openAtLogin,
-        lowBatteryAlerts: prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, true),
+        lowBatteryAlerts: prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false),
       };
     },
 

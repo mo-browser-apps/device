@@ -1,4 +1,4 @@
-# Lint and type-check the TypeScript sources.
+# Lint, type-check, and build the application.
 name: Check
 
 on:
@@ -32,3 +32,6 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Build
+        run: npm run build -- --verbose

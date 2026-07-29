@@ -40,19 +40,16 @@ jobs:
       - name: Verify macOS signing secrets
         run: |
           set -euo pipefail
-          if [ -z "${MAC_CERTIFICATE:-}" ]; then
-            echo "MAC_CERTIFICATE not set — code signing will be skipped."
-            exit 0
-          fi
           missing=()
+          [ -z "${MAC_CERTIFICATE:-}" ]        && missing+=(MAC_CERTIFICATE)
           [ -z "${MAC_CERTIFICATE_PWD:-}" ]    && missing+=(MAC_CERTIFICATE_PWD)
-          [ -z "${MAC_KEYCHAIN_PWD:-}" ]        && missing+=(MAC_KEYCHAIN_PWD)
-          [ -z "${MAC_CODESIGN_IDENTITY:-}" ]   && missing+=(MAC_CODESIGN_IDENTITY)
-          [ -z "${MAC_TEAM_ID:-}" ]             && missing+=(MAC_TEAM_ID)
-          [ -z "${MAC_APPLE_ID:-}" ]            && missing+=(MAC_APPLE_ID)
-          [ -z "${MAC_APPLE_PASSWORD:-}" ]      && missing+=(MAC_APPLE_PASSWORD)
+          [ -z "${MAC_KEYCHAIN_PWD:-}" ]       && missing+=(MAC_KEYCHAIN_PWD)
+          [ -z "${MAC_CODESIGN_IDENTITY:-}" ]  && missing+=(MAC_CODESIGN_IDENTITY)
+          [ -z "${MAC_TEAM_ID:-}" ]            && missing+=(MAC_TEAM_ID)
+          [ -z "${MAC_APPLE_ID:-}" ]           && missing+=(MAC_APPLE_ID)
+          [ -z "${MAC_APPLE_PASSWORD:-}" ]     && missing+=(MAC_APPLE_PASSWORD)
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "MAC_CERTIFICATE is set but the following required secrets are missing: ${missing[*]}"
+            echo "Missing required macOS signing secrets: ${missing[*]}"
             exit 1
           fi
 
@@ -63,24 +60,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set up macOS code signing (optional)
+      - name: Set up macOS code signing
         run: |
           set -euo pipefail
-          if [ -z "${MAC_CERTIFICATE:-}" ]; then
-            echo "Skipping macOS code signing (no MAC_CERTIFICATE secret). Build will produce an unsigned DMG."
-            # Clear all other MAC_* signing vars so the build doesn't attempt to sign
-            # with a partially-configured identity that happens to be set in secrets.
-            {
-              echo "MAC_CERTIFICATE_PWD="
-              echo "MAC_KEYCHAIN_PWD="
-              echo "MAC_CODESIGN_IDENTITY="
-              echo "MAC_TEAM_ID="
-              echo "MAC_APPLE_ID="
-              echo "MAC_APPLE_PASSWORD="
-            } >> "$GITHUB_ENV"
-            exit 0
-          fi
-
           KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
           security create-keychain -p "$MAC_KEYCHAIN_PWD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -141,18 +123,15 @@ jobs:
       - name: Verify Windows signing secrets
         shell: pwsh
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ACCOUNT_NAME)) {
-            Write-Host "AZURE_SIGNING_ACCOUNT_NAME not set — code signing will be skipped."
-            exit 0
-          }
           $missing = @()
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ACCOUNT_NAME))      { $missing += "AZURE_SIGNING_ACCOUNT_NAME" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_CERTIFICATE_PROFILE_NAME)) { $missing += "AZURE_CERTIFICATE_PROFILE_NAME" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ENDPOINT))          { $missing += "AZURE_SIGNING_ENDPOINT" }
-          if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID))                 { $missing += "AZURE_CLIENT_ID" }
-          if ([string]::IsNullOrWhiteSpace($env:AZURE_TENANT_ID))                 { $missing += "AZURE_TENANT_ID" }
-          if ([string]::IsNullOrWhiteSpace($env:AZURE_SUBSCRIPTION_ID))             { $missing += "AZURE_SUBSCRIPTION_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID))                  { $missing += "AZURE_CLIENT_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_TENANT_ID))                  { $missing += "AZURE_TENANT_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_SUBSCRIPTION_ID))            { $missing += "AZURE_SUBSCRIPTION_ID" }
           if ($missing.Count -gt 0) {
-            Write-Error "AZURE_SIGNING_ACCOUNT_NAME is set but the following required secrets are missing: $($missing -join ', ')"
+            Write-Error "Missing required Windows signing secrets: $($missing -join ', ')"
             exit 1
           }
 
@@ -164,7 +143,6 @@ jobs:
         run: npm ci
 
       - name: Azure login (for code signing)
-        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
         uses: azure/login@v3
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -174,8 +152,7 @@ jobs:
       - name: Build release package
         run: npm run build -- --verbose
 
-      - name: Sign Windows binaries (optional)
-        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+      - name: Sign Windows binaries
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
@@ -193,8 +170,7 @@ jobs:
         shell: pwsh
         run: npm run pack -- --verbose
 
-      - name: Sign installer (optional)
-        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+      - name: Sign installer
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
@@ -273,6 +249,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           draft: true
+          generate_release_notes: true
 
       - name: List release artifacts
         run: ls -R dist

@@ -8,6 +8,11 @@ import { useCarousel } from '@/lib/use-carousel';
 import { BUTTON_OUTLINE, cn, FOCUS_RING } from '@/lib/utils';
 import { AddDeviceDialog } from './add-device-dialog';
 
+export type HomeFocusTarget =
+  | { type: 'device'; id: string }
+  | { type: 'settings' }
+  | null;
+
 function deviceCard(carousel: HTMLElement | null, deviceId: string) {
   return carousel?.querySelector<HTMLElement>(`[data-device-id="${CSS.escape(deviceId)}"]`);
 }
@@ -112,19 +117,20 @@ function CarouselControl({
 export function Home({
   devices,
   initialScrollLeft,
-  restoreFocusId,
+  restoreFocus,
   onOpen,
   onOpenSettings,
 }: {
   devices: Device[];
   initialScrollLeft: number;
-  restoreFocusId: string | null;
+  restoreFocus: HomeFocusTarget;
   onOpen: (deviceId: string, scrollLeft: number) => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (scrollLeft: number) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Device | null>(null);
   const addedId = useRef<string | null>(null);
+  const settingsRef = useRef<HTMLButtonElement>(null);
   const {
     ref: carouselRef,
     overflows,
@@ -134,10 +140,14 @@ export function Home({
   } = useCarousel(initialScrollLeft, devices.length);
 
   useLayoutEffect(() => {
-    if (restoreFocusId) {
-      deviceCard(carouselRef.current, restoreFocusId)?.focus({ preventScroll: true });
-    }
-  }, [carouselRef, restoreFocusId]);
+    if (!restoreFocus) return;
+
+    const target =
+      restoreFocus.type === 'device'
+        ? deviceCard(carouselRef.current, restoreFocus.id)
+        : settingsRef.current;
+    target?.focus({ preventScroll: true });
+  }, [carouselRef, restoreFocus]);
 
   useLayoutEffect(() => {
     const pending = addedId.current;
@@ -165,8 +175,9 @@ export function Home({
             Add device
           </button>
           <button
+            ref={settingsRef}
             type="button"
-            onClick={onOpenSettings}
+            onClick={() => onOpenSettings(carouselRef.current?.scrollLeft ?? 0)}
             aria-label="Settings"
             className={cn(BUTTON_OUTLINE, 'bg-card/50 px-2.5 text-muted-foreground shadow-xs')}
           >
