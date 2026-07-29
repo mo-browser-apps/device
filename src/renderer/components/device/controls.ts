@@ -52,6 +52,13 @@ const ACTIONS: Record<string, string> = {
   disabled: 'Disabled',
 };
 
+const DEFAULT_MOUSE_ACTIONS: Record<string, string> = {
+  wheel: 'middle-click',
+  back: 'back',
+  forward: 'forward',
+  gesture: 'show-desktop',
+};
+
 /** A mouse button always holds an action, so it has nothing to restore to. */
 export const MOUSE_ACTIONS = Object.keys(ACTIONS).filter((id) => id !== 'default');
 
@@ -67,6 +74,17 @@ export const EFFECTS: [LightEffect, string][] = [
 
 export function boundAction(bindings: Binding[], control: string): string {
   return bindings.find((entry) => entry.control === control)?.action ?? '';
+}
+
+export function resetMouseBindings(bindings: Binding[]): Binding[] {
+  return bindings.map((binding) => ({
+    ...binding,
+    action: DEFAULT_MOUSE_ACTIONS[binding.control] ?? binding.action,
+  }));
+}
+
+export function resetKeyBindings(bindings: Binding[]): Binding[] {
+  return bindings.map((binding) => ({ ...binding, action: 'default' }));
 }
 
 export function actionLabel(action: string): string {

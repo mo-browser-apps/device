@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { Trash2 } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import {
   LinkType,
   type Binding,
@@ -18,6 +18,8 @@ import {
   actionLabel,
   boundAction,
   controlLabel,
+  resetKeyBindings,
+  resetMouseBindings,
 } from './controls';
 
 export type Segment = 'buttons' | 'movement' | 'keys' | 'lighting' | 'info';
@@ -174,12 +176,16 @@ function BindingEditor({
   bindings,
   actions,
   disabled,
+  resetLabel,
+  onReset,
   onRebind,
 }: {
   control: string;
   bindings: Binding[];
   actions: string[];
   disabled: boolean;
+  resetLabel: string;
+  onReset: () => void;
   onRebind: (bindings: Binding[]) => void;
 }) {
   const name = controlLabel(control);
@@ -191,20 +197,31 @@ function BindingEditor({
   return (
     <fieldset disabled={disabled} className="min-w-0 disabled:opacity-50">
       <legend className="sr-only">{name} action</legend>
-      <Section title={name}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          {actions.map((action) => (
-            <RadioOption
-              key={action}
-              group="action"
-              value={action}
-              label={actionLabel(action)}
-              selected={action === current}
-              onSelect={() => rebind(action)}
-            />
-          ))}
-        </div>
-      </Section>
+      <div className="flex flex-col gap-8">
+        <Section title={name}>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {actions.map((action) => (
+              <RadioOption
+                key={action}
+                group="action"
+                value={action}
+                label={actionLabel(action)}
+                selected={action === current}
+                onSelect={() => rebind(action)}
+              />
+            ))}
+          </div>
+        </Section>
+
+        <button
+          type="button"
+          onClick={onReset}
+          className={cn(BUTTON_OUTLINE, 'w-fit text-muted-foreground hover:text-foreground')}
+        >
+          <RotateCcw className="size-4" strokeWidth={1.75} />
+          {resetLabel}
+        </button>
+      </div>
     </fieldset>
   );
 }
@@ -292,6 +309,8 @@ function MouseEditor({
         bindings={mouse.bindings}
         actions={MOUSE_ACTIONS}
         disabled={disabled}
+        resetLabel="Reset all buttons"
+        onReset={() => onCommit(withMouse({ bindings: resetMouseBindings(mouse.bindings) }))}
         onRebind={(bindings) => onCommit(withMouse({ bindings }))}
       />
     );
@@ -374,6 +393,8 @@ function KeyboardEditor({
         bindings={keyboard.bindings}
         actions={KEY_ACTIONS}
         disabled={disabled}
+        resetLabel="Reset all keys"
+        onReset={() => onCommit(withKeyboard({ bindings: resetKeyBindings(keyboard.bindings) }))}
         onRebind={(bindings) => onCommit(withKeyboard({ bindings }))}
       />
     );
