@@ -10,6 +10,7 @@ import {
   type Settings,
 } from '@/gen/devices';
 import { connectionLabel } from '@/components/device-status';
+import { Switch } from '@/components/switch';
 import { BUTTON_OUTLINE, cn, FOCUS_RING } from '@/lib/utils';
 import {
   EFFECTS,
@@ -105,25 +106,6 @@ function Slider({
       )}
       {description && <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>}
     </div>
-  );
-}
-
-function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <input
-      type="checkbox"
-      role="switch"
-      checked={checked}
-      onChange={(event) => onChange(event.target.checked)}
-      className={cn(
-        'relative h-5.5 w-9.5 shrink-0 cursor-pointer appearance-none rounded-full bg-input',
-        'transition-colors checked:bg-primary disabled:cursor-default',
-        'before:absolute before:left-0.5 before:top-0.5 before:size-4.5 before:rounded-full',
-        'before:bg-white before:shadow-sm before:transition-transform',
-        'checked:before:translate-x-4',
-        FOCUS_RING,
-      )}
-    />
   );
 }
 
@@ -351,9 +333,12 @@ function MouseEditor({
         />
 
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm font-medium">Reverse direction</span>
+          <span id="reverse-scroll" className="text-sm font-medium">
+            Reverse direction
+          </span>
           <Switch
             checked={mouse.naturalScroll}
+            labelledBy="reverse-scroll"
             onChange={(naturalScroll) => onCommit(withMouse({ naturalScroll }))}
           />
         </div>

@@ -4,15 +4,10 @@ import { LinkType, type DeviceList } from './gen/native/devices';
 import { DeviceEventsServiceDescriptor } from './gen/native_service';
 import { DevicesServiceDescriptor } from './gen/ipc_service';
 import { Settings, type DeviceId } from './gen/devices';
+import { checkBatteries, persistPreferences } from './settings';
 
 const STORED_SETTINGS_KEY = 'devices.settings';
 const STORED_PAIRED_IDS_KEY = 'devices.pairedIds';
-
-function persistPreferences(): void {
-  if (!prefs.persist()) {
-    console.warn('Could not write device preferences.');
-  }
-}
 
 function readStoredSettings(): Record<string, unknown> {
   return prefs.getObject<Record<string, unknown>>(STORED_SETTINGS_KEY, {});
@@ -72,6 +67,14 @@ export function startDevices(): void {
   const deviceUpdates = ipc.registerService(DevicesServiceDescriptor);
   const devicesReady = restorePairedDevices().then(restoreSettings);
 
+  let restored = false;
+  void devicesReady
+    .then(async () => {
+      restored = true;
+      checkBatteries(await native.deviceStack.List({}));
+    })
+    .catch((error: unknown) => console.warn('Could not check device batteries.', error));
+
   ipc.registerService(DevicesServiceDescriptor, {
     async List() {
       await devicesReady;
@@ -108,6 +111,7 @@ export function startDevices(): void {
   native.registerService(DeviceEventsServiceDescriptor, {
     async Changed(devices: DeviceList) {
       deviceUpdates.Watch(devices);
+      if (restored) checkBatteries(devices);
       return {};
     },
   });

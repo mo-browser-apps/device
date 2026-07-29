@@ -12,7 +12,7 @@ import {
 import { LinkType, type Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
 
-const LOW_BATTERY = 20;
+export const LOW_BATTERY = 20;
 const FULL_BATTERY = 90;
 
 const UNKNOWN_CONNECTION = { label: 'Unknown connection', Icon: CircleHelp };

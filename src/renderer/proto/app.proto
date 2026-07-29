@@ -2,10 +2,18 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-message SetThemeRequest {
+message AppSettings {
   string theme = 1;
+  bool launch_at_login = 2;
+  bool low_battery_alerts = 3;
+}
+
+message OpenDevice {
+  string id = 1;
 }
 
 service AppService {
-  rpc SetTheme(SetThemeRequest) returns (google.protobuf.Empty);
+  rpc GetSettings(google.protobuf.Empty) returns (AppSettings);
+  rpc ApplySettings(AppSettings) returns (google.protobuf.Empty);
+  rpc OnOpenDevice(google.protobuf.Empty) returns (stream OpenDevice);
 }

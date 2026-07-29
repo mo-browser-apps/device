@@ -133,7 +133,7 @@ DeviceStack::DeviceStack() {
                     .model = "Travel Mouse",
                     .link = BLUETOOTH,
                     .firmware = "1.4.0",
-                    .battery = 45,
+                    .battery = 15,
                     .charging = false,
                     .buttons = {{"wheel", "middle-click"}},
                     .min_dpi = 800,

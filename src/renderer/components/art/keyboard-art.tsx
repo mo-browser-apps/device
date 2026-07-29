@@ -103,7 +103,6 @@ function lightStyle({ effect, hue, brightness }: Lighting, key: Key): CSSPropert
     textShadow: `0 1px ${2.5 * level}px ${light(0.7, 65)}`,
     animationDelay: effect === LightEffect.WAVE ? key.waveDelay : '0s',
     animationDuration: `${CYCLE_SECONDS}s`,
-    transition: 'box-shadow 200ms, color 200ms, text-shadow 200ms',
   };
 }
 

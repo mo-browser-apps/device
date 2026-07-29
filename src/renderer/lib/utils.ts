@@ -10,10 +10,20 @@ export const FOCUS_RING =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
-/** Shared button shape. Use one of the variants below, not this on its own. */
+/** Shared button shape; use a variant below. `h-9` is what `py-2 text-sm` measures. */
 const BUTTON =
-  'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ' +
+  'inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium ' +
   `transition-colors disabled:cursor-default disabled:opacity-50 ${FOCUS_RING}`;
+
+/** A borderless icon button, for the back arrow at the top of a screen. */
+export const BUTTON_ICON =
+  'rounded-md p-1 text-muted-foreground transition-colors ' +
+  `hover:bg-accent hover:text-foreground ${FOCUS_RING}`;
+
+/** One option of a segmented `ToggleGroup`, in the app's calm selected style. */
+export const TOGGLE_ITEM =
+  'px-3 text-muted-foreground hover:bg-transparent hover:text-foreground ' +
+  'data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm';
 
 export const BUTTON_PRIMARY = `${BUTTON} bg-primary text-primary-foreground hover:bg-primary/90`;
 export const BUTTON_OUTLINE = `${BUTTON} border hover:bg-accent`;

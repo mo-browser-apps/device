@@ -4,7 +4,7 @@ import { DeviceArt } from '@/components/art/device-art';
 import { DeviceStatus } from '@/components/device-status';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useDeviceSettings } from '@/gateway/devices';
-import { cn, FOCUS_RING } from '@/lib/utils';
+import { BUTTON_ICON, TOGGLE_ITEM } from '@/lib/utils';
 import type { Device } from '@/gen/devices';
 import { actionLabel, boundAction, controlLabel } from './controls';
 import { ControlEditor, type Segment } from './control-editor';
@@ -28,10 +28,6 @@ function segmentsFor(device: Device): [Segment, string][] {
   segments.push(['info', 'Info']);
   return segments;
 }
-
-const SEGMENT_ITEM =
-  'px-3 text-muted-foreground hover:bg-transparent hover:text-foreground ' +
-  'data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm';
 
 export function DeviceView({
   device,
@@ -63,18 +59,9 @@ export function DeviceView({
   const selectable = segment === 'buttons' || segment === 'keys';
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" aria-busy={settings === null}>
       <div className="mb-4 flex items-center gap-3 px-8">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to devices"
-          className={cn(
-            'rounded-md p-1 text-muted-foreground transition-colors',
-            'hover:bg-accent hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
+        <button type="button" onClick={onBack} aria-label="Back to devices" className={BUTTON_ICON}>
           <ArrowLeft className="size-5" />
         </button>
         <h1 className="text-xl font-semibold tracking-tight">{device.model}</h1>
@@ -83,7 +70,7 @@ export function DeviceView({
         </span>
       </div>
 
-      {settings ? (
+      {settings && (
         <>
           <ToggleGroup
             type="single"
@@ -94,7 +81,7 @@ export function DeviceView({
             className="mx-auto mb-5 w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
           >
             {segments.map(([value, label]) => (
-              <ToggleGroupItem key={value} value={value} className={SEGMENT_ITEM}>
+              <ToggleGroupItem key={value} value={value} className={TOGGLE_ITEM}>
                 {label}
               </ToggleGroupItem>
             ))}
@@ -128,10 +115,6 @@ export function DeviceView({
             </aside>
           </div>
         </>
-      ) : (
-        <div className="flex flex-1 items-center justify-center py-6">
-          <DeviceArt device={device} />
-        </div>
       )}
 
       {removeOpen && (

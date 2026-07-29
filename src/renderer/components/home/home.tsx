@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Settings, X } from 'lucide-react';
 import { LinkType, type Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
 import { DeviceBatteryStatus, DeviceConnectionIcon } from '@/components/device-status';
@@ -114,11 +114,13 @@ export function Home({
   initialScrollLeft,
   restoreFocusId,
   onOpen,
+  onOpenSettings,
 }: {
   devices: Device[];
   initialScrollLeft: number;
   restoreFocusId: string | null;
   onOpen: (deviceId: string, scrollLeft: number) => void;
+  onOpenSettings: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Device | null>(null);
@@ -153,14 +155,24 @@ export function Home({
     <div className="flex min-h-full flex-col">
       <div className="flex items-center justify-between gap-4 px-8">
         <h1 className="text-xl font-semibold tracking-tight">Devices</h1>
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className={cn(BUTTON_OUTLINE, 'bg-card/50 shadow-xs')}
-        >
-          <Plus className="size-4" strokeWidth={1.75} />
-          Add device
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className={cn(BUTTON_OUTLINE, 'bg-card/50 shadow-xs')}
+          >
+            <Plus className="size-4" strokeWidth={1.75} />
+            Add device
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="Settings"
+            className={cn(BUTTON_OUTLINE, 'bg-card/50 px-2.5 text-muted-foreground shadow-xs')}
+          >
+            <Settings className="size-4.5" strokeWidth={1.75} />
+          </button>
+        </div>
       </div>
 
       {devices.length > 0 ? (
