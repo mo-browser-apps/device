@@ -95,13 +95,15 @@ function lightStyle({ effect, hue, brightness }: Lighting, key: Key): CSSPropert
 
   return {
     mixBlendMode: 'screen',
-    background: light(0.14),
-    boxShadow: `0 0 ${9 * level}px ${2.5 * level}px ${light(0.5)}`,
-    color: `hsl(${hue} 100% 72% / ${(0.45 + 0.55 * level).toFixed(3)})`,
-    textShadow: `0 0 ${5 * level}px ${light(0.9, 65)}`,
+    boxShadow: [
+      `0 ${1.5 * level}px ${2.5 * level}px ${0.25 * level}px ${light(0.75, 62)}`,
+      `0 ${4 * level}px ${8 * level}px ${-1.5 * level}px ${light(0.42)}`,
+    ].join(', '),
+    color: `hsl(${hue} 100% 72% / ${(0.38 + 0.47 * level).toFixed(3)})`,
+    textShadow: `0 1px ${2.5 * level}px ${light(0.7, 65)}`,
     animationDelay: effect === LightEffect.WAVE ? key.waveDelay : '0s',
     animationDuration: `${CYCLE_SECONDS}s`,
-    transition: 'background 200ms, box-shadow 200ms, color 200ms, text-shadow 200ms',
+    transition: 'box-shadow 200ms, color 200ms, text-shadow 200ms',
   };
 }
 
