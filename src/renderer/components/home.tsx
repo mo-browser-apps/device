@@ -4,7 +4,7 @@ import type { Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
 import { DeviceBatteryStatus, DeviceConnectionIcon } from '@/components/device-status';
 import { useCarousel } from '@/lib/use-carousel';
-import { cn } from '@/lib/utils';
+import { cn, FOCUS_RING } from '@/lib/utils';
 
 function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) {
   return (
@@ -14,9 +14,8 @@ function DeviceCard({ device, onOpen }: { device: Device; onOpen: () => void }) 
       onClick={onOpen}
       className={cn(
         'group flex w-64 shrink-0 snap-center flex-col items-center gap-5 rounded-2xl px-6 py-7',
-        'transition-colors hover:bg-foreground/[0.045]',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-        'focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'transition-colors hover:bg-foreground/4.5',
+        FOCUS_RING,
       )}
     >
       <span className="flex h-44 w-full items-center justify-center">
@@ -120,7 +119,7 @@ export function Home({
         <div
           id="device-carousel"
           ref={carouselRef}
-          className="w-full snap-x snap-proximity overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
             {devices.map((device) => (

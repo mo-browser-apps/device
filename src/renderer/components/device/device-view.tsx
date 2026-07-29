@@ -4,8 +4,9 @@ import { DeviceArt } from '@/components/art/device-art';
 import { DeviceStatus } from '@/components/device-status';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useDeviceSettings } from '@/gateway/devices';
+import { cn, FOCUS_RING } from '@/lib/utils';
 import type { Device } from '@/gen/devices';
-import { actionLabel, boundAction } from './actions';
+import { actionLabel, boundAction, controlLabel } from './controls';
 import { ControlEditor } from './control-editor';
 
 type Segment = 'buttons' | 'movement';
@@ -27,6 +28,7 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
     segment === 'buttons' && mouse && spec
       ? spec.buttons.map((control) => ({
           id: control,
+          name: controlLabel(control),
           value: actionLabel(boundAction(mouse, control)),
         }))
       : [];
@@ -38,7 +40,11 @@ export function DeviceView({ device, onBack }: { device: Device; onBack: () => v
           type="button"
           onClick={onBack}
           aria-label="Back to devices"
-          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className={cn(
+            'rounded-md p-1 text-muted-foreground transition-colors',
+            'hover:bg-accent hover:text-foreground',
+            FOCUS_RING,
+          )}
         >
           <ArrowLeft className="size-5" />
         </button>

@@ -1,13 +1,6 @@
-import { cn } from '@/lib/utils';
+import { cn, FOCUS_RING } from '@/lib/utils';
 
 export type MouseArtProfile = 'performance' | 'travel';
-
-export const MOUSE_LABELS: Record<string, string> = {
-  wheel: 'Wheel',
-  back: 'Back',
-  forward: 'Forward',
-  gesture: 'Thumb button',
-};
 
 type Hotspot = { x: number; y: number; side: 'left' | 'right'; labelY: number };
 
@@ -23,22 +16,21 @@ const HOTSPOTS: Record<MouseArtProfile, Record<string, Hotspot>> = {
   },
 };
 
-export type Callout = { id: string; value: string };
+/** A control to label on the art: `wheel` shown as "Wheel · Middle click". */
+export type Callout = { id: string; name: string; value: string };
 
 function ControlCallout({
   id,
+  name,
   value,
   spot,
   selected,
   onSelect,
-}: {
-  id: string;
-  value: string;
+}: Callout & {
   spot: Hotspot;
   selected: boolean;
   onSelect?: (control: string) => void;
 }) {
-  const name = MOUSE_LABELS[id] ?? id;
   const anchor =
     spot.side === 'right'
       ? { top: `${spot.labelY}%`, left: `${spot.x}%` }
@@ -67,9 +59,8 @@ function ControlCallout({
         className={cn(
           'absolute flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap',
           'rounded-lg border px-2.5 py-1.5 text-xs backdrop-blur-sm',
-          'transition-colors focus-visible:outline-hidden focus-visible:ring-2',
-          'focus-visible:ring-ring focus-visible:ring-offset-2',
-          'focus-visible:ring-offset-background',
+          'transition-colors',
+          FOCUS_RING,
           spot.side === 'right' ? 'translate-x-3' : '-translate-x-3',
           selected
             ? 'border-primary/70 bg-primary/15 text-foreground'
@@ -117,14 +108,13 @@ export function MouseArt({
       />
 
       {callouts.map(
-        ({ id, value }) =>
-          hotspots[id] && (
+        (callout) =>
+          hotspots[callout.id] && (
             <ControlCallout
-              key={id}
-              id={id}
-              value={value}
-              spot={hotspots[id]}
-              selected={selectedControl === id}
+              key={callout.id}
+              {...callout}
+              spot={hotspots[callout.id]}
+              selected={selectedControl === callout.id}
               onSelect={onControlSelect}
             />
           ),

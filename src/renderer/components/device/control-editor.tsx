@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
-import { MOUSE_LABELS } from '@/components/art/mouse-art';
-import { cn } from '@/lib/utils';
-import { ACTIONS, boundAction } from './actions';
+import { cn, FOCUS_RING } from '@/lib/utils';
+import { ACTIONS, boundAction, controlLabel } from './controls';
 
 const DPI_STEP = 100;
 const SCROLL_SPEEDS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
@@ -64,8 +63,7 @@ function Slider({
           '[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none',
           '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary',
           '[&::-webkit-slider-thumb]:shadow-sm',
-          'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-          'focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          FOCUS_RING,
         )}
       />
       <div className="flex justify-between text-xs text-muted-foreground">
@@ -88,11 +86,9 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: b
         'relative h-5.5 w-9.5 shrink-0 cursor-pointer appearance-none rounded-full bg-input',
         'transition-colors checked:bg-primary disabled:cursor-default',
         'before:absolute before:left-0.5 before:top-0.5 before:size-4.5 before:rounded-full',
-        // ponytail: knob stays white in both themes, like the macOS switch.
         'before:bg-white before:shadow-sm before:transition-transform',
         'checked:before:translate-x-4',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-        'focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        FOCUS_RING,
       )}
     />
   );
@@ -176,7 +172,7 @@ export function ControlEditor({
         }),
       );
 
-    const name = MOUSE_LABELS[selected] ?? selected;
+    const name = controlLabel(selected);
     return (
       <fieldset disabled={disabled} className="min-w-0 disabled:opacity-50">
         <legend className="sr-only">{name} action</legend>
