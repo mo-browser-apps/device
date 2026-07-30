@@ -1,4 +1,5 @@
 import { app, ipc, prefs, BrowserWindow, Notification, Theme } from '@mobrowser/api';
+import { native } from './gen/native';
 import { AppSettings } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
 import type { Device, DeviceList } from './gen/native/devices';
@@ -7,7 +8,6 @@ const THEME_KEY = 'app.theme';
 const LOW_BATTERY_ALERTS_KEY = 'app.lowBatteryAlerts';
 const LOW_BATTERY = 20;
 
-/** Devices inside an open low-battery episode, so each drain notifies once. */
 const lowBattery = new Set<string>();
 
 const appEvents = ipc.registerService(AppServiceDescriptor);
@@ -45,13 +45,13 @@ function isLow(device: Device): boolean {
 
 /** Notifies for devices that have just entered a low-battery episode. */
 export function checkBatteries(devices: DeviceList): void {
-  const alertsOn = prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false);
+  if (!prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false)) return;
 
   for (const device of devices.devices) {
     if (isLow(device)) {
       if (!lowBattery.has(device.id)) {
         lowBattery.add(device.id);
-        if (alertsOn) notifyLowBattery(device);
+        notifyLowBattery(device);
       }
     } else if (device.hasBattery && device.battery > LOW_BATTERY) {
       lowBattery.delete(device.id);
@@ -80,9 +80,17 @@ export function startSettings(win: BrowserWindow): void {
         app.setLoginItemSettings({ openAtLogin: request.launchAtLogin });
       }
 
+      const alertsWereOn = prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false);
+
       prefs.setString(THEME_KEY, request.theme);
       prefs.setBoolean(LOW_BATTERY_ALERTS_KEY, request.lowBatteryAlerts);
       persistPreferences();
+
+      if (!request.lowBatteryAlerts) {
+        lowBattery.clear();
+      } else if (!alertsWereOn) {
+        checkBatteries(await native.deviceStack.List({}));
+      }
       return {};
     },
   });
