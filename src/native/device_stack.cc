@@ -109,11 +109,11 @@ DeviceSeed MakeKeyboard() {
 }  // namespace
 
 DeviceStack::DeviceStack() {
-  auto add = [](std::vector<Entry>& entries, DeviceSeed seed) {
-    entries.push_back({std::move(seed.device), std::move(seed.settings)});
+  auto add = [](std::vector<Entry>& paired, DeviceSeed seed) {
+    paired.push_back({std::move(seed.device), std::move(seed.settings)});
   };
 
-  add(entries_, MakeMouse({
+  add(paired_, MakeMouse({
                     .id = "performance-mouse",
                     .model = "Performance Mouse",
                     .link = RECEIVER,
@@ -128,7 +128,7 @@ DeviceStack::DeviceStack() {
                     .max_dpi = 8000,
                     .dpi = 1600,
                 }));
-  add(entries_, MakeMouse({
+  add(paired_, MakeMouse({
                     .id = "travel-mouse",
                     .model = "Travel Mouse",
                     .link = BLUETOOTH,
@@ -140,11 +140,11 @@ DeviceStack::DeviceStack() {
                     .max_dpi = 3200,
                     .dpi = 1200,
                 }));
-  add(entries_, MakeKeyboard());
+  add(paired_, MakeKeyboard());
 
   // A second unit of the same mouse, discoverable so the pairing flow is
   // usable on a fresh launch.
-  Entry nearby = entries_.front();
+  Entry nearby = paired_.front();
   nearby.device.set_id("performance-mouse-secondary");
   nearby.device.set_link(BLUETOOTH);
   nearby.device.set_battery(68);
@@ -156,7 +156,7 @@ DeviceStack::DeviceStack() {
 
 DeviceList DeviceStack::List() const {
   DeviceList list;
-  for (const Entry& entry : entries_) {
+  for (const Entry& entry : paired_) {
     *list.add_devices() = entry.device;
   }
   return list;
@@ -176,35 +176,35 @@ bool DeviceStack::Pair(const std::string& device_id) {
     return false;
   }
   entry->device.set_connected(true);
-  entries_.push_back(std::move(*entry));
+  paired_.push_back(std::move(*entry));
   available_.erase(entry);
   PublishDevicesChanged();
   return true;
 }
 
 bool DeviceStack::Forget(const std::string& device_id) {
-  auto entry = FindById(entries_, device_id);
-  if (entry == entries_.end() || entry->device.link() == WIRED) {
+  auto entry = FindById(paired_, device_id);
+  if (entry == paired_.end() || entry->device.link() == WIRED) {
     return false;
   }
   entry->device.set_connected(false);
   available_.push_back(std::move(*entry));
-  entries_.erase(entry);
+  paired_.erase(entry);
   PublishDevicesChanged();
   return true;
 }
 
 std::optional<Settings> DeviceStack::GetSettings(const std::string& device_id) const {
-  auto entry = FindById(entries_, device_id);
-  if (entry == entries_.end()) {
+  auto entry = FindById(paired_, device_id);
+  if (entry == paired_.end()) {
     return std::nullopt;
   }
   return entry->settings;
 }
 
 bool DeviceStack::ApplySettings(const Settings& settings) {
-  auto entry = FindById(entries_, settings.device_id());
-  if (entry != entries_.end()) {
+  auto entry = FindById(paired_, settings.device_id());
+  if (entry != paired_.end()) {
     if (entry->settings.kind_case() != settings.kind_case()) {
       return false;
     }
@@ -212,6 +212,7 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
     return true;
   }
 
+  // Keep an unpaired device's customizations so adding it again does not reset it.
   auto available = FindById(available_, settings.device_id());
   if (available == available_.end() || available->settings.kind_case() != settings.kind_case()) {
     return false;

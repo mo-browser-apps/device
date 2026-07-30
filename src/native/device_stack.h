@@ -34,7 +34,7 @@ class DeviceStack {
     Settings settings;
   };
 
-  std::vector<Entry> entries_;
+  std::vector<Entry> paired_;
   std::vector<Entry> available_;
   DevicesChangedHandler devices_changed_;
 
