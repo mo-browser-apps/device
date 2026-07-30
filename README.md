@@ -1,26 +1,25 @@
 # MōDevice — a peripherals configuration demo
 
-MōDevice is a cross-platform reference application for configuring computer peripherals, built with
-[MōBrowser](https://teamdev.com/mobrowser/). It demonstrates how a manufacturer can connect a native
-C++ device layer to a responsive web interface in a desktop application for Windows and macOS.
+MōDevice is a small reference application for configuring mice and keyboards, built with
+[MōBrowser](https://teamdev.com/mobrowser/). It demonstrates a desktop architecture with a React
+interface, a TypeScript application process, and a native C++ device layer.
 
-The project is intentionally focused: it presents a polished mouse and keyboard configuration
-experience without the complexity of a production device suite.
+The demo looks and behaves like real device configuration software while keeping the source code
+small and easy to follow.
 
-## Demo experience
+## What the demo shows
 
-The in-memory native device backend supports the primary workflows expected from peripheral
-software:
-
-- Browse mice and keyboards with connection, battery, and firmware information.
-- Discover, add, and remove wireless devices, with the paired roster restored on restart.
-- Assign actions to mouse buttons and adjust pointer and scrolling behaviour.
+- View mice and keyboards with their connection, battery, and firmware information.
+- Find, add, and remove wireless devices.
+- Assign actions to mouse buttons and adjust pointer and scrolling behavior.
 - Remap keyboard keys and configure backlight effects, color, and brightness.
-- Observe the interface react to native device-list changes in real time.
+- Change the app theme, launch it at login, and enable low-battery alerts.
+- Keep paired devices and settings between launches.
 
-MōDevice does not access peripherals connected to the host computer. Its devices and settings are
-provided by an in-memory C++ implementation of the same device-stack interface a real hardware
-integration would use, making the demo deterministic and portable across supported platforms.
+All devices are simulated by an in-memory C++ backend. MōDevice does not detect or change real
+peripherals connected to the computer. It is a reference demo, not production device software.
+
+The demo requires no account, API key, or external service, and it does not transmit user data.
 
 ## Requirements
 
@@ -28,21 +27,14 @@ integration would use, making the demo deterministic and portable across support
 - [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
 - [MōBrowser](https://teamdev.com/mobrowser/) 2.13.0 or later.
 
-The demo requires no account, API key, or external service, and it does not transmit user data.
-
-## Setup
+## Run from source
 
 ```bash
 npm install
-```
-
-## Development
-
-```bash
 npm run dev
 ```
 
-## Production build
+To create a production build:
 
 ```bash
 npm run build
