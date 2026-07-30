@@ -2,6 +2,10 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
+// MōBrowser generates native RPC and renderer IPC from separate proto roots.
+// Keep this device model aligned with src/renderer/proto/devices.proto. The
+// main-process bridge in src/main/devices.ts owns the handoff between them.
+
 enum LinkType {
   RECEIVER = 0;
   BLUETOOTH = 1;
