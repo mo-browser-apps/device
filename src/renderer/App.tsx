@@ -7,22 +7,25 @@ import { useAppSettings, useOpenDeviceRequests } from '@/gateway/settings';
 
 const isMac = navigator.userAgent.includes('Mac');
 
+interface HomeState {
+  scrollLeft: number;
+  focus: HomeFocusTarget;
+}
+
 export default function App() {
   const { devices, failed } = useDevices();
   const { settings, update } = useAppSettings();
-  /** Either fixed screen, or the id of the device being configured. */
+
   const [screen, setScreen] = useState('devices');
-  const [homeState, setHomeState] = useState<{
-    scrollLeft: number;
-    focus: HomeFocusTarget;
-  }>({
+  const [homeState, setHomeState] = useState<HomeState>({
     scrollLeft: 0,
     focus: null,
   });
+
   const mainRef = useRef<HTMLElement>(null);
   const restoreHomeFocus = useRef(false);
 
-  const openDevice = devices?.find((device) => device.id === screen) ?? null;
+  const activeDevice = devices?.find((device) => device.id === screen) ?? null;
 
   const theme = settings?.theme ?? 'system';
   useEffect(() => {
@@ -41,15 +44,15 @@ export default function App() {
     return () => media.removeEventListener('change', apply);
   }, [theme]);
 
-  useOpenDeviceRequests(
-    useCallback((deviceId: string) => {
-      setHomeState((current) => ({
-        ...current,
-        focus: { type: 'device', id: deviceId },
-      }));
-      setScreen(deviceId);
-    }, []),
-  );
+  const openDevice = useCallback((deviceId: string, scrollLeft?: number) => {
+    setHomeState((current) => ({
+      scrollLeft: scrollLeft ?? current.scrollLeft,
+      focus: { type: 'device', id: deviceId },
+    }));
+    setScreen(deviceId);
+  }, []);
+
+  useOpenDeviceRequests(openDevice);
 
   useEffect(() => {
     if (screen === 'devices' && restoreHomeFocus.current) {
@@ -59,8 +62,18 @@ export default function App() {
     mainRef.current?.focus();
   }, [screen]);
 
+  const openSettings = (scrollLeft: number) => {
+    setHomeState({ scrollLeft, focus: { type: 'settings' } });
+    setScreen('settings');
+  };
+
   const backToDevices = () => {
     restoreHomeFocus.current = true;
+    setScreen('devices');
+  };
+
+  const handleDeviceRemoved = () => {
+    setHomeState((current) => ({ ...current, focus: null }));
     setScreen('devices');
   };
 
@@ -80,13 +93,10 @@ export default function App() {
           >
             {screen === 'settings' ? (
               <SettingsView settings={settings} update={update} onBack={backToDevices} />
-            ) : openDevice ? (
+            ) : activeDevice ? (
               <DeviceView
-                device={openDevice}
-                onRemoved={() => {
-                  setHomeState((current) => ({ ...current, focus: null }));
-                  setScreen('devices');
-                }}
+                device={activeDevice}
+                onRemoved={handleDeviceRemoved}
                 onBack={backToDevices}
               />
             ) : (
@@ -94,14 +104,8 @@ export default function App() {
                 devices={devices}
                 initialScrollLeft={homeState.scrollLeft}
                 restoreFocus={homeState.focus}
-                onOpen={(deviceId, scrollLeft) => {
-                  setHomeState({ scrollLeft, focus: { type: 'device', id: deviceId } });
-                  setScreen(deviceId);
-                }}
-                onOpenSettings={(scrollLeft) => {
-                  setHomeState({ scrollLeft, focus: { type: 'settings' } });
-                  setScreen('settings');
-                }}
+                onOpen={openDevice}
+                onOpenSettings={openSettings}
               />
             )}
           </div>
