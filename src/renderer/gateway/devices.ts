@@ -24,7 +24,7 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 
   useEffect(() => {
     const subscription = ipc.devices.Watch({}).subscribe({
-      next: (list) => setDevices(list.devices),
+      next: (deviceList) => setDevices(deviceList.devices),
       error: (error: unknown) => {
         console.error('Device stream failed.', error);
         setFailed(true);
@@ -33,7 +33,9 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 
     ipc.devices
       .List({})
-      .then((list) => setDevices((current) => current ?? list.devices))
+      .then((deviceList) =>
+        setDevices((currentDevices) => currentDevices ?? deviceList.devices),
+      )
       .catch((error: unknown) => {
         console.error('Could not list devices.', error);
         setFailed(true);
@@ -53,26 +55,26 @@ export function useDeviceSettings(deviceId: string) {
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
-    let active = true;
+    let isActive = true;
 
     ipc.devices
       .GetSettings({ id: deviceId })
-      .then((stored) => {
-        if (active) setSettings(stored);
+      .then((storedSettings) => {
+        if (isActive) setSettings(storedSettings);
       })
       .catch((error: unknown) => console.error('Could not read device settings.', error));
 
     return () => {
-      active = false;
+      isActive = false;
     };
   }, [deviceId]);
 
-  const commit = useCallback((next: Settings) => {
-    setSettings(next);
-    void ipc.devices.ApplySettings(next).catch((error: unknown) => {
+  const commitSettings = useCallback((nextSettings: Settings) => {
+    setSettings(nextSettings);
+    void ipc.devices.ApplySettings(nextSettings).catch((error: unknown) => {
       console.error('Could not apply device settings.', error);
     });
   }, []);
 
-  return { settings, preview: setSettings, commit };
+  return { settings, preview: setSettings, commit: commitSettings };
 }

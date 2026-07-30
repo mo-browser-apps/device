@@ -25,17 +25,19 @@ import {
 
 export type Segment = 'buttons' | 'movement' | 'keys' | 'lighting' | 'info';
 
+type SettingsChangeHandler = (settings: Settings) => void;
+
 const DPI_STEP = 100;
-const SCROLL_SPEEDS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
+const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
 /** The hue slider's own track, the one place colour is allowed outside the art. */
-const HUE_TRACK: CSSProperties = {
+const HUE_TRACK_STYLE: CSSProperties = {
   background: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360]
     .map((hue) => `hsl(${hue} 95% 55%)`)
     .join(', ')})`,
 };
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-5">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -46,20 +48,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Slider({
-  label,
-  display,
-  value,
-  min,
-  max,
-  step,
-  minLabel,
-  maxLabel,
-  description,
-  trackStyle,
-  onPreview,
-  onCommit,
-}: {
+interface SettingsSliderProps {
   label: string;
   display: ReactNode;
   value: number;
@@ -72,7 +61,22 @@ function Slider({
   trackStyle?: CSSProperties;
   onPreview: (value: number) => void;
   onCommit: () => void;
-}) {
+}
+
+function SettingsSlider({
+  label,
+  display,
+  value,
+  min,
+  max,
+  step,
+  minLabel,
+  maxLabel,
+  description,
+  trackStyle,
+  onPreview,
+  onCommit,
+}: SettingsSliderProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
@@ -152,7 +156,17 @@ function RadioOption({
   );
 }
 
-/** Buttons and Keys differ only in which actions they offer. */
+interface BindingEditorProps {
+  control: string;
+  bindings: Binding[];
+  actions: string[];
+  disabled: boolean;
+  resetLabel: string;
+  onReset: () => void;
+  onRebind: (bindings: Binding[]) => void;
+}
+
+/** Buttons and keys differ only in which actions they offer. */
 function BindingEditor({
   control,
   bindings,
@@ -161,26 +175,18 @@ function BindingEditor({
   resetLabel,
   onReset,
   onRebind,
-}: {
-  control: string;
-  bindings: Binding[];
-  actions: string[];
-  disabled: boolean;
-  resetLabel: string;
-  onReset: () => void;
-  onRebind: (bindings: Binding[]) => void;
-}) {
-  const name = controlLabel(control);
-  const current = boundAction(bindings, control);
+}: BindingEditorProps) {
+  const controlName = controlLabel(control);
+  const selectedAction = boundAction(bindings, control);
 
   const rebind = (action: string) =>
     onRebind(bindings.map((entry) => (entry.control === control ? { ...entry, action } : entry)));
 
   return (
     <fieldset disabled={disabled} className="min-w-0 disabled:opacity-50">
-      <legend className="sr-only">{name} action</legend>
+      <legend className="sr-only">{controlName} action</legend>
       <div className="flex flex-col gap-8">
-        <Section title={name}>
+        <SettingsSection title={controlName}>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {actions.map((action) => (
               <RadioOption
@@ -188,12 +194,12 @@ function BindingEditor({
                 group="action"
                 value={action}
                 label={actionLabel(action)}
-                selected={action === current}
+                selected={action === selectedAction}
                 onSelect={() => rebind(action)}
               />
             ))}
           </div>
-        </Section>
+        </SettingsSection>
 
         <button
           type="button"
@@ -208,20 +214,20 @@ function BindingEditor({
   );
 }
 
-function Info({ device, onRemove }: { device: Device; onRemove: () => void }) {
-  const rows: [string, string][] = [
+function DeviceInfo({ device, onRemove }: { device: Device; onRemove: () => void }) {
+  const details: [label: string, value: string][] = [
     ['Connection', connectionLabel(device)],
     ['Firmware', device.firmware],
   ];
 
   if (device.keyboard) {
-    rows.push(
+    details.push(
       ['Remappable keys', String(device.keyboard.keys.length)],
       ['Lighting', device.keyboard.backlight ? 'Supported' : 'Not supported'],
     );
   }
   if (device.mouse) {
-    rows.push(
+    details.push(
       ['Remappable buttons', String(device.mouse.buttons.length)],
       ['Sensor', `${device.mouse.minDpi}–${device.mouse.maxDpi} DPI`],
     );
@@ -229,16 +235,16 @@ function Info({ device, onRemove }: { device: Device; onRemove: () => void }) {
 
   return (
     <div className="flex flex-col gap-8">
-      <Section title="Info">
+      <SettingsSection title="Info">
         <dl className="flex flex-col gap-4">
-          {rows.map(([label, value]) => (
+          {details.map(([label, value]) => (
             <div key={label} className="flex items-baseline justify-between gap-4 text-sm">
               <dt className="text-muted-foreground">{label}</dt>
               <dd className="text-right font-medium">{value}</dd>
             </div>
           ))}
         </dl>
-      </Section>
+      </SettingsSection>
 
       {device.link !== LinkType.WIRED && (
         <button
@@ -258,6 +264,17 @@ function Info({ device, onRemove }: { device: Device; onRemove: () => void }) {
   );
 }
 
+interface MouseEditorProps {
+  settings: Settings;
+  mouse: MouseSettings;
+  spec: MouseSpec;
+  selected: string | null;
+  segment: 'buttons' | 'movement';
+  disabled: boolean;
+  onPreview: SettingsChangeHandler;
+  onCommit: SettingsChangeHandler;
+}
+
 function MouseEditor({
   settings,
   mouse,
@@ -267,17 +284,8 @@ function MouseEditor({
   disabled,
   onPreview,
   onCommit,
-}: {
-  settings: Settings;
-  mouse: MouseSettings;
-  spec: MouseSpec;
-  selected: string | null;
-  segment: 'buttons' | 'movement';
-  disabled: boolean;
-  onPreview: (settings: Settings) => void;
-  onCommit: (settings: Settings) => void;
-}) {
-  const withMouse = (changes: Partial<MouseSettings>): Settings => ({
+}: MouseEditorProps) {
+  const withMouseChanges = (changes: Partial<MouseSettings>): Settings => ({
     ...settings,
     mouse: { ...mouse, ...changes },
   });
@@ -292,18 +300,20 @@ function MouseEditor({
         actions={MOUSE_ACTIONS}
         disabled={disabled}
         resetLabel="Reset all buttons"
-        onReset={() => onCommit(withMouse({ bindings: resetMouseBindings(mouse.bindings) }))}
-        onRebind={(bindings) => onCommit(withMouse({ bindings }))}
+        onReset={() =>
+          onCommit(withMouseChanges({ bindings: resetMouseBindings(mouse.bindings) }))
+        }
+        onRebind={(bindings) => onCommit(withMouseChanges({ bindings }))}
       />
     );
   }
 
-  const commitPreviewed = () => onCommit(settings);
+  const commitCurrentSettings = () => onCommit(settings);
 
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
-      <Section title="Pointer">
-        <Slider
+      <SettingsSection title="Pointer">
+        <SettingsSlider
           label="Speed"
           display={`${mouse.dpi} DPI`}
           value={mouse.dpi}
@@ -313,23 +323,23 @@ function MouseEditor({
           minLabel={`${spec.minDpi} DPI`}
           maxLabel={`${spec.maxDpi} DPI`}
           description="Higher values move the pointer farther with less hand movement."
-          onPreview={(dpi) => onPreview(withMouse({ dpi }))}
-          onCommit={commitPreviewed}
+          onPreview={(dpi) => onPreview(withMouseChanges({ dpi }))}
+          onCommit={commitCurrentSettings}
         />
-      </Section>
+      </SettingsSection>
 
-      <Section title="Scrolling">
-        <Slider
+      <SettingsSection title="Scrolling">
+        <SettingsSlider
           label="Wheel speed"
-          display={SCROLL_SPEEDS[mouse.scrollSpeed - 1] ?? `${mouse.scrollSpeed}`}
+          display={SCROLL_SPEED_LABELS[mouse.scrollSpeed - 1] ?? `${mouse.scrollSpeed}`}
           value={mouse.scrollSpeed}
           min={1}
-          max={SCROLL_SPEEDS.length}
+          max={SCROLL_SPEED_LABELS.length}
           step={1}
           minLabel="Slower"
           maxLabel="Faster"
-          onPreview={(scrollSpeed) => onPreview(withMouse({ scrollSpeed }))}
-          onCommit={commitPreviewed}
+          onPreview={(scrollSpeed) => onPreview(withMouseChanges({ scrollSpeed }))}
+          onCommit={commitCurrentSettings}
         />
 
         <div className="flex items-center justify-between gap-4">
@@ -338,13 +348,23 @@ function MouseEditor({
           </span>
           <Switch
             checked={mouse.naturalScroll}
-            labelledBy="reverse-scroll"
-            onChange={(naturalScroll) => onCommit(withMouse({ naturalScroll }))}
+            labelId="reverse-scroll"
+            onChange={(naturalScroll) => onCommit(withMouseChanges({ naturalScroll }))}
           />
         </div>
-      </Section>
+      </SettingsSection>
     </fieldset>
   );
+}
+
+interface KeyboardEditorProps {
+  settings: Settings;
+  keyboard: KeyboardSettings;
+  selected: string | null;
+  segment: 'keys' | 'lighting';
+  disabled: boolean;
+  onPreview: SettingsChangeHandler;
+  onCommit: SettingsChangeHandler;
 }
 
 function KeyboardEditor({
@@ -355,16 +375,8 @@ function KeyboardEditor({
   disabled,
   onPreview,
   onCommit,
-}: {
-  settings: Settings;
-  keyboard: KeyboardSettings;
-  selected: string | null;
-  segment: 'keys' | 'lighting';
-  disabled: boolean;
-  onPreview: (settings: Settings) => void;
-  onCommit: (settings: Settings) => void;
-}) {
-  const withKeyboard = (changes: Partial<KeyboardSettings>): Settings => ({
+}: KeyboardEditorProps) {
+  const withKeyboardChanges = (changes: Partial<KeyboardSettings>): Settings => ({
     ...settings,
     keyboard: { ...keyboard, ...changes },
   });
@@ -379,17 +391,19 @@ function KeyboardEditor({
         actions={KEY_ACTIONS}
         disabled={disabled}
         resetLabel="Reset all keys"
-        onReset={() => onCommit(withKeyboard({ bindings: resetKeyBindings(keyboard.bindings) }))}
-        onRebind={(bindings) => onCommit(withKeyboard({ bindings }))}
+        onReset={() =>
+          onCommit(withKeyboardChanges({ bindings: resetKeyBindings(keyboard.bindings) }))
+        }
+        onRebind={(bindings) => onCommit(withKeyboardChanges({ bindings }))}
       />
     );
   }
 
-  const commitPreviewed = () => onCommit(settings);
+  const commitCurrentSettings = () => onCommit(settings);
 
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
-      <Section title="Effect">
+      <SettingsSection title="Effect">
         <div className="flex flex-col">
           {EFFECTS.map(([effect, label]) => (
             <RadioOption
@@ -398,14 +412,14 @@ function KeyboardEditor({
               value={String(effect)}
               label={label}
               selected={effect === keyboard.effect}
-              onSelect={() => onCommit(withKeyboard({ effect }))}
+              onSelect={() => onCommit(withKeyboardChanges({ effect }))}
             />
           ))}
         </div>
-      </Section>
+      </SettingsSection>
 
-      <Section title="Colour">
-        <Slider
+      <SettingsSection title="Colour">
+        <SettingsSlider
           label="Hue"
           display={
             <span
@@ -418,14 +432,14 @@ function KeyboardEditor({
           min={0}
           max={359}
           step={1}
-          trackStyle={HUE_TRACK}
-          onPreview={(hue) => onPreview(withKeyboard({ hue }))}
-          onCommit={commitPreviewed}
+          trackStyle={HUE_TRACK_STYLE}
+          onPreview={(hue) => onPreview(withKeyboardChanges({ hue }))}
+          onCommit={commitCurrentSettings}
         />
-      </Section>
+      </SettingsSection>
 
-      <Section title="Brightness">
-        <Slider
+      <SettingsSection title="Brightness">
+        <SettingsSlider
           label="Level"
           display={`${keyboard.brightness}%`}
           value={keyboard.brightness}
@@ -434,12 +448,23 @@ function KeyboardEditor({
           step={1}
           minLabel="Off"
           maxLabel="Bright"
-          onPreview={(brightness) => onPreview(withKeyboard({ brightness }))}
-          onCommit={commitPreviewed}
+          onPreview={(brightness) => onPreview(withKeyboardChanges({ brightness }))}
+          onCommit={commitCurrentSettings}
         />
-      </Section>
+      </SettingsSection>
     </fieldset>
   );
+}
+
+interface ControlEditorProps {
+  device: Device;
+  settings: Settings;
+  selected: string | null;
+  segment: Segment;
+  disabled: boolean;
+  onRemove: () => void;
+  onPreview: SettingsChangeHandler;
+  onCommit: SettingsChangeHandler;
 }
 
 export function ControlEditor({
@@ -451,18 +476,9 @@ export function ControlEditor({
   onRemove,
   onPreview,
   onCommit,
-}: {
-  device: Device;
-  settings: Settings;
-  selected: string | null;
-  segment: Segment;
-  disabled: boolean;
-  onRemove: () => void;
-  onPreview: (settings: Settings) => void;
-  onCommit: (settings: Settings) => void;
-}) {
+}: ControlEditorProps) {
   if (segment === 'info') {
-    return <Info device={device} onRemove={onRemove} />;
+    return <DeviceInfo device={device} onRemove={onRemove} />;
   }
 
   if (segment === 'keys' || segment === 'lighting') {

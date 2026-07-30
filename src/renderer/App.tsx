@@ -79,7 +79,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      {isMac && <div className="draggable h-7 shrink-0" />}
+      {isMac && <div className="window-drag-region h-7 shrink-0" />}
       <main ref={mainRef} tabIndex={-1} className="flex-1 overflow-hidden pt-6 outline-hidden">
         {failed && (
           <p className="mx-auto max-w-3xl px-8 pb-4 text-sm text-destructive">

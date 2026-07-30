@@ -3,48 +3,64 @@ import { cn } from '@/lib/utils';
 import { KeyboardArt, type Lighting } from './keyboard-art';
 import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
 
-type Art = {
-  detail: string;
-  home: string;
+interface DeviceArtwork {
+  detailSrc: string;
+  homeSrc: string;
   alt: string;
-  aspect: string;
-  profile?: MouseArtProfile;
-};
+  aspectRatio: string;
+  mouseProfile?: MouseArtProfile;
+}
 
-const ART: Record<string, Art> = {
+interface DeviceArtProps {
+  device: Device;
+  variant?: 'home' | 'detail';
+  callouts?: Callout[];
+  lighting?: Lighting | null;
+  selectedControl?: string | null;
+  onControlSelect?: (control: string) => void;
+  className?: string;
+}
+
+const ARTWORK_BY_DEVICE_ID: Record<string, DeviceArtwork> = {
   'performance-mouse': {
-    detail: '/device-art/performance-mouse.webp',
-    home: '/device-art/performance-mouse-home.webp',
+    detailSrc: '/device-art/performance-mouse.webp',
+    homeSrc: '/device-art/performance-mouse-home.webp',
     alt: 'Graphite wireless performance mouse',
-    aspect: '3 / 2',
-    profile: 'performance',
+    aspectRatio: '3 / 2',
+    mouseProfile: 'performance',
   },
   'travel-mouse': {
-    detail: '/device-art/travel-mouse.webp',
-    home: '/device-art/travel-mouse-home.webp',
+    detailSrc: '/device-art/travel-mouse.webp',
+    homeSrc: '/device-art/travel-mouse-home.webp',
     alt: 'Stone-gray compact travel mouse',
-    aspect: '3 / 2',
-    profile: 'travel',
+    aspectRatio: '3 / 2',
+    mouseProfile: 'travel',
   },
   'compact-keyboard': {
-    detail: '/device-art/compact-keyboard.webp',
-    home: '/device-art/compact-keyboard-home.webp',
+    detailSrc: '/device-art/compact-keyboard.webp',
+    homeSrc: '/device-art/compact-keyboard-home.webp',
     alt: 'Graphite compact keyboard',
-    aspect: '821 / 479',
+    aspectRatio: '821 / 479',
   },
 };
 
-function artFor(device: Device): Art | null {
+function artworkFor(device: Device): DeviceArtwork | null {
   if (!device.mouse && !device.keyboard) {
     return null;
   }
-  if (ART[device.id]) {
-    return ART[device.id];
+
+  const exactArtwork = ARTWORK_BY_DEVICE_ID[device.id];
+  if (exactArtwork) {
+    return exactArtwork;
   }
+
   if (device.keyboard) {
-    return ART['compact-keyboard'];
+    return ARTWORK_BY_DEVICE_ID['compact-keyboard'];
   }
-  return (device.mouse?.buttons.length ?? 0) > 3 ? ART['performance-mouse'] : ART['travel-mouse'];
+
+  return (device.mouse?.buttons.length ?? 0) > 3
+    ? ARTWORK_BY_DEVICE_ID['performance-mouse']
+    : ARTWORK_BY_DEVICE_ID['travel-mouse'];
 }
 
 export function DeviceArt({
@@ -55,30 +71,22 @@ export function DeviceArt({
   selectedControl,
   onControlSelect,
   className,
-}: {
-  device: Device;
-  variant?: 'home' | 'detail';
-  callouts?: Callout[];
-  lighting?: Lighting | null;
-  selectedControl?: string | null;
-  onControlSelect?: (control: string) => void;
-  className?: string;
-}) {
-  const art = artFor(device);
-  if (!art) return null;
+}: DeviceArtProps) {
+  const artwork = artworkFor(device);
+  if (!artwork) return null;
 
-  const offline = !device.connected && 'grayscale opacity-45';
+  const offlineClassName = !device.connected && 'grayscale opacity-45';
 
   if (variant === 'home') {
     return (
       <img
-        src={art.home}
+        src={artwork.homeSrc}
         alt=""
         draggable={false}
         className={cn(
           'pointer-events-none size-full select-none object-contain',
           'drop-shadow-[0_16px_18px_rgba(0,0,0,0.28)]',
-          offline,
+          offlineClassName,
           className,
         )}
       />
@@ -89,13 +97,13 @@ export function DeviceArt({
     return (
       <KeyboardArt
         spec={device.keyboard}
-        src={art.detail}
-        alt={art.alt}
-        aspect={art.aspect}
+        src={artwork.detailSrc}
+        alt={artwork.alt}
+        aspect={artwork.aspectRatio}
         lighting={lighting}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
-        className={cn('max-w-3xl', offline, className)}
+        className={cn('max-w-3xl', offlineClassName, className)}
       />
     );
   }
@@ -103,14 +111,14 @@ export function DeviceArt({
   if (device.mouse) {
     return (
       <MouseArt
-        src={art.detail}
-        alt={art.alt}
-        aspect={art.aspect}
-        profile={art.profile ?? 'travel'}
+        src={artwork.detailSrc}
+        alt={artwork.alt}
+        aspect={artwork.aspectRatio}
+        profile={artwork.mouseProfile ?? 'travel'}
         callouts={callouts}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
-        className={cn('max-w-[520px]', offline, className)}
+        className={cn('max-w-[520px]', offlineClassName, className)}
       />
     );
   }

@@ -10,18 +10,26 @@ import { actionLabel, boundAction, controlLabel } from './controls';
 import { ControlEditor, type Segment } from './control-editor';
 import { RemoveDeviceDialog } from './remove-device-dialog';
 
-const MOUSE_SEGMENTS: [Segment, string][] = [
+type SegmentOption = [segment: Segment, label: string];
+
+interface DeviceViewProps {
+  device: Device;
+  onBack: () => void;
+  onRemoved: () => void;
+}
+
+const MOUSE_SEGMENTS: SegmentOption[] = [
   ['buttons', 'Buttons'],
   ['movement', 'Movement'],
   ['info', 'Info'],
 ];
 
 /** Panels come from the descriptor: a keyboard without a backlight has no Lighting tab. */
-function segmentsFor(device: Device): [Segment, string][] {
+function segmentsFor(device: Device): SegmentOption[] {
   if (!device.keyboard) {
     return MOUSE_SEGMENTS;
   }
-  const segments: [Segment, string][] = [['keys', 'Keys']];
+  const segments: SegmentOption[] = [['keys', 'Keys']];
   if (device.keyboard.backlight) {
     segments.push(['lighting', 'Lighting']);
   }
@@ -29,34 +37,34 @@ function segmentsFor(device: Device): [Segment, string][] {
   return segments;
 }
 
-export function DeviceView({
-  device,
-  onBack,
-  onRemoved,
-}: {
-  device: Device;
-  onBack: () => void;
-  onRemoved: () => void;
-}) {
+export function DeviceView({ device, onBack, onRemoved }: DeviceViewProps) {
   const segments = segmentsFor(device);
+  const { settings, preview, commit } = useDeviceSettings(device.id);
+
   const [segment, setSegment] = useState<Segment>(segments[0][0]);
   const [selectedControl, setSelectedControl] = useState<string | null>(
     () => device.mouse?.buttons[0] ?? device.keyboard?.keys[0] ?? null,
   );
-  const [removeOpen, setRemoveOpen] = useState(false);
-  const { settings, preview, commit } = useDeviceSettings(device.id);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
 
-  const mouse = settings?.mouse;
-  const callouts =
-    segment === 'buttons' && mouse && device.mouse
+  const mouseSettings = settings?.mouse;
+  const buttonCallouts =
+    segment === 'buttons' && mouseSettings && device.mouse
       ? device.mouse.buttons.map((control) => ({
           id: control,
           name: controlLabel(control),
-          value: actionLabel(boundAction(mouse.bindings, control)),
+          value: actionLabel(boundAction(mouseSettings.bindings, control)),
         }))
       : [];
 
-  const selectable = segment === 'buttons' || segment === 'keys';
+  const canSelectControl = segment === 'buttons' || segment === 'keys';
+
+  const selectSegment = (value: string) => {
+    if (value) setSegment(value as Segment);
+  };
+
+  const openRemoveDialog = () => setRemoveDialogOpen(true);
+  const closeRemoveDialog = () => setRemoveDialogOpen(false);
 
   return (
     <div className="flex h-full flex-col" aria-busy={settings === null}>
@@ -75,7 +83,7 @@ export function DeviceView({
           <ToggleGroup
             type="single"
             value={segment}
-            onValueChange={(value) => value && setSegment(value as Segment)}
+            onValueChange={selectSegment}
             aria-label="Settings section"
             size="sm"
             className="mx-auto mb-5 w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
@@ -91,10 +99,10 @@ export function DeviceView({
             <div className="flex min-w-0 flex-1 items-center justify-center pb-10">
               <DeviceArt
                 device={device}
-                callouts={callouts}
+                callouts={buttonCallouts}
                 lighting={device.keyboard?.backlight ? settings.keyboard : null}
                 selectedControl={selectedControl}
-                onControlSelect={selectable ? setSelectedControl : undefined}
+                onControlSelect={canSelectControl ? setSelectedControl : undefined}
               />
             </div>
 
@@ -108,7 +116,7 @@ export function DeviceView({
                 selected={selectedControl}
                 segment={segment}
                 disabled={!device.connected}
-                onRemove={() => setRemoveOpen(true)}
+                onRemove={openRemoveDialog}
                 onPreview={preview}
                 onCommit={commit}
               />
@@ -117,10 +125,10 @@ export function DeviceView({
         </>
       )}
 
-      {removeOpen && (
+      {removeDialogOpen && (
         <RemoveDeviceDialog
           device={device}
-          onClose={() => setRemoveOpen(false)}
+          onClose={closeRemoveDialog}
           onRemoved={onRemoved}
         />
       )}

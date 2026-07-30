@@ -1,64 +1,65 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-const EDGE_TOLERANCE = 2;
+const SCROLL_EDGE_TOLERANCE = 2;
 
 /**
- * Horizontal scroll state for a container holding a single track of items.
+ * Horizontal scroll state for a container holding one track of equally sized items.
  * `itemCount` re-measures when the track gains or loses items.
  */
 export function useCarousel(initialScrollLeft: number, itemCount: number) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [overflows, setOverflows] = useState(false);
-  const [canPrevious, setCanPrevious] = useState(false);
-  const [canNext, setCanNext] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [canScrollPrevious, setCanScrollPrevious] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
 
-  const measure = useCallback(() => {
-    const carousel = ref.current;
+  const updateScrollState = useCallback(() => {
+    const carousel = carouselRef.current;
     if (!carousel) return;
 
     const maxScrollLeft = Math.max(0, carousel.scrollWidth - carousel.clientWidth);
-    setOverflows(maxScrollLeft > EDGE_TOLERANCE);
-    setCanPrevious(carousel.scrollLeft > EDGE_TOLERANCE);
-    setCanNext(carousel.scrollLeft < maxScrollLeft - EDGE_TOLERANCE);
+    setHasOverflow(maxScrollLeft > SCROLL_EDGE_TOLERANCE);
+    setCanScrollPrevious(carousel.scrollLeft > SCROLL_EDGE_TOLERANCE);
+    setCanScrollNext(carousel.scrollLeft < maxScrollLeft - SCROLL_EDGE_TOLERANCE);
   }, []);
 
   useLayoutEffect(() => {
-    const carousel = ref.current;
+    const carousel = carouselRef.current;
     if (!carousel) return;
 
     carousel.scrollLeft = initialScrollLeft;
-    measure();
-  }, [initialScrollLeft, measure]);
+    updateScrollState();
+  }, [initialScrollLeft, updateScrollState]);
 
   useEffect(() => {
-    const carousel = ref.current;
+    const carousel = carouselRef.current;
     if (!carousel) return;
 
     const track = carousel.firstElementChild;
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(updateScrollState);
     observer.observe(carousel);
     if (track) observer.observe(track);
-    carousel.addEventListener('scroll', measure, { passive: true });
-    measure();
+    carousel.addEventListener('scroll', updateScrollState, { passive: true });
+    updateScrollState();
 
     return () => {
       observer.disconnect();
-      carousel.removeEventListener('scroll', measure);
+      carousel.removeEventListener('scroll', updateScrollState);
     };
-  }, [itemCount, measure]);
+  }, [itemCount, updateScrollState]);
 
   const scrollByItem = (direction: -1 | 1) => {
-    const track = ref.current?.firstElementChild;
-    const item = track?.firstElementChild;
-    if (!ref.current || !track || !item) return;
+    const carousel = carouselRef.current;
+    const track = carousel?.firstElementChild;
+    const firstItem = track?.firstElementChild;
+    if (!carousel || !track || !firstItem) return;
 
     const gap = Number.parseFloat(getComputedStyle(track).columnGap) || 0;
-    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    ref.current.scrollBy({
-      left: direction * (item.getBoundingClientRect().width + gap),
-      behavior: reducedMotion ? 'auto' : 'smooth',
+    const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    carousel.scrollBy({
+      left: direction * (firstItem.getBoundingClientRect().width + gap),
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
     });
   };
 
-  return { ref, overflows, canPrevious, canNext, scrollByItem };
+  return { carouselRef, hasOverflow, canScrollPrevious, canScrollNext, scrollByItem };
 }

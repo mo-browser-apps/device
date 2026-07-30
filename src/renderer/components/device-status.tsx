@@ -15,8 +15,28 @@ import { cn } from '@/lib/utils';
 export const LOW_BATTERY = 20;
 const FULL_BATTERY = 90;
 
-const UNKNOWN_CONNECTION = { label: 'Unknown connection', Icon: CircleHelp };
-const CONNECTIONS: Record<LinkType, { label: string; Icon: LucideIcon }> = {
+interface ConnectionStatus {
+  label: string;
+  Icon: LucideIcon;
+}
+
+interface BatteryStatus {
+  label: string;
+  Icon: LucideIcon;
+  toneClassName: string;
+}
+
+interface DeviceStatusProps {
+  device: Device;
+  className?: string;
+}
+
+const UNKNOWN_CONNECTION: ConnectionStatus = {
+  label: 'Unknown connection',
+  Icon: CircleHelp,
+};
+
+const CONNECTIONS: Record<LinkType, ConnectionStatus> = {
   [LinkType.RECEIVER]: { label: 'USB receiver', Icon: Usb },
   [LinkType.BLUETOOTH]: { label: 'Bluetooth', Icon: Bluetooth },
   [LinkType.WIRED]: { label: 'Wired', Icon: Cable },
@@ -27,38 +47,29 @@ export function connectionLabel(device: Device): string {
   return (CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION).label;
 }
 
-function batteryOf(
-  level: number,
-  charging: boolean,
-): { Icon: LucideIcon; tone: string; label: string } {
+function getBatteryStatus(level: number, charging: boolean): BatteryStatus {
   if (charging) {
     return {
       Icon: BatteryCharging,
-      tone: 'text-status-charging',
+      toneClassName: 'text-status-charging',
       label: `Battery ${level}%, charging`,
     };
   }
   if (level <= LOW_BATTERY) {
     return {
       Icon: BatteryLow,
-      tone: 'text-status-low',
+      toneClassName: 'text-status-low',
       label: `Battery low, ${level}%`,
     };
   }
   return {
     Icon: level >= FULL_BATTERY ? BatteryFull : BatteryMedium,
-    tone: 'text-foreground/70',
+    toneClassName: 'text-foreground/70',
     label: `Battery ${level}%`,
   };
 }
 
-export function DeviceConnectionIcon({
-  device,
-  className,
-}: {
-  device: Device;
-  className?: string;
-}) {
+export function DeviceConnectionIcon({ device, className }: DeviceStatusProps) {
   const connection = CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION;
   const label = device.connected ? connection.label : `${connection.label}, disconnected`;
 
@@ -78,33 +89,31 @@ export function DeviceConnectionIcon({
   );
 }
 
-export function DeviceBatteryStatus({
-  device,
-  className,
-}: {
-  device: Device;
-  className?: string;
-}) {
+export function DeviceBatteryStatus({ device, className }: DeviceStatusProps) {
   if (!device.connected || !device.hasBattery || device.link === LinkType.WIRED) return null;
 
-  const battery = batteryOf(device.battery, device.charging);
+  const batteryStatus = getBatteryStatus(device.battery, device.charging);
 
   return (
     <span
       role="img"
-      aria-label={battery.label}
-      title={battery.label}
-      className={cn('flex items-center gap-1.5 text-xs [&_svg]:size-4', battery.tone, className)}
+      aria-label={batteryStatus.label}
+      title={batteryStatus.label}
+      className={cn(
+        'flex items-center gap-1.5 text-xs [&_svg]:size-4',
+        batteryStatus.toneClassName,
+        className,
+      )}
     >
-      <battery.Icon strokeWidth={1.75} />
+      <batteryStatus.Icon strokeWidth={1.75} />
       <span className="font-mono tabular-nums">{device.battery}%</span>
     </span>
   );
 }
 
-export function DeviceStatus({ device }: { device: Device }) {
+export function DeviceStatus({ device, className }: DeviceStatusProps) {
   return (
-    <span className="flex items-center gap-4">
+    <span className={cn('flex items-center gap-4', className)}>
       <DeviceConnectionIcon device={device} className="[&_svg]:size-5" />
       <DeviceBatteryStatus device={device} className="gap-2 text-sm [&_svg]:size-5" />
     </span>

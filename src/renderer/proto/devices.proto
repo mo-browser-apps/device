@@ -6,12 +6,14 @@ import "google/protobuf/empty.proto";
 // Keep this device model aligned with src/native/proto/devices.proto. The
 // main-process bridge in src/main/devices.ts owns the handoff between them.
 
+// How the device communicates with the computer.
 enum LinkType {
   RECEIVER = 0;
   BLUETOOTH = 1;
   WIRED = 2;
 }
 
+// Lighting effects supported by the demo keyboard.
 enum LightEffect {
   STATIC = 0;
   BREATHING = 1;
@@ -19,12 +21,14 @@ enum LightEffect {
 }
 
 message MouseSpec {
+  // Stable identifiers shared with Binding.control.
   repeated string buttons = 1;
   int32 min_dpi = 2;
   int32 max_dpi = 3;
 }
 
 message KeyboardSpec {
+  // Stable identifiers shared with Binding.control.
   repeated string keys = 1;
   bool backlight = 2;
 }
@@ -36,8 +40,11 @@ message Device {
   string firmware = 4;
   bool connected = 5;
   bool has_battery = 6;
+  // Percentage from 0 to 100; ignored when has_battery is false.
   int32 battery = 7;
   bool charging = 10;
+
+  // Hardware capabilities and device category.
   oneof spec {
     MouseSpec mouse = 8;
     KeyboardSpec keyboard = 9;
@@ -52,6 +59,8 @@ message DeviceList {
   repeated Device devices = 1;
 }
 
+// Strings keep vendor-specific controls and actions extensible without
+// requiring schema changes.
 message Binding {
   string control = 1;
   string action = 2;
@@ -60,6 +69,7 @@ message Binding {
 message MouseSettings {
   repeated Binding bindings = 1;
   int32 dpi = 2;
+  // Demo scale from 1 (slowest) to 5 (fastest).
   int32 scroll_speed = 3;
   bool natural_scroll = 4;
 }
@@ -67,12 +77,16 @@ message MouseSettings {
 message KeyboardSettings {
   repeated Binding bindings = 1;
   LightEffect effect = 2;
+  // Hue in degrees from 0 to 360.
   int32 hue = 3;
+  // Percentage from 0 to 100.
   int32 brightness = 4;
 }
 
 message Settings {
   string device_id = 1;
+
+  // Must match the corresponding Device.spec variant.
   oneof kind {
     MouseSettings mouse = 2;
     KeyboardSettings keyboard = 3;
@@ -80,11 +94,19 @@ message Settings {
 }
 
 service DevicesService {
+  // All devices currently managed by the app.
   rpc List(google.protobuf.Empty) returns (DeviceList);
+
+  // Future complete snapshots whenever that set changes.
   rpc Watch(google.protobuf.Empty) returns (stream DeviceList);
+
+  // Nearby devices available to add.
   rpc Discover(google.protobuf.Empty) returns (DeviceList);
+
   rpc Pair(DeviceId) returns (google.protobuf.Empty);
   rpc Forget(DeviceId) returns (google.protobuf.Empty);
   rpc GetSettings(DeviceId) returns (Settings);
+
+  // Applies and persists one complete device-settings snapshot.
   rpc ApplySettings(Settings) returns (google.protobuf.Empty);
 }

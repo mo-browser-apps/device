@@ -13,7 +13,15 @@ export type HomeFocusTarget =
   | { type: 'settings' }
   | null;
 
-function deviceCard(carousel: HTMLElement | null, deviceId: string) {
+interface HomeProps {
+  devices: Device[];
+  initialScrollLeft: number;
+  restoreFocus: HomeFocusTarget;
+  onOpen: (deviceId: string, scrollLeft: number) => void;
+  onOpenSettings: (scrollLeft: number) => void;
+}
+
+function findDeviceCard(carousel: HTMLElement | null, deviceId: string) {
   return carousel?.querySelector<HTMLElement>(`[data-device-id="${CSS.escape(deviceId)}"]`);
 }
 
@@ -90,15 +98,15 @@ function CarouselControl({
   disabled: boolean;
   onClick: () => void;
 }) {
-  const previous = direction === 'previous';
-  const Icon = previous ? ChevronLeft : ChevronRight;
+  const isPrevious = direction === 'previous';
+  const Icon = isPrevious ? ChevronLeft : ChevronRight;
 
   return (
     <button
       type="button"
       onClick={() => !disabled && onClick()}
       aria-disabled={disabled}
-      aria-label={`${previous ? 'Previous' : 'Next'} devices`}
+      aria-label={`${isPrevious ? 'Previous' : 'Next'} devices`}
       aria-controls="device-carousel"
       className={cn(
         'absolute top-1/2 z-20 -translate-y-1/2 rounded-full border border-border/60',
@@ -106,7 +114,7 @@ function CarouselControl({
         'transition-[color,background-color,opacity]',
         'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
         disabled ? 'opacity-30' : 'hover:bg-accent/80 hover:text-foreground',
-        previous ? 'left-4' : 'right-4',
+        isPrevious ? 'left-4' : 'right-4',
       )}
     >
       <Icon className="size-4" strokeWidth={1.75} />
@@ -120,46 +128,48 @@ export function Home({
   restoreFocus,
   onOpen,
   onOpenSettings,
-}: {
-  devices: Device[];
-  initialScrollLeft: number;
-  restoreFocus: HomeFocusTarget;
-  onOpen: (deviceId: string, scrollLeft: number) => void;
-  onOpenSettings: (scrollLeft: number) => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<Device | null>(null);
-  const addedId = useRef<string | null>(null);
-  const settingsRef = useRef<HTMLButtonElement>(null);
+}: HomeProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null);
+  const pairedDeviceIdRef = useRef<string | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const {
-    ref: carouselRef,
-    overflows,
-    canPrevious,
-    canNext,
+    carouselRef,
+    hasOverflow,
+    canScrollPrevious,
+    canScrollNext,
     scrollByItem,
   } = useCarousel(initialScrollLeft, devices.length);
 
   useLayoutEffect(() => {
     if (!restoreFocus) return;
 
-    const target =
+    const focusTarget =
       restoreFocus.type === 'device'
-        ? deviceCard(carouselRef.current, restoreFocus.id)
-        : settingsRef.current;
-    target?.focus({ preventScroll: true });
+        ? findDeviceCard(carouselRef.current, restoreFocus.id)
+        : settingsButtonRef.current;
+    focusTarget?.focus({ preventScroll: true });
   }, [carouselRef, restoreFocus]);
 
   useLayoutEffect(() => {
-    const pending = addedId.current;
-    if (!pending) return;
+    const pairedDeviceId = pairedDeviceIdRef.current;
+    if (!pairedDeviceId) return;
 
-    const card = deviceCard(carouselRef.current, pending);
-    if (!card) return;
+    const pairedDeviceCard = findDeviceCard(carouselRef.current, pairedDeviceId);
+    if (!pairedDeviceCard) return;
 
-    addedId.current = null;
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    card.focus({ preventScroll: true });
+    pairedDeviceIdRef.current = null;
+    pairedDeviceCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    pairedDeviceCard.focus({ preventScroll: true });
   }, [carouselRef, devices]);
+
+  const openDevice = (deviceId: string) => {
+    onOpen(deviceId, carouselRef.current?.scrollLeft ?? 0);
+  };
+
+  const openSettings = () => {
+    onOpenSettings(carouselRef.current?.scrollLeft ?? 0);
+  };
 
   return (
     <div className="flex min-h-full flex-col">
@@ -168,16 +178,16 @@ export function Home({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={() => setIsAddDialogOpen(true)}
             className={cn(BUTTON_OUTLINE, 'bg-card/50 shadow-xs')}
           >
             <Plus className="size-4" strokeWidth={1.75} />
             Add device
           </button>
           <button
-            ref={settingsRef}
+            ref={settingsButtonRef}
             type="button"
-            onClick={() => onOpenSettings(carouselRef.current?.scrollLeft ?? 0)}
+            onClick={openSettings}
             aria-label="Settings"
             className={cn(BUTTON_OUTLINE, 'bg-card/50 px-2.5 text-muted-foreground shadow-xs')}
           >
@@ -198,39 +208,39 @@ export function Home({
                 <DeviceCard
                   key={device.id}
                   device={device}
-                  onOpen={() => onOpen(device.id, carouselRef.current?.scrollLeft ?? 0)}
+                  onOpen={() => openDevice(device.id)}
                   onRemove={
-                    device.link === LinkType.WIRED ? undefined : () => setRemoving(device)
+                    device.link === LinkType.WIRED ? undefined : () => setDeviceToRemove(device)
                   }
                 />
               ))}
             </div>
           </div>
 
-          {canPrevious && (
+          {canScrollPrevious && (
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
             />
           )}
 
-          {canNext && (
+          {canScrollNext && (
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
             />
           )}
 
-          {overflows && (
+          {hasOverflow && (
             <>
               <CarouselControl
                 direction="previous"
-                disabled={!canPrevious}
+                disabled={!canScrollPrevious}
                 onClick={() => scrollByItem(-1)}
               />
               <CarouselControl
                 direction="next"
-                disabled={!canNext}
+                disabled={!canScrollNext}
                 onClick={() => scrollByItem(1)}
               />
             </>
@@ -245,14 +255,16 @@ export function Home({
         </div>
       )}
 
-      {adding && (
+      {isAddDialogOpen && (
         <AddDeviceDialog
-          onClose={() => setAdding(false)}
-          onPaired={(deviceId) => (addedId.current = deviceId)}
+          onClose={() => setIsAddDialogOpen(false)}
+          onPaired={(deviceId) => {
+            pairedDeviceIdRef.current = deviceId;
+          }}
         />
       )}
-      {removing && (
-        <RemoveDeviceDialog device={removing} onClose={() => setRemoving(null)} />
+      {deviceToRemove && (
+        <RemoveDeviceDialog device={deviceToRemove} onClose={() => setDeviceToRemove(null)} />
       )}
     </div>
   );

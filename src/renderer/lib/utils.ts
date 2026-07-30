@@ -1,8 +1,8 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /** The app's focus ring, on every element that takes keyboard focus. */
@@ -11,9 +11,15 @@ export const FOCUS_RING =
   'focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
 /** Shared button shape; use a variant below. `h-9` is what `py-2 text-sm` measures. */
-const BUTTON =
+const BUTTON_BASE =
   'inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium ' +
   `transition-colors disabled:cursor-default disabled:opacity-50 ${FOCUS_RING}`;
+
+export const BUTTON_PRIMARY =
+  `${BUTTON_BASE} bg-primary text-primary-foreground hover:bg-primary/90`;
+export const BUTTON_OUTLINE = `${BUTTON_BASE} border hover:bg-accent`;
+export const BUTTON_DESTRUCTIVE =
+  `${BUTTON_BASE} bg-destructive text-destructive-foreground hover:bg-destructive/90`;
 
 /** A borderless icon button, for the back arrow at the top of a screen. */
 export const BUTTON_ICON =
@@ -24,8 +30,3 @@ export const BUTTON_ICON =
 export const TOGGLE_ITEM =
   'px-3 text-muted-foreground hover:bg-transparent hover:text-foreground ' +
   'data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm';
-
-export const BUTTON_PRIMARY = `${BUTTON} bg-primary text-primary-foreground hover:bg-primary/90`;
-export const BUTTON_OUTLINE = `${BUTTON} border hover:bg-accent`;
-export const BUTTON_DESTRUCTIVE =
-  `${BUTTON} bg-destructive text-destructive-foreground hover:bg-destructive/90`;

@@ -1,20 +1,18 @@
 import { cn, FOCUS_RING } from '@/lib/utils';
 
-export function Switch({
-  checked,
-  labelledBy,
-  onChange,
-}: {
+interface SwitchProps {
   checked: boolean;
-  labelledBy: string;
+  labelId: string;
   onChange: (checked: boolean) => void;
-}) {
+}
+
+export function Switch({ checked, labelId, onChange }: SwitchProps) {
   return (
     <input
       type="checkbox"
       role="switch"
       checked={checked}
-      aria-labelledby={labelledBy}
+      aria-labelledby={labelId}
       onChange={(event) => onChange(event.target.checked)}
       className={cn(
         'relative h-5.5 w-9.5 shrink-0 cursor-pointer appearance-none rounded-full bg-input',

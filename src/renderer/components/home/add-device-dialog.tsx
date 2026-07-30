@@ -7,56 +7,65 @@ import { discoverDevices, pairDevice } from '@/gateway/devices';
 import type { Device } from '@/gen/devices';
 import { BUTTON_OUTLINE, BUTTON_PRIMARY, cn } from '@/lib/utils';
 
+interface AddDeviceDialogProps {
+  onClose: () => void;
+  onPaired: (deviceId: string) => void;
+}
+
 export function AddDeviceDialog({
   onClose,
   onPaired,
-}: {
-  onClose: () => void;
-  onPaired: (deviceId: string) => void;
-}) {
-  const [devices, setDevices] = useState<Device[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pairing, setPairing] = useState<string | null>(null);
+}: AddDeviceDialogProps) {
+  const [nearbyDevices, setNearbyDevices] = useState<Device[] | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pairingDeviceId, setPairingDeviceId] = useState<string | null>(null);
+  const isPairing = pairingDeviceId !== null;
 
-  const discover = () => {
+  const loadNearbyDevices = () => {
     void discoverDevices()
-      .then(setDevices)
+      .then(setNearbyDevices)
       .catch(() => {
-        setDevices([]);
-        setError('Could not search for devices.');
+        setNearbyDevices([]);
+        setErrorMessage('Could not search for devices.');
       });
   };
 
-  useEffect(discover, []);
+  useEffect(loadNearbyDevices, []);
 
-  const pair = (device: Device) => {
-    setPairing(device.id);
-    setError(null);
+  const searchAgain = () => {
+    setNearbyDevices(null);
+    setErrorMessage(null);
+    loadNearbyDevices();
+  };
+
+  const connectDevice = (device: Device) => {
+    setPairingDeviceId(device.id);
+    setErrorMessage(null);
     void pairDevice(device.id)
       .then(() => {
         onPaired(device.id);
         onClose();
       })
-      .catch(() => setError(`Could not connect ${device.model}.`))
-      .finally(() => setPairing(null));
+      .catch(() => setErrorMessage(`Could not connect ${device.model}.`))
+      .finally(() => setPairingDeviceId(null));
   };
 
   return (
     <Modal
       title="Add device"
       description="Choose a nearby device to connect."
-      busy={Boolean(pairing)}
+      busy={isPairing}
       onClose={onClose}
     >
       <div className="min-h-52 px-6 py-5">
-        {devices === null ? (
+        {nearbyDevices === null ? (
           <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />
             Searching for devices…
           </div>
-        ) : devices.length > 0 ? (
+        ) : nearbyDevices.length > 0 ? (
           <ul className="flex flex-col gap-3">
-            {devices.map((device) => (
+            {nearbyDevices.map((device) => (
               <li
                 key={device.id}
                 className="flex items-center gap-4 rounded-xl border bg-background/55 px-4 py-3"
@@ -72,11 +81,11 @@ export function AddDeviceDialog({
                 </span>
                 <button
                   type="button"
-                  onClick={() => pair(device)}
-                  disabled={Boolean(pairing)}
+                  onClick={() => connectDevice(device)}
+                  disabled={isPairing}
                   className={BUTTON_PRIMARY}
                 >
-                  {pairing === device.id ? 'Connecting…' : 'Connect'}
+                  {pairingDeviceId === device.id ? 'Connecting…' : 'Connect'}
                 </button>
               </li>
             ))}
@@ -89,11 +98,7 @@ export function AddDeviceDialog({
             </p>
             <button
               type="button"
-              onClick={() => {
-                setDevices(null);
-                setError(null);
-                discover();
-              }}
+              onClick={searchAgain}
               className={cn(BUTTON_OUTLINE, 'mt-4 text-muted-foreground hover:text-foreground')}
             >
               <RotateCw className="size-3.5" />
@@ -102,7 +107,7 @@ export function AddDeviceDialog({
           </div>
         )}
 
-        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+        {errorMessage && <p className="mt-4 text-sm text-destructive">{errorMessage}</p>}
       </div>
     </Modal>
   );

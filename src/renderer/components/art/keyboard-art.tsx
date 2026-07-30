@@ -3,7 +3,7 @@ import { LightEffect, type KeyboardSettings, type KeyboardSpec } from '@/gen/dev
 import { controlLabel } from '@/components/device/controls';
 import { cn } from '@/lib/utils';
 
-const ROWS = [
+const KEYBOARD_ROWS = [
   'esc 1 2 3 4 5 6 7 8 9 0 minus equal backspace:2',
   'tab:1.5 q w e r t y u i o p bracketleft bracketright backslash:1.5',
   'capslock:1.75 a s d f g h j k l semicolon quote enter:2.25',
@@ -12,7 +12,7 @@ const ROWS = [
 ];
 
 /** Key-cap faces. Purely visual — the accessible name comes from `controlLabel`. */
-const KEY_FACES: Record<string, string> = {
+const KEY_FACE_LABELS: Record<string, string> = {
   esc: 'Esc',
   minus: '−',
   equal: '=',
@@ -40,43 +40,48 @@ const KEY_FACES: Record<string, string> = {
   ctrlright: 'Ctrl',
 };
 
-const ROW_INSETS = ['1.4%', '1%', '0.55%', '0.2%', '0%'];
+const KEY_ROW_INSETS = ['1.4%', '1%', '0.55%', '0.2%', '0%'];
 
 /** One full cycle of the glow animation, and the span a wave takes to cross the board. */
-const CYCLE_SECONDS = 2.4;
+const LIGHTING_CYCLE_SECONDS = 2.4;
 
-type Key = {
+interface KeyLayout {
   id: string;
   width: number;
-  waveDelay: string;
-};
+  waveAnimationDelay: string;
+}
 
-const KEY_ROWS: Key[][] = ROWS.map((row) => {
+const KEY_LAYOUT: KeyLayout[][] = KEYBOARD_ROWS.map((row) => {
   const keys = row.split(' ').map((key) => {
     const [id, width = '1'] = key.split(':');
     return { id, width: Number(width) };
   });
 
-  const total = keys.reduce((sum, key) => sum + key.width, 0);
-  let start = 0;
+  const totalWidth = keys.reduce((sum, key) => sum + key.width, 0);
+  let currentWidth = 0;
+
   return keys.map((key) => {
-    const offset = (start + key.width / 2) / total;
-    start += key.width;
-    return { ...key, waveDelay: `-${(offset * CYCLE_SECONDS).toFixed(2)}s` };
+    const centerOffset = (currentWidth + key.width / 2) / totalWidth;
+    currentWidth += key.width;
+
+    return {
+      ...key,
+      waveAnimationDelay: `-${(centerOffset * LIGHTING_CYCLE_SECONDS).toFixed(2)}s`,
+    };
   });
 });
 
 /** Row geometry is fixed by the art, so each row's grid is built once. */
-const ROW_STYLES: CSSProperties[] = KEY_ROWS.map((row, index) => ({
+const KEY_ROW_STYLES: CSSProperties[] = KEY_LAYOUT.map((row, index) => ({
   gridTemplateColumns: row.map(({ width }) => `${width}fr`).join(' '),
-  marginInline: ROW_INSETS[index],
+  marginInline: KEY_ROW_INSETS[index],
 }));
 
 export type Lighting = Pick<KeyboardSettings, 'effect' | 'hue' | 'brightness'>;
 
 /** The face printed on a key cap. The render's caps are blank, so this is the legend. */
-function keyFace(id: string): string {
-  return KEY_FACES[id] ?? id.toUpperCase();
+function keyFaceLabel(id: string): string {
+  return KEY_FACE_LABELS[id] ?? id.toUpperCase();
 }
 
 /** Only these effects move. Anything else, including an unrecognised value, stays still. */
@@ -88,29 +93,40 @@ function isAnimated(effect: LightEffect): boolean {
  * The glow is drawn here rather than baked into the art, so one neutral render
  * covers every colour and effect.
  */
-function lightStyle({ effect, hue, brightness }: Lighting, key: Key): CSSProperties {
-  const level = brightness / 100;
-  const light = (alpha: number, lightness = 55) =>
-    `hsl(${hue} 100% ${lightness}% / ${(alpha * level).toFixed(3)})`;
+function lightingStyle(
+  { effect, hue, brightness }: Lighting,
+  keyLayout: KeyLayout,
+): CSSProperties {
+  const intensity = brightness / 100;
+  const glowColor = (alpha: number, lightness = 55) =>
+    `hsl(${hue} 100% ${lightness}% / ${(alpha * intensity).toFixed(3)})`;
 
   return {
     mixBlendMode: 'screen',
     boxShadow: [
-      `0 ${1.5 * level}px ${2.5 * level}px ${0.25 * level}px ${light(0.75, 62)}`,
-      `0 ${4 * level}px ${8 * level}px ${-1.5 * level}px ${light(0.42)}`,
+      `0 ${1.5 * intensity}px ${2.5 * intensity}px ${0.25 * intensity}px ${glowColor(0.75, 62)}`,
+      `0 ${4 * intensity}px ${8 * intensity}px ${-1.5 * intensity}px ${glowColor(0.42)}`,
     ].join(', '),
-    color: `hsl(${hue} 100% 72% / ${(0.38 + 0.47 * level).toFixed(3)})`,
-    textShadow: `0 1px ${2.5 * level}px ${light(0.7, 65)}`,
-    animationDelay: effect === LightEffect.WAVE ? key.waveDelay : '0s',
-    animationDuration: `${CYCLE_SECONDS}s`,
+    color: `hsl(${hue} 100% 72% / ${(0.38 + 0.47 * intensity).toFixed(3)})`,
+    textShadow: `0 1px ${2.5 * intensity}px ${glowColor(0.7, 65)}`,
+    animationDelay: effect === LightEffect.WAVE ? keyLayout.waveAnimationDelay : '0s',
+    animationDuration: `${LIGHTING_CYCLE_SECONDS}s`,
   };
 }
 
 /** The lit cap face. Decorative — the legend it draws is the render's, which is blank. */
-function KeyFace({ id, lighting, keyData }: { id: string; lighting: Lighting | null; keyData: Key }) {
+function KeyFace({
+  id,
+  lighting,
+  keyLayout,
+}: {
+  id: string;
+  lighting: Lighting | null;
+  keyLayout: KeyLayout;
+}) {
   return (
     <span
-      style={lighting ? lightStyle(lighting, keyData) : undefined}
+      style={lighting ? lightingStyle(lighting, keyLayout) : undefined}
       className={cn(
         'flex min-w-0 items-center justify-center rounded-[14%]',
         'text-[8px] font-medium leading-none',
@@ -119,7 +135,7 @@ function KeyFace({ id, lighting, keyData }: { id: string; lighting: Lighting | n
           'animate-[key-glow_ease-in-out_infinite] motion-reduce:animate-none',
       )}
     >
-      {keyFace(id)}
+      {keyFaceLabel(id)}
     </span>
   );
 }
@@ -136,15 +152,15 @@ function KeyCap({
   selected: boolean;
   onSelect?: (control: string) => void;
 }) {
-  const name = controlLabel(id);
+  const keyName = controlLabel(id);
 
   return (
     <button
       type="button"
       disabled={!selectable}
-      aria-label={selectable ? `Select ${name} key` : undefined}
+      aria-label={selectable ? `Select ${keyName} key` : undefined}
       aria-pressed={selectable ? selected : undefined}
-      title={selectable ? `${name} key` : 'Fixed in firmware'}
+      title={selectable ? `${keyName} key` : 'Fixed in firmware'}
       onClick={() => onSelect?.(id)}
       className={cn(
         'min-w-0 rounded-[14%] border border-transparent bg-transparent',
@@ -163,32 +179,47 @@ function KeyCap({
  * One pass of the key grid. Both layers go through this, so the faces and the
  * hit targets cannot drift out of alignment.
  */
-function KeyLayer({
-  render,
-  className,
-  ...aria
-}: {
-  render: (key: Key) => ReactNode;
+interface KeyLayerProps {
+  renderKey: (key: KeyLayout) => ReactNode;
   className?: string;
   role?: string;
   'aria-label'?: string;
   'aria-hidden'?: boolean;
-}) {
+}
+
+function KeyLayer({ renderKey, className, ...ariaProps }: KeyLayerProps) {
   return (
     <span
-      {...aria}
+      {...ariaProps}
       className={cn(
         'absolute left-[7.4%] top-[24.1%] flex h-[43.9%] w-[85.2%] flex-col gap-[2.6%]',
         className,
       )}
     >
-      {KEY_ROWS.map((row, rowIndex) => (
-        <span key={rowIndex} className="grid min-h-0 flex-1 gap-[0.32%]" style={ROW_STYLES[rowIndex]}>
-          {row.map(render)}
+      {KEY_LAYOUT.map((row, rowIndex) => (
+        <span
+          key={rowIndex}
+          className="grid min-h-0 flex-1 gap-[0.32%]"
+          style={KEY_ROW_STYLES[rowIndex]}
+        >
+          {row.map(renderKey)}
         </span>
       ))}
     </span>
   );
+}
+
+interface KeyboardArtProps {
+  spec: KeyboardSpec;
+  src: string;
+  alt: string;
+  aspect: string;
+  /** The backlight to draw. Omitted, or at zero brightness, the caps read unlit. */
+  lighting?: Lighting | null;
+  selectedControl?: string | null;
+  /** Set to make the remappable keys selectable. */
+  onControlSelect?: (control: string) => void;
+  className?: string;
 }
 
 export function KeyboardArt({
@@ -200,20 +231,9 @@ export function KeyboardArt({
   selectedControl,
   onControlSelect,
   className,
-}: {
-  spec: KeyboardSpec;
-  src: string;
-  alt: string;
-  aspect: string;
-  /** The backlight to draw. Omitted, or at zero brightness, the caps read unlit. */
-  lighting?: Lighting | null;
-  selectedControl?: string | null;
-  /** Set to make the remappable keys selectable. */
-  onControlSelect?: (control: string) => void;
-  className?: string;
-}) {
-  const available = new Set(spec.keys);
-  const lit = lighting && lighting.brightness > 0 ? lighting : null;
+}: KeyboardArtProps) {
+  const selectableKeys = new Set(spec.keys);
+  const activeLighting = lighting && lighting.brightness > 0 ? lighting : null;
 
   return (
     <span className={cn('relative block w-full', className)} style={{ aspectRatio: aspect }}>
@@ -227,18 +247,20 @@ export function KeyboardArt({
       <KeyLayer
         aria-hidden
         className="pointer-events-none"
-        render={(key) => <KeyFace key={key.id} id={key.id} lighting={lit} keyData={key} />}
+        renderKey={(key) => (
+          <KeyFace key={key.id} id={key.id} lighting={activeLighting} keyLayout={key} />
+        )}
       />
 
       {onControlSelect && (
         <KeyLayer
           role="group"
           aria-label="Keys"
-          render={(key) => (
+          renderKey={(key) => (
             <KeyCap
               key={key.id}
               id={key.id}
-              selectable={available.has(key.id)}
+              selectable={selectableKeys.has(key.id)}
               selected={selectedControl === key.id}
               onSelect={onControlSelect}
             />

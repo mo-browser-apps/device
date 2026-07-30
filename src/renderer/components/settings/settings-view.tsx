@@ -6,13 +6,25 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { AppSettings } from '@/gen/app';
 import { BUTTON_ICON, TOGGLE_ITEM } from '@/lib/utils';
 
-const THEMES: [string, string][] = [
+const THEME_OPTIONS = [
   ['system', 'System'],
   ['light', 'Light'],
   ['dark', 'Dark'],
-];
+] as const;
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+interface SettingRowProps {
+  title: string;
+  description: string;
+  renderControl: (labelId: string) => ReactNode;
+}
+
+interface SettingsViewProps {
+  settings: AppSettings | null;
+  update: (changes: Partial<AppSettings>) => void;
+  onBack: () => void;
+}
+
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -23,15 +35,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Setting({
+function SettingRow({
   title,
   description,
-  control,
-}: {
-  title: string;
-  description: string;
-  control: (labelledBy: string) => ReactNode;
-}) {
+  renderControl,
+}: SettingRowProps) {
   const titleId = useId();
 
   return (
@@ -42,20 +50,16 @@ function Setting({
         </p>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
       </div>
-      {control(titleId)}
+      {renderControl(titleId)}
     </div>
   );
 }
 
 export function SettingsView({
   settings,
-  update,
+  update: updateSettings,
   onBack,
-}: {
-  settings: AppSettings | null;
-  update: (changes: Partial<AppSettings>) => void;
-  onBack: () => void;
-}) {
+}: SettingsViewProps) {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-175 flex-col gap-8 px-8 pb-12">
@@ -68,19 +72,19 @@ export function SettingsView({
 
         {settings && (
           <div className="flex flex-col gap-7">
-            <Section title="Appearance">
-              <Setting
+            <SettingsSection title="Appearance">
+              <SettingRow
                 title="Theme"
                 description="Match the app appearance to your preference."
-                control={(labelledBy) => (
+                renderControl={(labelId) => (
                   <ToggleGroup
                     type="single"
                     value={settings.theme}
-                    aria-labelledby={labelledBy}
-                    onValueChange={(theme) => theme && update({ theme })}
+                    aria-labelledby={labelId}
+                    onValueChange={(theme) => theme && updateSettings({ theme })}
                     className="shrink-0 rounded-lg bg-muted p-1"
                   >
-                    {THEMES.map(([value, label]) => (
+                    {THEME_OPTIONS.map(([value, label]) => (
                       <ToggleGroupItem key={value} value={value} className={TOGGLE_ITEM}>
                         {label}
                       </ToggleGroupItem>
@@ -88,35 +92,35 @@ export function SettingsView({
                   </ToggleGroup>
                 )}
               />
-            </Section>
+            </SettingsSection>
 
-            <Section title="General">
-              <Setting
+            <SettingsSection title="General">
+              <SettingRow
                 title="Launch at login"
                 description="Open the app automatically when you sign in."
-                control={(labelledBy) => (
+                renderControl={(labelId) => (
                   <Switch
                     checked={settings.launchAtLogin}
-                    labelledBy={labelledBy}
-                    onChange={(launchAtLogin) => update({ launchAtLogin })}
+                    labelId={labelId}
+                    onChange={(launchAtLogin) => updateSettings({ launchAtLogin })}
                   />
                 )}
               />
-            </Section>
+            </SettingsSection>
 
-            <Section title="Notifications">
-              <Setting
+            <SettingsSection title="Notifications">
+              <SettingRow
                 title="Low battery alerts"
                 description={`Notify when a wireless device reaches ${LOW_BATTERY}%.`}
-                control={(labelledBy) => (
+                renderControl={(labelId) => (
                   <Switch
                     checked={settings.lowBatteryAlerts}
-                    labelledBy={labelledBy}
-                    onChange={(lowBatteryAlerts) => update({ lowBatteryAlerts })}
+                    labelId={labelId}
+                    onChange={(lowBatteryAlerts) => updateSettings({ lowBatteryAlerts })}
                   />
                 )}
               />
-            </Section>
+            </SettingsSection>
           </div>
         )}
       </div>

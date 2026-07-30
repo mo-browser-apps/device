@@ -2,6 +2,16 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn, FOCUS_RING } from '@/lib/utils';
 
+interface ModalProps {
+  title: ReactNode;
+  description: ReactNode;
+  role?: 'alertdialog';
+  busy?: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}
+
 /**
  * A modal built on the native `<dialog>` element, which brings the focus trap,
  * Escape handling, and top-layer stacking with it. Render it only while open.
@@ -15,32 +25,30 @@ export function Modal({
   onClose,
   children,
   className,
-}: {
-  title: ReactNode;
-  description: ReactNode;
-  role?: 'alertdialog';
-  busy?: boolean;
-  onClose: () => void;
-  children: ReactNode;
-  className?: string;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
+}: ModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const descriptionId = useId();
 
-  useEffect(() => ref.current?.showModal(), []);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
 
-  const close = () => {
+  const requestClose = () => {
     if (!busy) onClose();
   };
 
   return (
     <dialog
-      ref={ref}
+      ref={dialogRef}
       role={role}
       aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       onCancel={(event) => {
         event.preventDefault();
-        close();
+        requestClose();
       }}
       className={cn(
         'm-auto w-130 max-w-[calc(100vw-3rem)] rounded-2xl border bg-card p-0 text-card-foreground',
@@ -53,11 +61,13 @@ export function Modal({
           <h2 id={titleId} className="text-lg font-semibold">
             {title}
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
         </div>
         <button
           type="button"
-          onClick={close}
+          onClick={requestClose}
           disabled={busy}
           aria-label="Close"
           className={cn(

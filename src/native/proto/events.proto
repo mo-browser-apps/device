@@ -3,6 +3,8 @@ syntax = "proto3";
 import "devices.proto";
 import "google/protobuf/empty.proto";
 
+// Native-to-main callbacks emitted by the device stack.
 service DeviceEventsService {
+  // Carries the complete managed-device snapshot after a change.
   rpc Changed(DeviceList) returns (google.protobuf.Empty);
 }

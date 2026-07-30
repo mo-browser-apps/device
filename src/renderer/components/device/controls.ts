@@ -1,7 +1,7 @@
 import { LightEffect, type Binding } from '@/gen/devices';
 
 /** Names for the controls a mouse reports. */
-const CONTROLS: Record<string, string> = {
+const MOUSE_CONTROL_LABELS: Record<string, string> = {
   wheel: 'Wheel',
   back: 'Back',
   forward: 'Forward',
@@ -9,7 +9,7 @@ const CONTROLS: Record<string, string> = {
 };
 
 /** Names for the keys whose id does not already read as one. Letters and digits do. */
-const KEYS: Record<string, string> = {
+const KEY_LABELS: Record<string, string> = {
   esc: 'Esc',
   minus: 'Minus',
   equal: 'Equal',
@@ -37,7 +37,7 @@ const KEYS: Record<string, string> = {
 };
 
 /** Actions a control can be bound to. */
-const ACTIONS: Record<string, string> = {
+const ACTION_LABELS: Record<string, string> = {
   default: 'Default',
   'middle-click': 'Middle click',
   back: 'Back',
@@ -52,6 +52,14 @@ const ACTIONS: Record<string, string> = {
   disabled: 'Disabled',
 };
 
+/** A mouse button always holds an action, so it has nothing to restore to. */
+export const MOUSE_ACTIONS = Object.keys(ACTION_LABELS).filter((action) => action !== 'default');
+
+/** A key types a character unless rebound, so "Default" is what restores it. */
+export const KEY_ACTIONS = Object.keys(ACTION_LABELS).filter(
+  (action) => action !== 'middle-click',
+);
+
 const DEFAULT_MOUSE_ACTIONS: Record<string, string> = {
   wheel: 'middle-click',
   back: 'back',
@@ -59,14 +67,8 @@ const DEFAULT_MOUSE_ACTIONS: Record<string, string> = {
   gesture: 'show-desktop',
 };
 
-/** A mouse button always holds an action, so it has nothing to restore to. */
-export const MOUSE_ACTIONS = Object.keys(ACTIONS).filter((id) => id !== 'default');
-
-/** A key types a character unless rebound, so "Default" is what restores it. */
-export const KEY_ACTIONS = Object.keys(ACTIONS).filter((id) => id !== 'middle-click');
-
 /** The selectable light effects, in the order the picker offers them. */
-export const EFFECTS: [LightEffect, string][] = [
+export const EFFECTS: [effect: LightEffect, label: string][] = [
   [LightEffect.STATIC, 'Steady'],
   [LightEffect.BREATHING, 'Pulse'],
   [LightEffect.WAVE, 'Wave'],
@@ -88,9 +90,9 @@ export function resetKeyBindings(bindings: Binding[]): Binding[] {
 }
 
 export function actionLabel(action: string): string {
-  return ACTIONS[action] ?? action;
+  return ACTION_LABELS[action] ?? action;
 }
 
 export function controlLabel(control: string): string {
-  return CONTROLS[control] ?? KEYS[control] ?? control.toUpperCase();
+  return MOUSE_CONTROL_LABELS[control] ?? KEY_LABELS[control] ?? control.toUpperCase();
 }

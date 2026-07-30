@@ -1,19 +1,23 @@
 syntax = "proto3";
 
+import "devices.proto";
 import "google/protobuf/empty.proto";
 
+// Application-wide preferences owned and persisted by the main process.
 message AppSettings {
   string theme = 1;
   bool launch_at_login = 2;
   bool low_battery_alerts = 3;
 }
 
-message OpenDevice {
-  string id = 1;
-}
-
+// Main-process application settings and renderer navigation events.
 service AppService {
+  // Returns the complete current preference snapshot.
   rpc GetSettings(google.protobuf.Empty) returns (AppSettings);
+
+  // Applies and persists one complete preference snapshot.
   rpc ApplySettings(AppSettings) returns (google.protobuf.Empty);
-  rpc OnOpenDevice(google.protobuf.Empty) returns (stream OpenDevice);
+
+  // Future navigation requests, such as clicks on device notifications.
+  rpc OnOpenDevice(google.protobuf.Empty) returns (stream DeviceId);
 }
