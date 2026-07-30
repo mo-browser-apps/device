@@ -124,7 +124,7 @@ export function DeviceArt({
         callouts={callouts}
         selectedControl={selectedControl}
         onControlSelect={onControlSelect}
-        className={cn('max-w-[520px]', offlineClassName, className)}
+        className={cn('max-w-130', offlineClassName, className)}
       />
     );
   }
