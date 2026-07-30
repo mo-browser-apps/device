@@ -14,6 +14,7 @@ struct ButtonSeed {
 
 struct MouseSeed {
   std::string id;
+  std::string model_id;
   std::string model;
   LinkType link;
   std::string firmware;
@@ -39,6 +40,7 @@ auto FindById(Entries& entries, const std::string& device_id) {
 DeviceSeed MakeMouse(const MouseSeed& seed) {
   Device device;
   device.set_id(seed.id);
+  device.set_model_id(seed.model_id);
   device.set_model(seed.model);
   device.set_link(seed.link);
   device.set_firmware(seed.firmware);
@@ -80,6 +82,7 @@ const char* const kRemappableKeys[] = {
 DeviceSeed MakeKeyboard() {
   Device device;
   device.set_id("compact-keyboard");
+  device.set_model_id("compact-keyboard");
   device.set_model("Compact Keyboard");
   device.set_link(WIRED);
   device.set_firmware("2.0.5");
@@ -115,6 +118,7 @@ DeviceStack::DeviceStack() {
 
   add(paired_, MakeMouse({
                     .id = "performance-mouse",
+                    .model_id = "performance-mouse",
                     .model = "Performance Mouse",
                     .link = RECEIVER,
                     .firmware = "3.2.1",
@@ -130,6 +134,7 @@ DeviceStack::DeviceStack() {
                 }));
   add(paired_, MakeMouse({
                     .id = "travel-mouse",
+                    .model_id = "travel-mouse",
                     .model = "Travel Mouse",
                     .link = BLUETOOTH,
                     .firmware = "1.4.0",

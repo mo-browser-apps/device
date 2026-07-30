@@ -21,7 +21,7 @@ interface DeviceArtProps {
   className?: string;
 }
 
-const ARTWORK_BY_DEVICE_ID: Record<string, DeviceArtwork> = {
+const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
   'performance-mouse': {
     detailSrc: '/device-art/performance-mouse.webp',
     homeSrc: '/device-art/performance-mouse-home.webp',
@@ -45,28 +45,6 @@ const ARTWORK_BY_DEVICE_ID: Record<string, DeviceArtwork> = {
 };
 
 /**
- * Chooses exact artwork when available and falls back to the device's capabilities.
- */
-function artworkFor(device: Device): DeviceArtwork | null {
-  if (!device.mouse && !device.keyboard) {
-    return null;
-  }
-
-  const exactArtwork = ARTWORK_BY_DEVICE_ID[device.id];
-  if (exactArtwork) {
-    return exactArtwork;
-  }
-
-  if (device.keyboard) {
-    return ARTWORK_BY_DEVICE_ID['compact-keyboard'];
-  }
-
-  return (device.mouse?.buttons.length ?? 0) > 3
-    ? ARTWORK_BY_DEVICE_ID['performance-mouse']
-    : ARTWORK_BY_DEVICE_ID['travel-mouse'];
-}
-
-/**
  * Shows device artwork and adds interactive mouse or keyboard controls when requested.
  */
 export function DeviceArt({
@@ -78,7 +56,7 @@ export function DeviceArt({
   onControlSelect,
   className,
 }: DeviceArtProps) {
-  const artwork = artworkFor(device);
+  const artwork = ARTWORK_BY_MODEL_ID[device.modelId];
   if (!artwork) return null;
 
   const offlineClassName = !device.connected && 'grayscale opacity-45';

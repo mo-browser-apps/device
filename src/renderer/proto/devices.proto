@@ -35,6 +35,8 @@ message KeyboardSpec {
 
 message Device {
   string id = 1;
+  // Stable product identity shared by every unit of the same model.
+  string model_id = 11;
   string model = 2;
   LinkType link = 3;
   string firmware = 4;
