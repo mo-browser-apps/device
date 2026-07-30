@@ -44,6 +44,9 @@ const ARTWORK_BY_DEVICE_ID: Record<string, DeviceArtwork> = {
   },
 };
 
+/**
+ * Chooses exact artwork when available and falls back to the device's capabilities.
+ */
 function artworkFor(device: Device): DeviceArtwork | null {
   if (!device.mouse && !device.keyboard) {
     return null;
@@ -63,6 +66,9 @@ function artworkFor(device: Device): DeviceArtwork | null {
     : ARTWORK_BY_DEVICE_ID['travel-mouse'];
 }
 
+/**
+ * Shows device artwork and adds interactive mouse or keyboard controls when requested.
+ */
 export function DeviceArt({
   device,
   variant = 'detail',

@@ -3,8 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 const SCROLL_EDGE_TOLERANCE = 2;
 
 /**
- * Horizontal scroll state for a container holding one track of equally sized items.
- * `itemCount` re-measures when the track gains or loses items.
+ * Tracks the home screen's horizontal device list and moves it one card at a time.
+ * It remeasures when cards are added, removed, or resized.
  */
 export function useCarousel(initialScrollLeft: number, itemCount: number) {
   const carouselRef = useRef<HTMLDivElement>(null);

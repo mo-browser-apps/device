@@ -11,7 +11,9 @@ const KEYBOARD_ROWS = [
   'ctrlleft:1.25 metaleft:1.25 altleft:1.25 space:6.25 altright:1.25 fn:1.25 menu:1.25 ctrlright:1.25',
 ];
 
-/** Key-cap faces. Purely visual — the accessible name comes from `controlLabel`. */
+/**
+ * Provides the short labels drawn on special key caps.
+ */
 const KEY_FACE_LABELS: Record<string, string> = {
   esc: 'Esc',
   minus: '−',
@@ -42,7 +44,9 @@ const KEY_FACE_LABELS: Record<string, string> = {
 
 const KEY_ROW_INSETS = ['1.4%', '1%', '0.55%', '0.2%', '0%'];
 
-/** One full cycle of the glow animation, and the span a wave takes to cross the board. */
+/**
+ * Sets the length of one glow cycle and one wave across the keyboard.
+ */
 const LIGHTING_CYCLE_SECONDS = 2.4;
 
 interface KeyLayout {
@@ -71,7 +75,9 @@ const KEY_LAYOUT: KeyLayout[][] = KEYBOARD_ROWS.map((row) => {
   });
 });
 
-/** Row geometry is fixed by the art, so each row's grid is built once. */
+/**
+ * Builds the fixed grid geometry that keeps both keyboard layers aligned.
+ */
 const KEY_ROW_STYLES: CSSProperties[] = KEY_LAYOUT.map((row, index) => ({
   gridTemplateColumns: row.map(({ width }) => `${width}fr`).join(' '),
   marginInline: KEY_ROW_INSETS[index],
@@ -79,19 +85,22 @@ const KEY_ROW_STYLES: CSSProperties[] = KEY_LAYOUT.map((row, index) => ({
 
 export type Lighting = Pick<KeyboardSettings, 'effect' | 'hue' | 'brightness'>;
 
-/** The face printed on a key cap. The render's caps are blank, so this is the legend. */
+/**
+ * Returns the short label drawn on one key cap.
+ */
 function keyFaceLabel(id: string): string {
   return KEY_FACE_LABELS[id] ?? id.toUpperCase();
 }
 
-/** Only these effects move. Anything else, including an unrecognised value, stays still. */
+/**
+ * Reports whether a lighting effect should animate the key layer.
+ */
 function isAnimated(effect: LightEffect): boolean {
   return effect === LightEffect.BREATHING || effect === LightEffect.WAVE;
 }
 
 /**
- * The glow is drawn here rather than baked into the art, so one neutral render
- * covers every colour and effect.
+ * Builds the glow style for one key from the current lighting settings.
  */
 function lightingStyle(
   { effect, hue, brightness }: Lighting,
@@ -114,7 +123,9 @@ function lightingStyle(
   };
 }
 
-/** The lit cap face. Decorative — the legend it draws is the render's, which is blank. */
+/**
+ * Draws the decorative label and glow for one key.
+ */
 function KeyFace({
   id,
   lighting,
@@ -140,7 +151,9 @@ function KeyFace({
   );
 }
 
-/** The hit target and selection outline, over the face. Carries no legend of its own. */
+/**
+ * Adds the selectable hit target that sits over one key in the image.
+ */
 function KeyCap({
   id,
   selectable,
@@ -176,8 +189,8 @@ function KeyCap({
 }
 
 /**
- * One pass of the key grid. Both layers go through this, so the faces and the
- * hit targets cannot drift out of alignment.
+ * Places one complete layer over the keyboard image.
+ * Both the visual keys and hit targets use it so they stay aligned.
  */
 interface KeyLayerProps {
   renderKey: (key: KeyLayout) => ReactNode;
@@ -187,6 +200,9 @@ interface KeyLayerProps {
   'aria-hidden'?: boolean;
 }
 
+/**
+ * Renders every key in one shared keyboard layer.
+ */
 function KeyLayer({ renderKey, className, ...ariaProps }: KeyLayerProps) {
   return (
     <span
@@ -214,14 +230,21 @@ interface KeyboardArtProps {
   src: string;
   alt: string;
   aspect: string;
-  /** The backlight to draw. Omitted, or at zero brightness, the caps read unlit. */
+  /**
+   * The backlight to draw; omitted or zero brightness leaves the keys unlit.
+   */
   lighting?: Lighting | null;
   selectedControl?: string | null;
-  /** Set to make the remappable keys selectable. */
+  /**
+   * Makes reported remappable keys selectable when provided.
+   */
   onControlSelect?: (control: string) => void;
   className?: string;
 }
 
+/**
+ * Draws the keyboard image, its lighting layer, and selectable key targets.
+ */
 export function KeyboardArt({
   spec,
   src,

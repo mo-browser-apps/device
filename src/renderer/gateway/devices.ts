@@ -2,21 +2,30 @@ import { useCallback, useEffect, useState } from 'react';
 import { ipc } from '@/gen/ipc';
 import type { Device, Settings } from '@/gen/devices';
 
+/**
+ * Requests the devices that the native stack currently offers for pairing.
+ */
 export async function discoverDevices(): Promise<Device[]> {
   return (await ipc.devices.Discover({})).devices;
 }
 
+/**
+ * Asks the main process to add one discovered device.
+ */
 export async function pairDevice(deviceId: string): Promise<void> {
   await ipc.devices.Pair({ id: deviceId });
 }
 
+/**
+ * Asks the main process to remove one managed device.
+ */
 export async function forgetDevice(deviceId: string): Promise<void> {
   await ipc.devices.Forget({ id: deviceId });
 }
 
 /**
- * The live device list. `Watch` carries only future snapshots, so the current list
- * is fetched separately, and a snapshot arriving during that call wins.
+ * Keeps the renderer's device list in sync with complete snapshots from the main process.
+ * It loads the current list first, then listens for later changes.
  */
 export function useDevices(): { devices: Device[] | null; failed: boolean } {
   const [devices, setDevices] = useState<Device[] | null>(null);
@@ -48,8 +57,8 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 }
 
 /**
- * Settings for one device. `preview` updates local state, while `commit` sends the
- * settings to the device service for application and persistence.
+ * Loads one device's settings from the main process.
+ * It previews changes locally and sends committed values back through IPC.
  */
 export function useDeviceSettings(deviceId: string) {
   const [settings, setSettings] = useState<Settings | null>(null);

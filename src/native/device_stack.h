@@ -9,21 +9,33 @@
 
 #include "gen/devices.pb.h"
 
-// Owns discovery, paired devices, and their settings. Replace this in-memory
-// implementation with a vendor HID SDK; the RPC and UI layers stay unchanged.
+// Holds the simulated devices and their settings.
 class DeviceStack {
  public:
   using DevicesChangedHandler = std::function<void(const DeviceList&)>;
 
+  // Creates the managed demo devices and one nearby device available to pair.
   DeviceStack();
 
+  // Returns every device currently managed by the stack.
   DeviceList List() const;
+
+  // Returns nearby devices that are available to pair.
   DeviceList Discover() const;
+
+  // Moves one nearby device into the managed device list.
   bool Pair(const std::string& device_id);
+
+  // Removes one wireless device from the managed device list.
   bool Forget(const std::string& device_id);
+
+  // Returns the current settings for one managed device.
   std::optional<Settings> GetSettings(const std::string& device_id) const;
+
+  // Replaces the complete settings snapshot for one known device.
   bool ApplySettings(const Settings& settings);
 
+  // Connects native device-list changes to the main-process callback.
   void SetDevicesChangedHandler(DevicesChangedHandler handler) {
     devices_changed_ = std::move(handler);
   }
@@ -38,6 +50,7 @@ class DeviceStack {
   std::vector<Entry> available_;
   DevicesChangedHandler devices_changed_;
 
+  // Sends the latest managed-device snapshot to the registered callback.
   void PublishDevicesChanged() const;
 };
 

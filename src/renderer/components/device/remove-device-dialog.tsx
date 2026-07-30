@@ -10,6 +10,9 @@ interface RemoveDeviceDialogProps {
   onRemoved?: () => void;
 }
 
+/**
+ * Confirms removal, then asks the main process to forget the device.
+ */
 export function RemoveDeviceDialog({ device, onClose, onRemoved }: RemoveDeviceDialogProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

@@ -1,3 +1,6 @@
+/**
+ * Starts the main process, connects its services, and opens the application window.
+ */
 import { app, BrowserWindow } from '@mobrowser/api';
 import { buildApplicationMenu } from './menu';
 import { startDevices } from './devices';

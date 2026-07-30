@@ -6,6 +6,9 @@ interface SwitchProps {
   onChange: (checked: boolean) => void;
 }
 
+/**
+ * Provides the shared accessible on/off control used by settings editors.
+ */
 export function Switch({ checked, labelId, onChange }: SwitchProps) {
   return (
     <input

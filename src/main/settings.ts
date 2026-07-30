@@ -13,12 +13,18 @@ const lowBattery = new Set<string>();
 const appEvents = ipc.registerService(AppServiceDescriptor);
 let mainWindow: BrowserWindow;
 
+/**
+ * Writes the current main-process preferences to disk.
+ */
 export function persistPreferences(): void {
   if (!prefs.persist()) {
     console.warn('Could not write preferences.');
   }
 }
 
+/**
+ * Shows a system alert that opens the matching device when clicked.
+ */
 function notifyLowBattery(device: Device): void {
   const { id } = device;
 
@@ -39,11 +45,16 @@ function notifyLowBattery(device: Device): void {
   notification.show();
 }
 
+/**
+ * Reports whether a device should currently show a low-battery alert.
+ */
 function isLow(device: Device): boolean {
   return device.connected && device.hasBattery && !device.charging && device.battery <= LOW_BATTERY;
 }
 
-/** Notifies for devices that have just entered a low-battery episode. */
+/**
+ * Shows one alert when a managed device enters a low-battery state.
+ */
 export function checkBatteries(devices: DeviceList): void {
   if (!prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false)) return;
 
@@ -59,6 +70,9 @@ export function checkBatteries(devices: DeviceList): void {
   }
 }
 
+/**
+ * Connects renderer settings requests to saved preferences and MōBrowser system APIs.
+ */
 export function startSettings(win: BrowserWindow): void {
   mainWindow = win;
 

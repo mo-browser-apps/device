@@ -30,13 +30,18 @@ type SettingsChangeHandler = (settings: Settings) => void;
 const DPI_STEP = 100;
 const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
-/** The hue slider's own track, the one place colour is allowed outside the art. */
+/**
+ * Draws the color range behind the keyboard hue slider.
+ */
 const HUE_TRACK_STYLE: CSSProperties = {
   background: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360]
     .map((hue) => `hsl(${hue} 95% 55%)`)
     .join(', ')})`,
 };
 
+/**
+ * Gives each group of device settings a consistent heading and spacing.
+ */
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-5">
@@ -63,6 +68,9 @@ interface SettingsSliderProps {
   onCommit: () => void;
 }
 
+/**
+ * Previews values while the user moves a slider and commits when the interaction ends.
+ */
 function SettingsSlider({
   label,
   display,
@@ -113,6 +121,9 @@ function SettingsSlider({
   );
 }
 
+/**
+ * Shows one action or lighting choice as an accessible radio option.
+ */
 function RadioOption({
   group,
   value,
@@ -166,7 +177,9 @@ interface BindingEditorProps {
   onRebind: (bindings: Binding[]) => void;
 }
 
-/** Buttons and keys differ only in which actions they offer. */
+/**
+ * Edits the action assigned to the selected mouse button or keyboard key.
+ */
 function BindingEditor({
   control,
   bindings,
@@ -214,6 +227,9 @@ function BindingEditor({
   );
 }
 
+/**
+ * Shows the device details reported by the native stack and offers removal when allowed.
+ */
 function DeviceInfo({ device, onRemove }: { device: Device; onRemove: () => void }) {
   const details: [label: string, value: string][] = [
     ['Connection', connectionLabel(device)],
@@ -275,6 +291,9 @@ interface MouseEditorProps {
   onCommit: SettingsChangeHandler;
 }
 
+/**
+ * Shows button assignments or movement settings for a mouse.
+ */
 function MouseEditor({
   settings,
   mouse,
@@ -367,6 +386,9 @@ interface KeyboardEditorProps {
   onCommit: SettingsChangeHandler;
 }
 
+/**
+ * Shows key assignments or lighting settings for a keyboard.
+ */
 function KeyboardEditor({
   settings,
   keyboard,
@@ -467,6 +489,9 @@ interface ControlEditorProps {
   onCommit: SettingsChangeHandler;
 }
 
+/**
+ * Chooses the settings panel that matches the device type and selected section.
+ */
 export function ControlEditor({
   device,
   settings,

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { ipc } from '@/gen/ipc';
 import type { AppSettings } from '@/gen/app';
 
-/** Fires when the user clicks a device notification. */
+/**
+ * Listens for main-process requests to open a device, such as notification clicks.
+ */
 export function useOpenDeviceRequests(onOpenDevice: (deviceId: string) => void): void {
   useEffect(() => {
     const subscription = ipc.app.OnOpenDevice({}).subscribe({
@@ -13,7 +15,9 @@ export function useOpenDeviceRequests(onOpenDevice: (deviceId: string) => void):
   }, [onOpenDevice]);
 }
 
-/** Application settings, owned by the main process. `update` applies at once. */
+/**
+ * Loads app settings from the main process and sends each update back through IPC.
+ */
 export function useAppSettings() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
 

@@ -13,9 +13,8 @@ interface ModalProps {
 }
 
 /**
- * A modal built on the native `<dialog>` element, which brings the focus trap,
- * Escape handling, and top-layer stacking with it. Render it only while open.
- * `busy` blocks dismissal while work the user started is still running.
+ * Shows app content in the browser's native dialog layer.
+ * It handles focus, Escape, and busy-state closing for its caller.
  */
 export function Modal({
   title,

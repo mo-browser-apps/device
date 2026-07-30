@@ -26,6 +26,9 @@ const toggleVariants = cva(
   }
 )
 
+/**
+ * Wraps the Radix toggle with the shared renderer styles and size variants.
+ */
 const Toggle = React.forwardRef<
   React.ElementRef<typeof TogglePrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root> &

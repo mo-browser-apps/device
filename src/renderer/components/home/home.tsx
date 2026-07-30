@@ -21,10 +21,16 @@ interface HomeProps {
   onOpenSettings: (scrollLeft: number) => void;
 }
 
+/**
+ * Finds a device card so focus and scroll position can be restored after navigation.
+ */
 function findDeviceCard(carousel: HTMLElement | null, deviceId: string) {
   return carousel?.querySelector<HTMLElement>(`[data-device-id="${CSS.escape(deviceId)}"]`);
 }
 
+/**
+ * Shows one managed device with its artwork, status, and available actions.
+ */
 function DeviceCard({
   device,
   onOpen,
@@ -89,6 +95,9 @@ function DeviceCard({
   );
 }
 
+/**
+ * Moves the device carousel backward or forward by one card.
+ */
 function CarouselControl({
   direction,
   disabled,
@@ -122,6 +131,9 @@ function CarouselControl({
   );
 }
 
+/**
+ * Shows managed devices and opens the pairing, removal, and settings workflows.
+ */
 export function Home({
   devices,
   initialScrollLeft,

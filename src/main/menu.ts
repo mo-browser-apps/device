@@ -3,6 +3,9 @@ import { app, workspace, Menu, MenuItem, MenuWithRole } from '@mobrowser/api';
 const DISPLAY_NAME = 'MōDevice';
 const REPOSITORY_URL = 'https://github.com/mo-browser-apps/device';
 
+/**
+ * Shows app details in a native dialog and links to the source repository.
+ */
 async function showAbout(): Promise<void> {
   const result = await app.showMessageDialog({
     type: 'info',
@@ -18,6 +21,9 @@ async function showAbout(): Promise<void> {
   }
 }
 
+/**
+ * Builds the native application menu used by the main process.
+ */
 export function buildApplicationMenu(): Menu {
   const appMenu = new MenuWithRole({
     role: 'macAppMenu',

@@ -12,6 +12,9 @@ interface HomeState {
   focus: HomeFocusTarget;
 }
 
+/**
+ * Chooses the active screen and connects shared device and app settings to it.
+ */
 export default function App() {
   const { devices, failed } = useDevices();
   const { settings, update } = useAppSettings();

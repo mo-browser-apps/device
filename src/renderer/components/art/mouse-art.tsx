@@ -2,7 +2,9 @@ import { cn, FOCUS_RING } from '@/lib/utils';
 
 export type MouseArtProfile = 'performance' | 'travel';
 
-/** A control to label on the art: `wheel` shown as "Wheel · Middle click". */
+/**
+ * Describes one mouse control and the action shown beside it.
+ */
 export type Callout = { id: string; name: string; value: string };
 
 interface ControlHotspot {
@@ -41,6 +43,9 @@ const HOTSPOTS_BY_PROFILE: Record<MouseArtProfile, Record<string, ControlHotspot
   },
 };
 
+/**
+ * Places one selectable control label beside its marker on the mouse image.
+ */
 function ControlCallout({
   id,
   name,
@@ -95,6 +100,9 @@ function ControlCallout({
   );
 }
 
+/**
+ * Draws a mouse image with interactive labels for its reported controls.
+ */
 export function MouseArt({
   src,
   alt,

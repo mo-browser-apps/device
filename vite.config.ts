@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => {
   throw new Error(`Unsupported Vite config mode: ${mode}`);
 });
 
+/**
+ * Builds the Node.js code that runs in the MōBrowser main process.
+ */
 function defineMainConfig(): UserConfig {
   return {
     root: path.resolve(__dirname, 'src/main'),
@@ -40,6 +43,9 @@ function defineMainConfig(): UserConfig {
   };
 }
 
+/**
+ * Builds the React code that runs inside the application window.
+ */
 function defineRendererConfig(): UserConfig {
   return {
     root: path.resolve(__dirname, 'src/renderer'),

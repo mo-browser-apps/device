@@ -43,10 +43,16 @@ const CONNECTIONS: Record<LinkType, ConnectionStatus> = {
   [LinkType.UNRECOGNIZED]: UNKNOWN_CONNECTION,
 };
 
+/**
+ * Turns a device link type into the connection name shown in the UI.
+ */
 export function connectionLabel(device: Device): string {
   return (CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION).label;
 }
 
+/**
+ * Chooses the battery icon, label, and color for a battery reading.
+ */
 function getBatteryStatus(level: number, charging: boolean): BatteryStatus {
   if (charging) {
     return {
@@ -69,6 +75,9 @@ function getBatteryStatus(level: number, charging: boolean): BatteryStatus {
   };
 }
 
+/**
+ * Shows the icon and accessible label for a device's connection type.
+ */
 export function DeviceConnectionIcon({ device, className }: DeviceStatusProps) {
   const connection = CONNECTIONS[device.link] ?? UNKNOWN_CONNECTION;
   const label = device.connected ? connection.label : `${connection.label}, disconnected`;
@@ -89,6 +98,9 @@ export function DeviceConnectionIcon({ device, className }: DeviceStatusProps) {
   );
 }
 
+/**
+ * Shows a wireless device's battery level when it is available.
+ */
 export function DeviceBatteryStatus({ device, className }: DeviceStatusProps) {
   if (!device.connected || !device.hasBattery || device.link === LinkType.WIRED) return null;
 
@@ -111,6 +123,9 @@ export function DeviceBatteryStatus({ device, className }: DeviceStatusProps) {
   );
 }
 
+/**
+ * Combines the connection and battery indicators used on a device screen.
+ */
 export function DeviceStatus({ device, className }: DeviceStatusProps) {
   return (
     <span className={cn('flex items-center gap-4', className)}>

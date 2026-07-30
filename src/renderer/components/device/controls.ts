@@ -1,6 +1,8 @@
 import { LightEffect, type Binding } from '@/gen/devices';
 
-/** Names for the controls a mouse reports. */
+/**
+ * Maps native mouse control IDs to names shown in the renderer.
+ */
 const MOUSE_CONTROL_LABELS: Record<string, string> = {
   wheel: 'Wheel',
   back: 'Back',
@@ -8,7 +10,9 @@ const MOUSE_CONTROL_LABELS: Record<string, string> = {
   gesture: 'Thumb button',
 };
 
-/** Names for the keys whose id does not already read as one. Letters and digits do. */
+/**
+ * Maps special key IDs to readable names; letters and digits need no entry.
+ */
 const KEY_LABELS: Record<string, string> = {
   esc: 'Esc',
   minus: 'Minus',
@@ -36,7 +40,9 @@ const KEY_LABELS: Record<string, string> = {
   menu: 'Menu',
 };
 
-/** Actions a control can be bound to. */
+/**
+ * Maps action IDs shared with the native stack to names shown in the renderer.
+ */
 const ACTION_LABELS: Record<string, string> = {
   default: 'Default',
   'middle-click': 'Middle click',
@@ -52,10 +58,14 @@ const ACTION_LABELS: Record<string, string> = {
   disabled: 'Disabled',
 };
 
-/** A mouse button always holds an action, so it has nothing to restore to. */
+/**
+ * Lists the actions offered for mouse buttons.
+ */
 export const MOUSE_ACTIONS = Object.keys(ACTION_LABELS).filter((action) => action !== 'default');
 
-/** A key types a character unless rebound, so "Default" is what restores it. */
+/**
+ * Lists the actions offered for keyboard keys, including their default behavior.
+ */
 export const KEY_ACTIONS = Object.keys(ACTION_LABELS).filter(
   (action) => action !== 'middle-click',
 );
@@ -67,17 +77,25 @@ const DEFAULT_MOUSE_ACTIONS: Record<string, string> = {
   gesture: 'show-desktop',
 };
 
-/** The selectable light effects, in the order the picker offers them. */
+/**
+ * Lists the keyboard lighting effects in the order shown by the editor.
+ */
 export const EFFECTS: [effect: LightEffect, label: string][] = [
   [LightEffect.STATIC, 'Steady'],
   [LightEffect.BREATHING, 'Pulse'],
   [LightEffect.WAVE, 'Wave'],
 ];
 
+/**
+ * Finds the action assigned to one control, or falls back to its default behavior.
+ */
 export function boundAction(bindings: Binding[], control: string): string {
   return bindings.find((entry) => entry.control === control)?.action ?? '';
 }
 
+/**
+ * Restores the known default action for every mouse button.
+ */
 export function resetMouseBindings(bindings: Binding[]): Binding[] {
   return bindings.map((binding) => ({
     ...binding,
@@ -85,14 +103,23 @@ export function resetMouseBindings(bindings: Binding[]): Binding[] {
   }));
 }
 
+/**
+ * Restores every keyboard key to its normal typing behavior.
+ */
 export function resetKeyBindings(bindings: Binding[]): Binding[] {
   return bindings.map((binding) => ({ ...binding, action: 'default' }));
 }
 
+/**
+ * Turns an action ID into the name shown in editors and callouts.
+ */
 export function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action;
 }
 
+/**
+ * Turns a mouse button or key ID into the name shown in the UI.
+ */
 export function controlLabel(control: string): string {
   return MOUSE_CONTROL_LABELS[control] ?? KEY_LABELS[control] ?? control.toUpperCase();
 }

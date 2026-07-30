@@ -24,6 +24,9 @@ interface SettingsViewProps {
   onBack: () => void;
 }
 
+/**
+ * Groups related application settings under one heading.
+ */
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
@@ -35,6 +38,9 @@ function SettingsSection({ title, children }: { title: string; children: ReactNo
   );
 }
 
+/**
+ * Pairs a setting's title and description with its interactive control.
+ */
 function SettingRow({
   title,
   description,
@@ -55,6 +61,9 @@ function SettingRow({
   );
 }
 
+/**
+ * Shows app-wide settings and sends each change back to the main process.
+ */
 export function SettingsView({
   settings,
   update: updateSettings,

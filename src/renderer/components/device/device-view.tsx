@@ -24,7 +24,9 @@ const MOUSE_SEGMENTS: SegmentOption[] = [
   ['info', 'Info'],
 ];
 
-/** Panels come from the descriptor: a keyboard without a backlight has no Lighting tab. */
+/**
+ * Builds the editor sections from the capabilities reported by the device.
+ */
 function segmentsFor(device: Device): SegmentOption[] {
   if (!device.keyboard) {
     return MOUSE_SEGMENTS;
@@ -37,6 +39,9 @@ function segmentsFor(device: Device): SegmentOption[] {
   return segments;
 }
 
+/**
+ * Combines the artwork, status, and settings editor for one managed device.
+ */
 export function DeviceView({ device, onBack, onRemoved }: DeviceViewProps) {
   const segments = segmentsFor(device);
   const { settings, preview, commit } = useDeviceSettings(device.id);

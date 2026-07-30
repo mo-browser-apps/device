@@ -12,10 +12,16 @@ import { checkBatteries, persistPreferences } from './settings';
 const STORED_SETTINGS_KEY = 'devices.settings';
 const STORED_PAIRED_IDS_KEY = 'devices.pairedIds';
 
+/**
+ * Reads every saved device-settings snapshot from main-process preferences.
+ */
 function readStoredSettings(): Record<string, unknown> {
   return prefs.getObject<Record<string, unknown>>(STORED_SETTINGS_KEY, {});
 }
 
+/**
+ * Saves one device's complete settings snapshot without changing the others.
+ */
 function storeSettings(settings: IpcSettings): void {
   prefs.setObject(STORED_SETTINGS_KEY, {
     ...readStoredSettings(),
@@ -24,6 +30,9 @@ function storeSettings(settings: IpcSettings): void {
   persistPreferences();
 }
 
+/**
+ * Saves the IDs of devices currently managed by the native device stack.
+ */
 function storePairedDevices(devices: NativeDeviceList): void {
   prefs.setArray(
     STORED_PAIRED_IDS_KEY,
@@ -32,6 +41,9 @@ function storePairedDevices(devices: NativeDeviceList): void {
   persistPreferences();
 }
 
+/**
+ * Makes the native paired-device list match the IDs saved by the main process.
+ */
 async function restorePairedDevices(): Promise<void> {
   const paired = await native.deviceStack.List({});
   if (!prefs.hasArray(STORED_PAIRED_IDS_KEY)) {
@@ -56,6 +68,9 @@ async function restorePairedDevices(): Promise<void> {
   storePairedDevices(await native.deviceStack.List({}));
 }
 
+/**
+ * Sends saved settings back to the native device stack when the app starts.
+ */
 async function restoreSettings(): Promise<void> {
   for (const storedSettings of Object.values(readStoredSettings())) {
     try {
@@ -66,6 +81,9 @@ async function restoreSettings(): Promise<void> {
   }
 }
 
+/**
+ * Connects renderer device requests to the native stack and keeps both sides in sync.
+ */
 export function startDevices(): void {
   const deviceUpdates = ipc.registerService(DevicesServiceDescriptor);
   const devicesReady = restorePairedDevices().then(restoreSettings);

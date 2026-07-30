@@ -12,6 +12,9 @@ interface AddDeviceDialogProps {
   onPaired: (deviceId: string) => void;
 }
 
+/**
+ * Finds nearby devices and asks the main process to pair the selected one.
+ */
 export function AddDeviceDialog({
   onClose,
   onPaired,
