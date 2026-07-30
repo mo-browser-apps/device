@@ -1,9 +1,8 @@
 import type { Device, Settings } from '@/gen/devices';
 import { DeviceInfo } from './device-info';
+import type { Segment } from './device-presentation';
 import { KeyboardEditor } from './keyboard-editor';
 import { MouseEditor } from './mouse-editor';
-
-export type Segment = 'buttons' | 'movement' | 'keys' | 'lighting' | 'info';
 
 interface ControlEditorProps {
   device: Device;

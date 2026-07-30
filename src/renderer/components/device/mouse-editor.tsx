@@ -1,7 +1,7 @@
 import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
 import { Switch } from '@/components/switch';
-import { MOUSE_ACTIONS, resetMouseBindings } from './controls';
 import { BindingEditor, SettingsSection, SettingsSlider } from './editor-controls';
+import { MOUSE_ACTIONS, mouseControlLabel, resetMouseBindings } from './mouse-device';
 
 const DPI_STEP = 100;
 const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
@@ -41,6 +41,7 @@ export function MouseEditor({
     return (
       <BindingEditor
         control={selected}
+        controlName={mouseControlLabel(selected)}
         bindings={mouse.bindings}
         actions={MOUSE_ACTIONS}
         disabled={disabled}

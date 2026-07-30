@@ -1,12 +1,17 @@
 import type { CSSProperties } from 'react';
 import type { KeyboardSettings, Settings } from '@/gen/devices';
-import { EFFECTS, KEY_ACTIONS, resetKeyBindings } from './controls';
 import {
   BindingEditor,
   RadioOption,
   SettingsSection,
   SettingsSlider,
 } from './editor-controls';
+import {
+  KEY_ACTIONS,
+  KEYBOARD_EFFECTS,
+  keyboardControlLabel,
+  resetKeyBindings,
+} from './keyboard-device';
 
 /**
  * Draws the color range behind the keyboard hue slider.
@@ -50,6 +55,7 @@ export function KeyboardEditor({
     return (
       <BindingEditor
         control={selected}
+        controlName={keyboardControlLabel(selected)}
         bindings={keyboard.bindings}
         actions={KEY_ACTIONS}
         disabled={disabled}
@@ -68,7 +74,7 @@ export function KeyboardEditor({
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
       <SettingsSection title="Effect">
         <div className="flex flex-col">
-          {EFFECTS.map(([effect, label]) => (
+          {KEYBOARD_EFFECTS.map(([effect, label]) => (
             <RadioOption
               key={effect}
               group="effect"

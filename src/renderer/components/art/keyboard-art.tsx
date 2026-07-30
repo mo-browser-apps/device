@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { LightEffect, type KeyboardSettings, type KeyboardSpec } from '@/gen/devices';
-import { controlLabel } from '@/components/device/controls';
+import { keyboardControlLabel } from '@/components/device/keyboard-device';
 import { cn } from '@/lib/utils';
 
 const KEYBOARD_ROWS = [
@@ -165,7 +165,7 @@ function KeyCap({
   selected: boolean;
   onSelect?: (control: string) => void;
 }) {
-  const keyName = controlLabel(id);
+  const keyName = keyboardControlLabel(id);
 
   return (
     <button

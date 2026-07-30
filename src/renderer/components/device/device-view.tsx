@@ -6,11 +6,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useDeviceSettings } from '@/gateway/devices';
 import { BUTTON_ICON, TOGGLE_ITEM } from '@/lib/utils';
 import type { Device } from '@/gen/devices';
-import { actionLabel, boundAction, controlLabel } from './controls';
-import { ControlEditor, type Segment } from './control-editor';
+import { ControlEditor } from './control-editor';
+import { presentationFor, type Segment } from './device-presentation';
 import { RemoveDeviceDialog } from './remove-device-dialog';
-
-type SegmentOption = [segment: Segment, label: string];
 
 interface DeviceViewProps {
   device: Device;
@@ -18,51 +16,20 @@ interface DeviceViewProps {
   onRemoved: () => void;
 }
 
-const MOUSE_SEGMENTS: SegmentOption[] = [
-  ['buttons', 'Buttons'],
-  ['movement', 'Movement'],
-  ['info', 'Info'],
-];
-
-/**
- * Builds the editor sections from the capabilities reported by the device.
- */
-function segmentsFor(device: Device): SegmentOption[] {
-  if (!device.keyboard) {
-    return MOUSE_SEGMENTS;
-  }
-  const segments: SegmentOption[] = [['keys', 'Keys']];
-  if (device.keyboard.backlight) {
-    segments.push(['lighting', 'Lighting']);
-  }
-  segments.push(['info', 'Info']);
-  return segments;
-}
-
 /**
  * Combines the artwork, status, and settings editor for one managed device.
  */
 export function DeviceView({ device, onBack, onRemoved }: DeviceViewProps) {
-  const segments = segmentsFor(device);
+  const presentation = presentationFor(device);
   const { settings, preview, commit } = useDeviceSettings(device.id);
 
-  const [segment, setSegment] = useState<Segment>(segments[0][0]);
+  const [segment, setSegment] = useState<Segment>(presentation.segments[0][0]);
   const [selectedControl, setSelectedControl] = useState<string | null>(
-    () => device.mouse?.buttons[0] ?? device.keyboard?.keys[0] ?? null,
+    presentation.initialControl,
   );
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
 
-  const mouseSettings = settings?.mouse;
-  const buttonCallouts =
-    segment === 'buttons' && mouseSettings && device.mouse
-      ? device.mouse.buttons.map((control) => ({
-          id: control,
-          name: controlLabel(control),
-          value: actionLabel(boundAction(mouseSettings.bindings, control)),
-        }))
-      : [];
-
-  const canSelectControl = segment === 'buttons' || segment === 'keys';
+  const artState = presentation.artState(settings, segment);
 
   const selectSegment = (value: string) => {
     if (value) setSegment(value as Segment);
@@ -93,7 +60,7 @@ export function DeviceView({ device, onBack, onRemoved }: DeviceViewProps) {
             size="sm"
             className="mx-auto mb-5 w-fit rounded-lg border bg-muted/80 p-1 shadow-sm"
           >
-            {segments.map(([value, label]) => (
+            {presentation.segments.map(([value, label]) => (
               <ToggleGroupItem key={value} value={value} className={TOGGLE_ITEM}>
                 {label}
               </ToggleGroupItem>
@@ -104,10 +71,10 @@ export function DeviceView({ device, onBack, onRemoved }: DeviceViewProps) {
             <div className="flex min-w-0 flex-1 items-center justify-center pb-10">
               <DeviceArt
                 device={device}
-                callouts={buttonCallouts}
-                lighting={device.keyboard?.backlight ? settings.keyboard : null}
+                callouts={artState.callouts}
+                lighting={artState.lighting}
                 selectedControl={selectedControl}
-                onControlSelect={canSelectControl ? setSelectedControl : undefined}
+                onControlSelect={artState.canSelectControl ? setSelectedControl : undefined}
               />
             </div>
 

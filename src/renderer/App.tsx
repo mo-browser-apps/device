@@ -12,6 +12,11 @@ interface HomeState {
   focus: HomeFocusTarget;
 }
 
+type Screen =
+  | { type: 'devices' }
+  | { type: 'settings' }
+  | { type: 'device'; deviceId: string };
+
 /**
  * Chooses the active screen and connects shared device and app settings to it.
  */
@@ -19,7 +24,7 @@ export default function App() {
   const { devices, failed } = useDevices();
   const { settings, update } = useAppSettings();
 
-  const [screen, setScreen] = useState('devices');
+  const [screen, setScreen] = useState<Screen>({ type: 'devices' });
   const [homeState, setHomeState] = useState<HomeState>({
     scrollLeft: 0,
     focus: null,
@@ -28,7 +33,11 @@ export default function App() {
   const mainRef = useRef<HTMLElement>(null);
   const restoreHomeFocus = useRef(false);
 
-  const activeDevice = devices?.find((device) => device.id === screen) ?? null;
+  const activeDevice =
+    screen.type === 'device'
+      ? (devices?.find((device) => device.id === screen.deviceId) ?? null)
+      : null;
+  const screenKey = screen.type === 'device' ? `${screen.type}:${screen.deviceId}` : screen.type;
 
   const theme = settings?.theme ?? 'system';
   useEffect(() => {
@@ -52,13 +61,13 @@ export default function App() {
       scrollLeft: scrollLeft ?? current.scrollLeft,
       focus: { type: 'device', id: deviceId },
     }));
-    setScreen(deviceId);
+    setScreen({ type: 'device', deviceId });
   }, []);
 
   useOpenDeviceRequests(openDevice);
 
   useEffect(() => {
-    if (screen === 'devices' && restoreHomeFocus.current) {
+    if (screen.type === 'devices' && restoreHomeFocus.current) {
       restoreHomeFocus.current = false;
       return;
     }
@@ -67,17 +76,17 @@ export default function App() {
 
   const openSettings = (scrollLeft: number) => {
     setHomeState({ scrollLeft, focus: { type: 'settings' } });
-    setScreen('settings');
+    setScreen({ type: 'settings' });
   };
 
   const backToDevices = () => {
     restoreHomeFocus.current = true;
-    setScreen('devices');
+    setScreen({ type: 'devices' });
   };
 
   const handleDeviceRemoved = () => {
     setHomeState((current) => ({ ...current, focus: null }));
-    setScreen('devices');
+    setScreen({ type: 'devices' });
   };
 
   return (
@@ -91,10 +100,10 @@ export default function App() {
         )}
         {devices !== null && (
           <div
-            key={screen}
+            key={screenKey}
             className="h-full animate-in fade-in duration-200 motion-reduce:animate-none"
           >
-            {screen === 'settings' ? (
+            {screen.type === 'settings' ? (
               <SettingsView settings={settings} update={update} onBack={backToDevices} />
             ) : activeDevice ? (
               <DeviceView

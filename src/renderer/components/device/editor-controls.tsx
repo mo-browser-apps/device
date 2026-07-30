@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import type { Binding } from '@/gen/devices';
 import { BUTTON_OUTLINE, cn, FOCUS_RING } from '@/lib/utils';
-import { actionLabel, boundAction, controlLabel } from './controls';
+import { actionLabel, boundAction } from './controls';
 
 /**
  * Gives each group of device settings a consistent heading and spacing.
@@ -136,6 +136,7 @@ export function RadioOption({
 
 interface BindingEditorProps {
   control: string;
+  controlName: string;
   bindings: Binding[];
   actions: string[];
   disabled: boolean;
@@ -149,6 +150,7 @@ interface BindingEditorProps {
  */
 export function BindingEditor({
   control,
+  controlName,
   bindings,
   actions,
   disabled,
@@ -156,7 +158,6 @@ export function BindingEditor({
   onReset,
   onRebind,
 }: BindingEditorProps) {
-  const controlName = controlLabel(control);
   const selectedAction = boundAction(bindings, control);
 
   const rebind = (action: string) =>
