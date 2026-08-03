@@ -5,6 +5,7 @@ import { app, BrowserWindow } from '@mobrowser/api';
 import { buildApplicationMenu } from './menu';
 import { startDevices } from './devices';
 import { startSettings } from './settings';
+import { checkForUpdates } from './updates';
 import * as process from 'node:process';
 
 const isMac = process.platform === 'darwin';
@@ -29,3 +30,7 @@ win.show();
 if (isMac) {
   app.setMenu(buildApplicationMenu());
 }
+
+void checkForUpdates(win).catch((error: unknown) => {
+  console.warn('Could not finish the application update check.', error);
+});

@@ -33,7 +33,9 @@ function SettingsSection({ title, children }: { title: string; children: ReactNo
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
-      <div className="rounded-xl border bg-card/50 px-5 py-4 shadow-xs">{children}</div>
+      <div className="flex flex-col gap-5 rounded-xl border bg-card/50 px-5 py-4 shadow-xs">
+        {children}
+      </div>
     </section>
   );
 }
@@ -81,6 +83,33 @@ export function SettingsView({
 
         {settings && (
           <div className="flex flex-col gap-7">
+            <SettingsSection title="General">
+              <SettingRow
+                title="Download updates automatically"
+                description="Download new versions in the background."
+                renderControl={(labelId) => (
+                  <Switch
+                    checked={settings.automaticUpdateDownloads}
+                    labelId={labelId}
+                    onChange={(automaticUpdateDownloads) =>
+                      updateSettings({ automaticUpdateDownloads })
+                    }
+                  />
+                )}
+              />
+              <SettingRow
+                title="Launch at login"
+                description="Open the app automatically when you sign in."
+                renderControl={(labelId) => (
+                  <Switch
+                    checked={settings.launchAtLogin}
+                    labelId={labelId}
+                    onChange={(launchAtLogin) => updateSettings({ launchAtLogin })}
+                  />
+                )}
+              />
+            </SettingsSection>
+
             <SettingsSection title="Appearance">
               <SettingRow
                 title="Theme"
@@ -99,20 +128,6 @@ export function SettingsView({
                       </ToggleGroupItem>
                     ))}
                   </ToggleGroup>
-                )}
-              />
-            </SettingsSection>
-
-            <SettingsSection title="General">
-              <SettingRow
-                title="Launch at login"
-                description="Open the app automatically when you sign in."
-                renderControl={(labelId) => (
-                  <Switch
-                    checked={settings.launchAtLogin}
-                    labelId={labelId}
-                    onChange={(launchAtLogin) => updateSettings({ launchAtLogin })}
-                  />
                 )}
               />
             </SettingsSection>

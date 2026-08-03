@@ -6,6 +6,7 @@ import type { Device, DeviceList } from './gen/native/devices';
 
 const THEME_KEY = 'app.theme';
 const LOW_BATTERY_ALERTS_KEY = 'app.lowBatteryAlerts';
+const AUTOMATIC_UPDATE_DOWNLOADS_KEY = 'app.automaticUpdateDownloads';
 const LOW_BATTERY = 20;
 
 const lowBattery = new Set<string>();
@@ -20,6 +21,13 @@ export function persistPreferences(): void {
   if (!prefs.persist()) {
     console.warn('Could not write preferences.');
   }
+}
+
+/**
+ * Reports whether available application updates should download without asking first.
+ */
+export function shouldDownloadUpdatesAutomatically(): boolean {
+  return prefs.getBoolean(AUTOMATIC_UPDATE_DOWNLOADS_KEY, true);
 }
 
 /**
@@ -84,6 +92,7 @@ export function startSettings(win: BrowserWindow): void {
         theme: prefs.getString(THEME_KEY, 'system'),
         launchAtLogin: app.loginItemSettings.openAtLogin,
         lowBatteryAlerts: prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false),
+        automaticUpdateDownloads: shouldDownloadUpdatesAutomatically(),
       };
     },
 
@@ -98,6 +107,7 @@ export function startSettings(win: BrowserWindow): void {
 
       prefs.setString(THEME_KEY, request.theme);
       prefs.setBoolean(LOW_BATTERY_ALERTS_KEY, request.lowBatteryAlerts);
+      prefs.setBoolean(AUTOMATIC_UPDATE_DOWNLOADS_KEY, request.automaticUpdateDownloads);
       persistPreferences();
 
       if (!request.lowBatteryAlerts) {

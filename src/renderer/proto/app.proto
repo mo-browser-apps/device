@@ -8,6 +8,7 @@ message AppSettings {
   string theme = 1;
   bool launch_at_login = 2;
   bool low_battery_alerts = 3;
+  bool automatic_update_downloads = 4;
 }
 
 // Main-process application settings and renderer navigation events.
