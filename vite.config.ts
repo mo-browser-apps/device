@@ -1,6 +1,9 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type UserConfig } from 'vite';
+
+const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig(({ mode }) => {
   if (mode === 'main') {
@@ -17,21 +20,21 @@ export default defineConfig(({ mode }) => {
  */
 function defineMainConfig(): UserConfig {
   return {
-    root: path.resolve(__dirname, 'src/main'),
+    root: path.resolve(PROJECT_ROOT, 'src/main'),
     build: {
       target: 'esnext',
-      outDir: path.resolve(__dirname, 'out/main'),
+      outDir: path.resolve(PROJECT_ROOT, 'out/main'),
       emptyOutDir: true,
       sourcemap: true,
       lib: {
-        entry: path.resolve(__dirname, 'src/main/index.ts'),
+        entry: path.resolve(PROJECT_ROOT, 'src/main/index.ts'),
         formats: ['es'],
         fileName: () => 'index.js',
       },
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src/main'),
+        '@': path.resolve(PROJECT_ROOT, 'src/main'),
       },
     },
     server: {
@@ -48,16 +51,16 @@ function defineMainConfig(): UserConfig {
  */
 function defineRendererConfig(): UserConfig {
   return {
-    root: path.resolve(__dirname, 'src/renderer'),
+    root: path.resolve(PROJECT_ROOT, 'src/renderer'),
     plugins: [react()],
     build: {
-      outDir: path.resolve(__dirname, 'out/renderer'),
+      outDir: path.resolve(PROJECT_ROOT, 'out/renderer'),
       emptyOutDir: true,
       sourcemap: true,
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src/renderer'),
+        '@': path.resolve(PROJECT_ROOT, 'src/renderer'),
       },
     },
     server: {
