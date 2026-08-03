@@ -38,7 +38,8 @@ export async function checkForUpdates(win: BrowserWindow): Promise<void> {
     return;
   }
 
-  if (!shouldDownloadUpdatesAutomatically()) {
+  const automaticDownload = shouldDownloadUpdatesAutomatically();
+  if (!automaticDownload) {
     const confirmation = await app.showMessageDialog({
       parentWindow: win,
       type: 'info',
@@ -61,12 +62,20 @@ export async function checkForUpdates(win: BrowserWindow): Promise<void> {
   try {
     download = await update.download();
   } catch (error) {
-    await showDownloadError(win, error instanceof Error ? error.message : undefined);
+    if (automaticDownload) {
+      console.warn('Could not download the application update.', error);
+    } else {
+      await showDownloadError(win, error instanceof Error ? error.message : undefined);
+    }
     return;
   }
 
   if (!download.success) {
-    await showDownloadError(win, download.error);
+    if (automaticDownload) {
+      console.warn('Could not download the application update.', download.error);
+    } else {
+      await showDownloadError(win, download.error);
+    }
     return;
   }
 

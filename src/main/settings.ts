@@ -66,15 +66,23 @@ function isLow(device: Device): boolean {
 export function checkBatteries(devices: DeviceList): void {
   if (!prefs.getBoolean(LOW_BATTERY_ALERTS_KEY, false)) return;
 
+  const currentDevices = new Set<string>();
+
   for (const device of devices.devices) {
+    currentDevices.add(device.id);
+
     if (isLow(device)) {
       if (!lowBattery.has(device.id)) {
         lowBattery.add(device.id);
         notifyLowBattery(device);
       }
-    } else if (device.hasBattery && device.battery > LOW_BATTERY) {
+    } else {
       lowBattery.delete(device.id);
     }
+  }
+
+  for (const deviceId of lowBattery) {
+    if (!currentDevices.has(deviceId)) lowBattery.delete(deviceId);
   }
 }
 

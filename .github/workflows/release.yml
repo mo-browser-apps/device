@@ -1,4 +1,4 @@
-# Build production artifacts on macOS, Windows, and Linux, then draft a GitHub Release.
+# Build production artifacts on macOS and Windows, then draft a GitHub Release.
 #
 # Requires a committed package-lock.json (npm ci).
 name: Release
@@ -10,8 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
-  contents: write
+  contents: read
 
 jobs:
   build-macos:
@@ -33,11 +32,13 @@ jobs:
       MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
       # App-specific password generated at appleid.apple.com for notarization.
       MAC_APPLE_PASSWORD: ${{ secrets.MAC_APPLE_PASSWORD }}
+      # Shared private key used to sign auto-update packages on every platform.
+      CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY: ${{ secrets.CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify macOS signing secrets
+      - name: Verify macOS release secrets
         run: |
           set -euo pipefail
           missing=()
@@ -48,8 +49,9 @@ jobs:
           [ -z "${MAC_TEAM_ID:-}" ]            && missing+=(MAC_TEAM_ID)
           [ -z "${MAC_APPLE_ID:-}" ]           && missing+=(MAC_APPLE_ID)
           [ -z "${MAC_APPLE_PASSWORD:-}" ]     && missing+=(MAC_APPLE_PASSWORD)
+          [ -z "${CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY:-}" ] && missing+=(CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY)
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "Missing required macOS signing secrets: ${missing[*]}"
+            echo "Missing required macOS release secrets: ${missing[*]}"
             exit 1
           fi
 
@@ -103,6 +105,10 @@ jobs:
     environment: production
     runs-on: windows-latest
 
+    permissions:
+      contents: read
+      id-token: write
+
     env:
       # Azure Artifact Signing account name (Artifact Signing resource in the Azure portal).
       AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
@@ -116,11 +122,13 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       # Azure subscription ID of the service principal.
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # Shared private key used to sign auto-update packages on every platform.
+      CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY: ${{ secrets.CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Windows signing secrets
+      - name: Verify Windows release secrets
         shell: pwsh
         run: |
           $missing = @()
@@ -130,8 +138,9 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID))                  { $missing += "AZURE_CLIENT_ID" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_TENANT_ID))                  { $missing += "AZURE_TENANT_ID" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_SUBSCRIPTION_ID))            { $missing += "AZURE_SUBSCRIPTION_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY)) { $missing += "CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY" }
           if ($missing.Count -gt 0) {
-            Write-Error "Missing required Windows signing secrets: $($missing -join ', ')"
+            Write-Error "Missing required Windows release secrets: $($missing -join ', ')"
             exit 1
           }
 
@@ -192,34 +201,6 @@ jobs:
             build/dist/win-x64/pack/releases.win.json
           if-no-files-found: error
 
-  build-linux:
-    environment: production
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build release package
-        run: npm run build -- --verbose
-
-      # Linux production builds have no installer yet; ship the bin tree for distribution or CI.
-      - name: Pack Linux binaries
-        run: tar -czvf linux-x64-bin.tar.gz -C build/dist/linux-x64/bin .
-
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-linux-x64
-          path: linux-x64-bin.tar.gz
-          if-no-files-found: error
-
   release:
     name: Create GitHub Release draft
     runs-on: ubuntu-latest
@@ -227,7 +208,9 @@ jobs:
     needs:
       - build-macos
       - build-windows
-      - build-linux
+
+    permissions:
+      contents: write
 
     steps:
       - name: Download all artifacts
@@ -245,7 +228,6 @@ jobs:
             dist/artifacts-win-x64/**/*.exe
             dist/artifacts-win-x64/**/*.nupkg
             dist/artifacts-win-x64/**/releases.win.json
-            dist/artifacts-linux-x64/**/*.tar.gz
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           draft: true
