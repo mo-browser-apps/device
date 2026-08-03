@@ -66,38 +66,36 @@ npm run build
 
 ## Connect real devices
 
-Start with [`src/native/device_stack.cc`](src/native/device_stack.cc). Replace its seeded devices and
-the `List`, `Discover`, `Pair`, `Forget`, `GetSettings`, and `ApplySettings` implementations with
-calls to your device SDK or system APIs. Keep the public interface in
-[`src/native/device_stack.h`](src/native/device_stack.h) if these operations fit your integration.
+Replace the simulated implementation in
+[`src/native/device_stack.cc`](src/native/device_stack.cc) with calls to your device SDK or system
+APIs. Keep the interface in [`src/native/device_stack.h`](src/native/device_stack.h) if its operations
+fit your integration.
 
-The demo saves paired device IDs and settings in the main process. Real hardware or a vendor SDK
-may already store this data. Review the restore and save logic in
-[`src/main/devices.ts`](src/main/devices.ts), decide which layer owns the data, and keep only one
-source of truth so the app and device cannot restore conflicting values.
+The demo saves paired device IDs and settings in [`src/main/devices.ts`](src/main/devices.ts). If
+your devices or SDK already store this data, remove that persistence and keep one source of truth.
 
 ### Add capabilities and device types
 
-For another mouse or keyboard, reuse the existing screens where possible:
+For another mouse or keyboard, reuse the existing screens where possible.
 
-- Report its supported controls and value ranges from
-  [`src/native/device_stack.cc`](src/native/device_stack.cc).
-- Add its images to [`src/renderer/public/device-art/`](src/renderer/public/device-art/) and map its
-  `modelId` in [`src/renderer/components/art/device-art.tsx`](src/renderer/components/art/device-art.tsx).
-- Add actions and labels to `mouse-device.ts` or `keyboard-device.ts`, and add controls to
-  `mouse-editor.tsx` or `keyboard-editor.tsx` in
-  [`src/renderer/components/device/`](src/renderer/components/device/).
+- `src/native/device_stack.cc` reports the controls and value ranges supported by each device.
+- `device-art.tsx` connects each `modelId` to its artwork, while
+  `src/renderer/public/device-art/` stores the image files.
+- `mouse-device.ts` and `keyboard-device.ts` define the sections, actions, and labels shown for each
+  device type.
+- `mouse-editor.tsx` and `keyboard-editor.tsx` render the controls used to change device settings.
 
 For a different device category, give it its own capabilities, settings, editor, and artwork. Keep
 the shared device screen responsible only for layout and navigation.
 
-Where to make the changes:
-
-- Device data — `src/native/proto/devices.proto` and `src/renderer/proto/devices.proto`.
-- Device-specific behavior — a new device and editor module in
-  `src/renderer/components/device/`.
-- UI routing — `device-presentation.ts` and `control-editor.tsx`.
-- Artwork — `device-art.tsx` and `src/renderer/public/device-art/`.
+- `src/native/proto/devices.proto` and `src/renderer/proto/devices.proto` describe the capabilities
+  and settings shared between the app layers.
+- A new device module in `src/renderer/components/device/` describes the sections and artwork
+  behavior for the device type.
+- A new editor module in the same folder renders its settings controls.
+- `device-presentation.ts` chooses the matching device module, and `control-editor.tsx` chooses its
+  editor.
+- `device-art.tsx` renders the matching artwork from `src/renderer/public/device-art/`.
 
 ## Download
 
