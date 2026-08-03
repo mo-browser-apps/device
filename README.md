@@ -7,7 +7,7 @@ interface, a TypeScript application process, and a native C++ device layer.
 The demo looks and behaves like real device configuration software while keeping the source code
 small and easy to follow.
 
-<img src="assets/screenshots/macos-devices.png" width="45%" alt="Device overview on macOS"> <img src="assets/screenshots/windows-devices.png" width="45%" alt="Device overview on Windows">
+<a href="assets/screenshots/windows-devices.png"><img src="assets/screenshots/windows-devices.png" width="100%" alt="Device overview on Windows"></a>
 
 ## What the demo shows
 
@@ -18,7 +18,15 @@ small and easy to follow.
 - Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
 - Keep paired devices and settings between launches.
 
-<img src="assets/screenshots/macos-mouse-buttons.png" width="32%" alt="Mouse button configuration"> <img src="assets/screenshots/macos-keyboard-lighting.png" width="32%" alt="Keyboard lighting configuration"> <img src="assets/screenshots/macos-settings.png" width="32%" alt="App settings">
+<p align="center">
+  <a href="assets/screenshots/macos-devices.png"><img src="assets/screenshots/macos-devices.png" width="49%" alt="Device overview on macOS"></a>
+  <a href="assets/screenshots/macos-mouse-buttons.png"><img src="assets/screenshots/macos-mouse-buttons.png" width="49%" alt="Mouse button configuration"></a>
+</p>
+
+<p align="center">
+  <a href="assets/screenshots/macos-keyboard-lighting.png"><img src="assets/screenshots/macos-keyboard-lighting.png" width="49%" alt="Keyboard lighting configuration"></a>
+  <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
+</p>
 
 All devices are simulated by an in-memory C++ backend. This app does not detect or change real
 peripherals connected to the computer. It is a reference demo, not production device software.
