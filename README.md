@@ -1,11 +1,8 @@
 # MōDevice — a peripherals configuration demo
 
 MōDevice is a small reference application for configuring mice and keyboards, built with
-[MōBrowser](https://teamdev.com/mobrowser/). It demonstrates a desktop architecture with a React
-interface, a TypeScript application process, and a native C++ device layer.
-
-The demo looks and behaves like real device configuration software while keeping the source code
-small and easy to follow.
+[MōBrowser](https://teamdev.com/mobrowser/). It shows how a React interface communicates with a TypeScript main process
+and a native C++ module that simulates the device backend.
 
 <a href="assets/screenshots/windows-devices.png"><img src="assets/screenshots/windows-devices.png" width="100%" alt="Device overview on Windows"></a>
 
