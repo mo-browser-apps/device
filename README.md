@@ -7,6 +7,8 @@ interface, a TypeScript application process, and a native C++ device layer.
 The demo looks and behaves like real device configuration software while keeping the source code
 small and easy to follow.
 
+<img src="assets/screenshots/macos-devices.png" width="45%" alt="Device overview on macOS"> <img src="assets/screenshots/windows-devices.png" width="45%" alt="Device overview on Windows">
+
 ## What the demo shows
 
 - View mice and keyboards with their connection, battery, and firmware information.
@@ -15,6 +17,8 @@ small and easy to follow.
 - Remap keyboard keys and configure backlight effects, color, and brightness.
 - Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
 - Keep paired devices and settings between launches.
+
+<img src="assets/screenshots/macos-mouse-buttons.png" width="32%" alt="Mouse button configuration"> <img src="assets/screenshots/macos-keyboard-lighting.png" width="32%" alt="Keyboard lighting configuration"> <img src="assets/screenshots/macos-settings.png" width="32%" alt="App settings">
 
 All devices are simulated by an in-memory C++ backend. This app does not detect or change real
 peripherals connected to the computer. It is a reference demo, not production device software.

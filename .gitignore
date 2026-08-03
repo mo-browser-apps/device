@@ -6,9 +6,9 @@ build/
 dist/
 out/
 
+# IDEs and editors.
 .idea/
 .vscode/
-docs/
 
 # Local environment and secrets.
 .env
