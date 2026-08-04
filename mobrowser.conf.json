@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "MoDevice",
+    "version": {
+      "major": "1",
+      "minor": "0",
+      "patch": "0"
+    },
+    "author": "TeamDev",
+    "copyright": "Copyright © 2026 TeamDev",
+    "description": "Configure your mice and keyboards.",
+    "locales": [
+      "en-US"
+    ],
+    "trustedOrigins": [],
+    "schemes": [],
+    "bundle": {
+      "macOS": {
+        "icon": "assets/app.icns",
+        "bundleID": "com.teamdev.MoDevice",
+        "codesignIdentity": "${MAC_CODESIGN_IDENTITY}",
+        "codesignEntitlements": "assets/entitlements.plist",
+        "teamID": "${MAC_TEAM_ID}",
+        "appleID": "${MAC_APPLE_ID}",
+        "password": "${MAC_APPLE_PASSWORD}",
+        "installer": {
+          "dmg": {
+            "name": "",
+            "volumeName": "",
+            "volumeIcon": "assets/app.icns",
+            "eula": "",
+            "window": {
+              "textSize": 14,
+              "skipPrettifying": false,
+              "backgroundImage": "",
+              "position": {
+                "x": 500,
+                "y": 400
+              },
+              "size": {
+                "width": 600,
+                "height": 400
+              },
+              "icon": {
+                "size": 150,
+                "position": {
+                  "x": 160,
+                  "y": 160
+                }
+              },
+              "appDropLink": {
+                "x": 430,
+                "y": 160
+              }
+            }
+          }
+        }
+      },
+      "Windows": {
+        "icon": "assets/app.ico",
+        "signCommand": "",
+        "installer": {
+          "exe": {
+            "name": "",
+            "icon": "assets/app.ico",
+            "installationGif": "",
+            "packageId": "MoDevice",
+            "installationFolderName": "MoDevice",
+            "displayName": "MoDevice",
+            "deltaStrategy": "BestSpeed"
+          }
+        }
+      },
+      "Linux": {
+        "icon": "assets/app.png"
+      }
+    }
+  }
+}

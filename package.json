@@ -1,0 +1,67 @@
+{
+  "name": "modevice",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "mobrowser dev",
+    "dev:build": "mobrowser dev:build",
+    "build": "mobrowser build",
+    "pack": "mobrowser pack",
+    "gen": "mobrowser gen",
+    "mobrowser": "mobrowser",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
+  },
+  "dependencies": {
+    "@mobrowser/api": "2.13.0",
+    "@mobrowser/cli": "2.13.0",
+    "@mobrowser/native": "2.13.0",
+    "@radix-ui/react-toggle": "^1.1.10",
+    "@radix-ui/react-toggle-group": "^1.1.11",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.503.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.2.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "optionalDependencies": {
+    "@mobrowser/sdk-darwin-arm64": "2.13.0",
+    "@mobrowser/sdk-linux-x64": "2.13.0",
+    "@mobrowser/sdk-win-x64": "2.13.0"
+  },
+  "allowScripts": {
+    "@mobrowser/sdk-darwin-arm64@2.13.0": true,
+    "fsevents@2.3.3": true
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.2",
+    "@types/node": "^20.11.5",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^4.1.4",
+    "tar-stream": "3.2.0",
+    "ts-proto": "^2.10.1",
+    "typescript": "^5.8.3",
+    "vite": "^8.0.0"
+  },
+  "engines": {
+    "node": "^20.20.2 || ^22.22.2 || >=24.14.1"
+  },
+  "overrides": {
+    "@mobrowser/cli": {
+      "adm-zip": "0.6.0",
+      "tar-stream": "3.1.7"
+    }
+  }
+}

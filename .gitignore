@@ -1,0 +1,30 @@
+# Node dependencies.
+node_modules/
+
+# Build output.
+build/
+dist/
+out/
+
+# IDEs and editors.
+.idea/
+.vscode/
+
+# Local environment and secrets.
+.env
+.env.*
+!.env.example
+
+# Agent session state.
+.mobrowser/
+
+# Generated code.
+gen/
+*.tsbuildinfo
+
+# macOS metadata.
+.DS_Store
+
+# Windows metadata.
+Thumbs.db
+Desktop.ini

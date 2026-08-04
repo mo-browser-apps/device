@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+@config '../../tailwind.config.js';
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --background: 40 10% 97%;
+    --foreground: 30 8% 12%;
+
+    --card: 40 20% 99%;
+    --card-foreground: 30 8% 12%;
+
+    --popover: 40 20% 99%;
+    --popover-foreground: 30 8% 12%;
+
+    --primary: 213 34% 42%;
+    --primary-foreground: 40 20% 98%;
+
+    --secondary: 40 6% 93%;
+    --secondary-foreground: 30 8% 12%;
+
+    --muted: 40 6% 93%;
+    --muted-foreground: 35 6% 42%;
+
+    --accent: 40 6% 91%;
+    --accent-foreground: 30 8% 12%;
+
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 40 20% 98%;
+
+    --status-charging: 145 38% 32%;
+    --status-low: 4 42% 42%;
+
+    --border: 35 8% 87%;
+    --input: 35 8% 85%;
+    --ring: 213 34% 42%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --background: 30 6% 7%;
+    --foreground: 40 8% 92%;
+
+    --card: 30 5% 10%;
+    --card-foreground: 40 8% 92%;
+
+    --popover: 30 5% 13%;
+    --popover-foreground: 40 8% 92%;
+
+    --primary: 211 32% 62%;
+    --primary-foreground: 215 24% 10%;
+
+    --secondary: 30 4% 16%;
+    --secondary-foreground: 40 8% 92%;
+
+    --muted: 30 4% 16%;
+    --muted-foreground: 35 5% 60%;
+
+    --accent: 30 4% 18%;
+    --accent-foreground: 40 8% 92%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 8% 96%;
+
+    --status-charging: 145 30% 58%;
+    --status-low: 4 38% 62%;
+
+    --border: 30 4% 18%;
+    --input: 30 4% 20%;
+    --ring: 211 32% 62%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .window-drag-region {
+    -webkit-app-region: drag;
+  }
+}
+
+@keyframes key-glow {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
