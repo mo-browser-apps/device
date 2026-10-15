@@ -35,7 +35,7 @@ updates, but device data and settings are not sent anywhere.
 
 - macOS 14 or later on Apple silicon, or Windows 10 or later on 64-bit systems.
 - [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
-- [MōBrowser](https://teamdev.com/mobrowser/) 2.13.0 or later.
+- [MōBrowser](https://teamdev.com/mobrowser/) 2.18.0 or later.
 
 ## Run from source
 

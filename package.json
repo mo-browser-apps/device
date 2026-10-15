@@ -15,9 +15,9 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
   },
   "dependencies": {
-    "@mobrowser/api": "2.13.0",
-    "@mobrowser/cli": "2.13.0",
-    "@mobrowser/native": "2.13.0",
+    "@mobrowser/api": "2.18.0",
+    "@mobrowser/cli": "2.18.0",
+    "@mobrowser/native": "2.18.0",
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "class-variance-authority": "^0.7.0",
@@ -29,12 +29,12 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "optionalDependencies": {
-    "@mobrowser/sdk-darwin-arm64": "2.13.0",
-    "@mobrowser/sdk-linux-x64": "2.13.0",
-    "@mobrowser/sdk-win-x64": "2.13.0"
+    "@mobrowser/sdk-darwin-arm64": "2.18.0",
+    "@mobrowser/sdk-linux-x64": "2.18.0",
+    "@mobrowser/sdk-win-x64": "2.18.0"
   },
   "allowScripts": {
-    "@mobrowser/sdk-darwin-arm64@2.13.0": true,
+    "@mobrowser/sdk-darwin-arm64@2.18.0": true,
     "fsevents@2.3.3": true
   },
   "devDependencies": {
