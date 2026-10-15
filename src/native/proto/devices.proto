@@ -45,6 +45,8 @@ message Device {
   // Percentage from 0 to 100; ignored when has_battery is false.
   int32 battery = 7;
   bool charging = 10;
+  // True for physical hardware driven by the native module, not the simulation.
+  bool live = 12;
 
   // Hardware capabilities and device category.
   oneof spec {

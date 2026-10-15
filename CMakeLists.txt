@@ -20,6 +20,8 @@ set(APP_SOURCES
         src/native/device_stack.cc
         src/native/device_service.h
         src/native/device_service.cc
+        src/native/keychron_hid.h
+        src/native/keychron_hid.cc
 )
 
 # Defines the main target of the application.
@@ -28,9 +30,17 @@ add_library(mobrowser_lib STATIC ${APP_SOURCES} ${GENERATED_SOURCES})
 mobrowser_configure_app_lib(mobrowser_lib)
 
 # Add shared third party dependencies and configuration for all platforms here.
-# Example:
-# find_package(example CONFIG REQUIRED)
-# target_link_libraries(mobrowser_lib PRIVATE example::example)
+# HIDAPI talks to the Keychron keyboard over USB HID (see src/native/keychron_hid.cc).
+include(FetchContent)
+set(BUILD_SHARED_LIBS OFF)
+# On Linux, use the kernel hidraw backend only (needs libudev-dev), not libusb.
+set(HIDAPI_WITH_LIBUSB OFF)
+FetchContent_Declare(hidapi
+        URL https://github.com/libusb/hidapi/archive/refs/tags/hidapi-0.15.0.tar.gz
+        URL_HASH SHA256=5d84dec684c27b97b921d2f3b73218cb773cf4ea915caee317ac8fc73cef8136
+)
+FetchContent_MakeAvailable(hidapi)
+target_link_libraries(mobrowser_lib PRIVATE hidapi::hidapi)
 
 # Keep platform-specific dependencies inside the matching block below.
 # Platform-only find_package calls, include directories, source files, compile definitions,

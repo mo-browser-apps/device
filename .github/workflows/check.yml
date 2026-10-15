@@ -24,6 +24,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # HIDAPI's Linux hidraw backend links against libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
       - name: Generate
         run: npm run gen
 

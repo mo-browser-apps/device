@@ -124,7 +124,11 @@ export function startDevices(): void {
     async ApplySettings(request: IpcSettings) {
       await devicesReady;
       await native.deviceStack.ApplySettings(request);
-      storeSettings(request);
+      // Real hardware keeps its own state; saving it would re-apply demo values at startup.
+      const { devices } = await native.deviceStack.List({});
+      if (!devices.find((device) => device.id === request.deviceId)?.live) {
+        storeSettings(request);
+      }
       return {};
     },
   });

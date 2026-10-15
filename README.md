@@ -71,6 +71,52 @@ fit your integration.
 The demo saves paired device IDs and settings in [`src/main/devices.ts`](src/main/devices.ts). If
 your devices or SDK already store this data, remove that persistence and keep one source of truth.
 
+### Example: Keychron keyboards over USB
+
+The app includes one real device. When a **Keychron K10 Max (ANSI RGB)** or **Keychron K2 HE
+(RGB, ANSI/ISO/JIS)** is plugged in by **USB cable** at startup, it appears next to the simulated
+devices with a **Live device** badge. Its
+Lighting controls drive the physical backlight:
+
+- **Effect**: Steady, Pulse, and Wave map to the firmware's Solid Color, Breathing, and Cycle Left
+  Right effects.
+- **Hue** sets the backlight colour.
+- **Brightness** sets the backlight level.
+
+The app reads the keyboard's current lighting when it starts.
+
+How it works:
+
+```
+React slider → useDeviceSettings().commit → IPC → src/main/devices.ts
+  → native RPC → DeviceStack::ApplySettings → KeychronHid → HIDAPI → keyboard
+```
+
+- [HIDAPI](https://github.com/libusb/hidapi) 0.15.0 is downloaded and statically linked by
+  [`CMakeLists.txt`](CMakeLists.txt) with `FetchContent`. Linux builds need `libudev-dev`.
+- [`src/native/keychron_hid.cc`](src/native/keychron_hid.cc) opens the keyboard's VIA raw HID
+  interface (VID `0x3434`, usage page `0xFF60`). The supported product IDs are listed in
+  `kModels` (K10 Max `0x0AA0`, K2 HE `0x0E20`–`0x0E22`). It sends the QMK/VIA
+  `custom_get_value` and `custom_set_value` commands on the RGB matrix channel, as listed in
+  Keychron's VIA definitions for these models.
+- [`src/native/device_stack.cc`](src/native/device_stack.cc) adds the keyboard to the device list
+  and converts the editor's hue (0–359°) and brightness (0–100%) to VIA's 0–255 range.
+
+To try it, connect the keyboard by cable with the mode switch set to USB, then run `npm run dev`.
+
+Limitations:
+
+- The app looks for the keyboard only once, at launch. If you unplug it, its controls are disabled
+  until you restart the app.
+- Lighting changes are not saved to the keyboard's memory. Unplugging the keyboard restores its own
+  saved lighting.
+- Firmware effects that have no matching editor option are shown as Wave. Saturation is always set
+  to full.
+- Only the first supported keyboard found is used. The K2 HE support follows Keychron's published
+  firmware and has not been tested on the hardware.
+- Key remapping, Bluetooth, the 2.4 GHz receiver, and other Keychron models are not supported. The
+  app uses the compact keyboard artwork for these keyboards.
+
 ### Add capabilities and device types
 
 For another mouse or keyboard, reuse the existing screens where possible.

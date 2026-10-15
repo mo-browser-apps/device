@@ -42,7 +42,15 @@ const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
     alt: 'Graphite compact keyboard',
     aspectRatio: '821 / 479',
   },
+  // Real keyboards reuse the demo artwork to preview their lighting.
+  'keychron-k10-max': {
+    detailSrc: '/device-art/compact-keyboard.webp',
+    homeSrc: '/device-art/compact-keyboard-home.webp',
+    alt: 'Keyboard illustration',
+    aspectRatio: '821 / 479',
+  },
 };
+ARTWORK_BY_MODEL_ID['keychron-k2-he'] = ARTWORK_BY_MODEL_ID['keychron-k10-max'];
 
 /**
  * Shows device artwork and adds interactive mouse or keyboard controls when requested.

@@ -109,6 +109,62 @@ DeviceSeed MakeKeyboard() {
   return {std::move(device), std::move(settings)};
 }
 
+// The editor's three effects, mapped to entries in the supported keyboards' effect list
+// (Keychron's VIA definition: 1 Solid Color, 2 Breathing, 5 Cycle Left Right).
+constexpr int kViaSolid = 1;
+constexpr int kViaBreathing = 2;
+constexpr int kViaCycleLeftRight = 5;
+
+// The editor uses hue 0–359° and brightness 0–100%; VIA uses 0–255 for both.
+int ToVia(int value, int range) {
+  return std::clamp((value * 255 + range / 2) / range, 0, 255);
+}
+
+int FromVia(int value, int range) {
+  return (value * range + 127) / 255;
+}
+
+KeychronHid::Lighting ToKeychronLighting(const KeyboardSettings& keyboard) {
+  int effect = kViaSolid;
+  if (keyboard.effect() == BREATHING) effect = kViaBreathing;
+  if (keyboard.effect() == WAVE) effect = kViaCycleLeftRight;
+
+  return {
+      .effect = effect,
+      .hue = ToVia(keyboard.hue(), 360),
+      // Full saturation keeps hue changes clearly visible.
+      .saturation = 255,
+      .brightness = ToVia(keyboard.brightness(), 100),
+  };
+}
+
+DeviceSeed MakeKeychron(const KeychronHid& keychron, const KeychronHid::Lighting& lighting) {
+  Device device;
+  device.set_id(keychron.model().id);
+  device.set_model_id(keychron.model().id);
+  device.set_model(keychron.model().name);
+  device.set_link(WIRED);
+  device.set_firmware("VIA protocol " + std::to_string(keychron.protocol_version()));
+  device.set_connected(true);
+  device.set_has_battery(false);
+  device.set_live(true);
+  // Lighting only: key remapping is not implemented for the real keyboard.
+  device.mutable_keyboard()->set_backlight(true);
+
+  Settings settings;
+  settings.set_device_id(device.id());
+  KeyboardSettings* keyboard = settings.mutable_keyboard();
+  // Firmware effects the editor cannot show are listed as the animated "Wave".
+  keyboard->set_effect(WAVE);
+  // Effect 0 means the backlight is off; it is shown as Steady at zero brightness.
+  if (lighting.effect == kViaSolid || lighting.effect == 0) keyboard->set_effect(STATIC);
+  if (lighting.effect == kViaBreathing) keyboard->set_effect(BREATHING);
+  keyboard->set_hue(std::min(FromVia(lighting.hue, 360), 359));
+  keyboard->set_brightness(lighting.effect == 0 ? 0 : FromVia(lighting.brightness, 100));
+
+  return {std::move(device), std::move(settings)};
+}
+
 }  // namespace
 
 DeviceStack::DeviceStack() {
@@ -157,6 +213,16 @@ DeviceStack::DeviceStack() {
   nearby.device.set_connected(false);
   nearby.settings.set_device_id(nearby.device.id());
   available_.push_back(std::move(nearby));
+
+  // A single scan at startup; plugging the keyboard in later needs an app restart.
+  keychron_ = KeychronHid::Open();
+  std::optional<KeychronHid::Lighting> lighting;
+  if (keychron_) lighting = keychron_->ReadLighting();
+  if (lighting) {
+    add(paired_, MakeKeychron(*keychron_, *lighting));
+  } else {
+    keychron_.reset();
+  }
 }
 
 DeviceList DeviceStack::List() const {
@@ -212,6 +278,18 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
   if (entry != paired_.end()) {
     if (entry->settings.kind_case() != settings.kind_case()) {
       return false;
+    }
+    if (entry->device.live()) {
+      if (!keychron_) {
+        return false;
+      }
+      if (!keychron_->WriteLighting(ToKeychronLighting(settings.keyboard()))) {
+        // Most likely unplugged; show it as disconnected until the app restarts.
+        keychron_.reset();
+        entry->device.set_connected(false);
+        PublishDevicesChanged();
+        return false;
+      }
     }
     entry->settings = settings;
     return true;

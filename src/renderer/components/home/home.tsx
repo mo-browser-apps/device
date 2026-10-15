@@ -2,7 +2,11 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Settings, X } from 'lucide-react';
 import { LinkType, type Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
-import { DeviceBatteryStatus, DeviceConnectionIcon } from '@/components/device-status';
+import {
+  DeviceBatteryStatus,
+  DeviceConnectionIcon,
+  LiveDeviceBadge,
+} from '@/components/device-status';
 import { RemoveDeviceDialog } from '@/components/device/remove-device-dialog';
 import { useCarousel } from '@/lib/use-carousel';
 import { BUTTON_OUTLINE, cn, FOCUS_RING } from '@/lib/utils';
@@ -70,6 +74,7 @@ function DeviceCard({
           </span>
           <span className="flex min-h-4 items-center">
             <DeviceBatteryStatus device={device} />
+            <LiveDeviceBadge device={device} />
           </span>
         </span>
       </button>
