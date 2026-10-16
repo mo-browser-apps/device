@@ -4,7 +4,8 @@
 
 #include <algorithm>
 #include <set>
-#include <thread>
+
+#include "platform/platform.h"
 
 namespace {
 
@@ -34,13 +35,20 @@ constexpr uint16_t kAdjustableDpi = 0x2201;
 constexpr uint8_t kPingData = 0x5A;
 
 constexpr int kReplyTimeoutMs = 500;
+// How long each read waits on one collection when the receiver has two.
+constexpr int kSplitReadSliceMs = 10;
 
 }  // namespace
 
 class HidppReceiver {
  public:
-  explicit HidppReceiver(hid_device* device) : device_(device) {}
-  ~HidppReceiver() { hid_close(device_); }
+  // short_device is the collection with short reports, or nullptr when device has them.
+  HidppReceiver(hid_device* device, hid_device* short_device)
+      : device_(device), short_device_(short_device) {}
+  ~HidppReceiver() {
+    hid_close(device_);
+    if (short_device_) hid_close(short_device_);
+  }
   HidppReceiver(const HidppReceiver&) = delete;
   HidppReceiver& operator=(const HidppReceiver&) = delete;
 
@@ -48,8 +56,6 @@ class HidppReceiver {
   std::optional<std::array<uint8_t, 16>> Request(uint8_t index, uint8_t feature,
                                                  uint8_t function,
                                                  std::initializer_list<uint8_t> params) {
-    // The scanning thread and write threads share the interface.
-    std::lock_guard lock(mutex_);
     uint8_t request[kLongLength] = {kLongReport, index, feature,
                                     static_cast<uint8_t>((function << 4) | kSoftwareId)};
     std::copy(params.begin(), params.end(), request + 4);
@@ -64,13 +70,11 @@ class HidppReceiver {
     while (true) {
       const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
           deadline - std::chrono::steady_clock::now());
+      if (remaining.count() <= 0) return std::nullopt;
       uint8_t reply[kLongLength] = {};
-      if (remaining.count() <= 0 ||
-          hid_read_timeout(device_, reply, sizeof(reply),
-                           static_cast<int>(remaining.count())) <= 0) {
-        return std::nullopt;
-      }
-      if (reply[1] != index) continue;
+      const int read = Read(reply, static_cast<int>(remaining.count()));
+      if (read < 0) return std::nullopt;
+      if (read == 0 || reply[1] != index) continue;
       const bool error = (reply[0] == kShortReport && reply[2] == kHidpp10Error) ||
                          (reply[0] == kLongReport && reply[2] == kHidpp20Error);
       if (error && reply[3] == request[2] && reply[4] == request[3]) return std::nullopt;
@@ -83,8 +87,17 @@ class HidppReceiver {
   }
 
  private:
-  std::mutex mutex_;
+  // Reads one report from either collection; 0 if none arrived within timeout_ms.
+  int Read(uint8_t* reply, int timeout_ms) {
+    if (!short_device_) return hid_read_timeout(device_, reply, kLongLength, timeout_ms);
+    const int read = hid_read_timeout(short_device_, reply, kLongLength, 0);
+    if (read != 0) return read;
+    return hid_read_timeout(device_, reply, kLongLength,
+                            std::min(timeout_ms, kSplitReadSliceMs));
+  }
+
   hid_device* device_;
+  hid_device* short_device_;
 };
 
 std::optional<HidppMouse::Params> HidppMouse::Request(uint8_t feature, uint8_t function,
@@ -156,36 +169,13 @@ std::optional<int> HidppMouse::ReadDpi() {
   return ((*dpi)[1] << 8) | (*dpi)[2];
 }
 
-void HidppMouse::WriteDpiAsync(int dpi, WriteDone done) {
-  std::lock_guard lock(write_mutex_);
-  pending_ = std::clamp(dpi, min_dpi_, max_dpi_);
-  waiting_.push_back(std::move(done));
-  if (writing_) return;
-  writing_ = true;
-  // The thread keeps the mouse alive until it finishes, so it is never joined.
-  std::thread([self = shared_from_this()] { self->DrainWrites(); }).detach();
-}
-
-void HidppMouse::DrainWrites() {
-  while (true) {
-    int dpi;
-    std::vector<WriteDone> waiting;
-    {
-      std::lock_guard lock(write_mutex_);
-      if (!pending_) {
-        writing_ = false;
-        return;
-      }
-      dpi = *pending_;
-      pending_.reset();
-      waiting.swap(waiting_);
-    }
-    const bool ok =
-        !failed_ && Request(dpi_feature_, 3,
-                            {0, static_cast<uint8_t>(dpi >> 8), static_cast<uint8_t>(dpi)});
-    if (!ok) failed_ = true;
-    for (WriteDone& done : waiting) done(ok);
-  }
+bool HidppMouse::WriteDpi(int dpi) {
+  dpi = std::clamp(dpi, min_dpi_, max_dpi_);
+  const bool ok =
+      !failed_ &&
+      Request(dpi_feature_, 3, {0, static_cast<uint8_t>(dpi >> 8), static_cast<uint8_t>(dpi)});
+  if (!ok) failed_ = true;
+  return ok;
 }
 
 std::optional<std::vector<HidppScanner::Found>> HidppScanner::Scan() {
@@ -194,10 +184,8 @@ std::optional<std::vector<HidppScanner::Found>> HidppScanner::Scan() {
   next_scan_ = now + interval_;
 
   std::vector<Found> found;
-  if (hid_init() != 0) return found;
 
-  // ponytail: Bolt receivers only, through the long-report interface. On Windows, where
-  // short reports arrive on a separate interface, an empty slot waits for the timeout.
+  // ponytail: Bolt receivers only.
   std::set<std::string> present;
   hid_device_info* devices = hid_enumerate(kLogitech, kBoltReceiver);
   for (hid_device_info* info = devices; info; info = info->next) {
@@ -205,7 +193,10 @@ std::optional<std::vector<HidppScanner::Found>> HidppScanner::Scan() {
     present.insert(info->path);
     if (!receivers_.count(info->path)) {
       if (hid_device* device = hid_open_path(info->path)) {
-        receivers_[info->path] = std::make_shared<HidppReceiver>(device);
+        const std::string short_path = HidppShortReportPath(info->path);
+        hid_device* short_device =
+            short_path.empty() ? nullptr : hid_open_path(short_path.c_str());
+        receivers_[info->path] = std::make_shared<HidppReceiver>(device, short_device);
       }
     }
   }

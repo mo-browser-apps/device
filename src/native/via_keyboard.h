@@ -2,13 +2,10 @@
 #define VIA_KEYBOARD_H_
 
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,9 +22,8 @@ struct hid_device_info;
 // lighting state without writing EEPROM, so unplugging the keyboard restores
 // its saved lighting.
 //
-// Opened by ViaScanner. After that, only WriteLightingAsync() may be called, from any
-// thread; the handle is then used by one write thread at a time.
-class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
+// Opened by ViaScanner, and used only on the thread that calls it.
+class ViaKeyboard {
  public:
   // What HIDAPI reports about the VIA interface. Known-model policy, such as effect
   // numbers or which product is a wireless receiver, belongs to the main process.
@@ -57,8 +53,6 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
     int brightness = 0;
   };
 
-  using WriteDone = std::function<void(bool ok)>;
-
   // Opens the VIA interface if it answers and has lighting; nullptr otherwise.
   static std::shared_ptr<ViaKeyboard> Open(const hid_device_info& info);
 
@@ -80,11 +74,8 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
   std::optional<Lighting> ReadLighting();
 
   // Sends effect, color, and brightness; false if any command was not acknowledged.
+  // A failed keyboard rejects writes without touching the device.
   bool WriteLighting(const Lighting& lighting);
-
-  // Writes on a background thread and calls done there. Lighting queued while a write
-  // is running is merged: only the latest is sent, and each waiting done gets its result.
-  void WriteLightingAsync(const Lighting& lighting, WriteDone done);
 
   // True once a write failed, most likely because the keyboard was unplugged. Later
   // writes fail at once, and the next scan reopens the interface if it is still there.
@@ -96,9 +87,6 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
   ViaKeyboard(hid_device_* device, Hardware hardware)
       : device_(device), hardware_(std::move(hardware)) {}
 
-  // Runs on the write thread until no lighting is pending.
-  void DrainWrites();
-
   // Sends one VIA report and replaces it with the keyboard's reply.
   bool Transact(Report& report);
   std::optional<Report> GetValue(uint8_t value_id);
@@ -108,12 +96,7 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
   Hardware hardware_;
   const Channel* channel_ = nullptr;
   int protocol_version_ = 0;
-  std::atomic<bool> failed_ = false;
-
-  std::mutex write_mutex_;
-  std::optional<Lighting> pending_;
-  std::vector<WriteDone> waiting_;
-  bool writing_ = false;
+  bool failed_ = false;
 };
 
 // Tracks which VIA keyboards are plugged in by comparing HID enumerations. Every call
@@ -139,7 +122,6 @@ class ViaScanner {
 
  private:
   std::chrono::milliseconds retry_delay_;
-  bool initialized_ = false;
   std::map<std::string, std::shared_ptr<ViaKeyboard>> open_;
   std::map<std::string, std::chrono::steady_clock::time_point> retry_at_;
 };

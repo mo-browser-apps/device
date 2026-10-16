@@ -36,7 +36,8 @@ updates, but device data and settings are not sent anywhere.
 
 ## Requirements
 
-- macOS 14 or later on Apple silicon, or Windows 10 or later on 64-bit systems.
+- macOS 14 or later on Apple silicon, Windows 10 or later on x64, or Linux on x64. See
+  [Supported platforms](#supported-platforms).
 - [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
 - [MōBrowser](https://teamdev.com/mobrowser/) 2.18.0 or later.
 
@@ -65,10 +66,54 @@ npm run build
   native RPC.
 - `src/native/via_keyboard.*` speaks the VIA protocol over HIDAPI.
 - `src/native/hidpp_mouse.*` speaks Logitech's HID++ 2.0 protocol over HIDAPI.
+- `src/native/platform/` holds everything that differs per operating system: `platform.h` and
+  one implementation file per supported platform.
 - `src/renderer/gateway/devices.ts` is the interface's single entry point for device operations.
 - `src/renderer/components/device/` contains the shared device screen and the separate mouse and
   keyboard editors.
 - `src/renderer/public/device-art/` contains the product images shown in the app.
+
+## Supported platforms
+
+| Platform | Platform file | HIDAPI backend | Device access | CI checks | Release | Tested with devices |
+|---|---|---|---|---|---|---|
+| macOS 14+, Apple silicon | [`mac.cc`](src/native/platform/mac.cc) | IOHIDManager | Nothing to set up | Yes | Yes, signed and notarized | Yes |
+| Windows 10+, x64 | [`windows.cc`](src/native/platform/windows.cc) | WinAPI | Nothing to set up | Yes | No | No |
+| Linux, x64 | [`linux.cc`](src/native/platform/linux.cc) | hidraw (needs `libudev-dev` to build) | Install [`70-modevice.rules`](src/native/platform/70-modevice.rules) | Yes | No | No |
+
+All device code is shared. Only the functions declared in
+[`src/native/platform/platform.h`](src/native/platform/platform.h) differ per platform, and
+[`CMakeLists.txt`](CMakeLists.txt) compiles one implementation of them. Building on any other
+platform stops with an error that points here.
+
+On Linux, HID devices are readable only by root until a udev rule grants access. Run this once,
+then plug the devices in again:
+
+```bash
+sudo cp src/native/platform/70-modevice.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### Add a platform
+
+1. Create `src/native/platform/<platform>.cc` and implement every function in `platform.h`. Copy
+   the closest existing file and change what differs. Each function's comment says what to
+   check: for example, whether the platform opens every top-level HID collection under its own
+   path.
+2. Add an `elseif` block for it in [`CMakeLists.txt`](CMakeLists.txt) that compiles the file and
+   sets any HIDAPI backend options. Keep the platform's other dependencies in that block.
+3. If users need permission to open HID devices, ship that setup next to the file, as Linux does
+   with `70-modevice.rules`, and describe it above.
+4. Add the platform's runner to the `os` matrix in
+   [`.github/workflows/check.yml`](.github/workflows/check.yml). It runs the TypeScript and native
+   tests and builds the app.
+5. Configure the platform under `app.bundle` in [`mobrowser.conf.json`](mobrowser.conf.json), and
+   add a build job to [`.github/workflows/ci.yml`](.github/workflows/ci.yml) to release it.
+6. Add a row to the table above. Mark it tested only once a keyboard and a mouse work on it.
+
+When a platform needs new behaviour, declare it in `platform.h` and implement it in every
+platform file, even when some of them do nothing. A missing function then fails the build
+instead of misbehaving on one platform.
 
 ## Connect real devices
 
@@ -107,14 +152,16 @@ ViaScanner, HidppScanner → HardwareEventsService.Changed(complete snapshot) �
 ```
 
 - [HIDAPI](https://github.com/libusb/hidapi) 0.15.0 is downloaded and statically linked by
-  [`CMakeLists.txt`](CMakeLists.txt) with `FetchContent`. Linux builds need `libudev-dev`.
+  [`CMakeLists.txt`](CMakeLists.txt) with `FetchContent`, with the backend for each
+  [supported platform](#supported-platforms).
 - [`src/native/via_keyboard.cc`](src/native/via_keyboard.cc) opens every HID interface with the VIA
   usage page `0xFF60` and usage `0x61`, from any vendor, and skips those that do not answer or
   report a VIA protocol older than 12. QMK does not say which lighting it has, so the app probes
   the RGB matrix, RGB light, LED matrix, and backlight channels and uses the first one the firmware
   handles. It then sends the VIA `custom_get_value` and `custom_set_value` commands on that
-  channel. Each open keyboard gets an opaque connection ID that changes whenever it is reopened,
-  and writes queued behind a slow keyboard are merged so only the latest is sent.
+  channel. Each open keyboard gets an opaque connection ID that changes whenever it is reopened.
+  One native thread owns every HID handle: it scans for devices once a second and runs the
+  main process's writes in between.
 - Effect numbers depend on the effects compiled into each firmware, so only Solid Color (1) is the
   same everywhere. `KNOWN_MODELS` in [`src/main/via.ts`](src/main/via.ts) adds Pulse and Wave for the Keychron K10 Max (ANSI RGB) and K2 HE
   (RGB, ANSI/ISO/JIS), as listed in Keychron's VIA definitions. Add an entry with the vendor and
@@ -123,8 +170,9 @@ ViaScanner, HidppScanner → HardwareEventsService.Changed(complete snapshot) �
   converts the editor's hue (0–359°) and brightness (0–100%) to VIA's 0–255 range.
   [`src/main/device-state.ts`](src/main/device-state.ts) adds the keyboards to the device list and
   ignores a write that finishes after its keyboard was reopened.
-- `npm run test:native` runs [`src/native/test/via_test.cc`](src/native/test/via_test.cc), which
-  checks the HID code against simulated QMK firmware through a fake HIDAPI. `npm test` runs
+- `npm run test:native` builds [`src/native/test/`](src/native/test/CMakeLists.txt) with CMake
+  and runs [`via_test.cc`](src/native/test/via_test.cc), which checks the HID code against
+  simulated QMK firmware through a fake HIDAPI. `npm test` runs
   [`src/main/devices.test.ts`](src/main/devices.test.ts) for the device model and VIA mapping.
 
 To try it, connect a keyboard by cable (on wireless models, set the mode switch to USB), then run
@@ -155,7 +203,9 @@ being awake. Once added, it shows its real battery level, and its Speed slider s
 live. [`src/native/hidpp_mouse.cc`](src/native/hidpp_mouse.cc) opens the receiver's HID++ interface
 (vendor `046D`, product `C548`, usage page `0xFF00`), asks each of its six slots for a HID++ 2.0
 device, and uses the Device Name (`0x0005`), Unified Battery (`0x1004`), and Adjustable DPI
-(`0x2201`) features. It reads the battery again every 3 seconds. `npm run test:native` also runs
+(`0x2201`) features. It reads the battery again every 3 seconds. On Windows, where the receiver's
+short reports and error replies arrive on a separate HID collection, it reads that collection
+too. `npm run test:native` also runs
 [`src/native/test/hidpp_test.cc`](src/native/test/hidpp_test.cc) against a simulated receiver.
 
 Limitations:
@@ -166,37 +216,60 @@ Limitations:
 - Like the Logitech apps, a DPI set this way may be lost when the mouse is switched off. The app
   reads it again whenever the mouse connects.
 - Buttons and scrolling are not configurable: that needs the app to handle the mouse's input.
-- On Windows, the receiver reports errors on a separate HID interface, so each empty slot waits for
-  a 500 ms timeout during a scan.
 
-### Add capabilities and device types
+### Add a device
 
-For another mouse or keyboard, reuse the existing screens where possible.
+**Another model of a supported kind** (a VIA keyboard or a mouse behind a Bolt receiver) needs
+no native changes:
 
-- `src/main/device-state.ts` and `src/main/via.ts` report the controls and value ranges supported
-  by each device.
-- `device-art.tsx` connects each `modelId` to its artwork, while
-  `src/renderer/public/device-art/` stores the image files.
-- `mouse-device.ts` and `keyboard-device.ts` define the sections, actions, and labels shown for each
-  device type.
-- `mouse-editor.tsx` and `keyboard-editor.tsx` render the controls used to change device settings.
+- For a VIA keyboard, add its vendor and product IDs and effect numbers to `KNOWN_MODELS` in
+  [`src/main/via.ts`](src/main/via.ts). Without an entry it still works with Steady only.
+- Add its artwork to `src/renderer/public/device-art/` and connect its `modelId` in
+  [`device-art.tsx`](src/renderer/components/art/device-art.tsx).
+- On Linux, add a line for a new vendor ID to
+  [`70-modevice.rules`](src/native/platform/70-modevice.rules).
 
-For a different device category, give it its own capabilities, settings, editor, and artwork. Keep
-the shared device screen responsible only for layout and navigation.
+**A new kind of device**, such as another vendor's protocol or a headset, touches each layer once.
+Work from the hardware up, and run `npm run gen` after changing either `.proto` file:
 
-- `src/renderer/proto/devices.proto` describes the capabilities and settings shared between the
-  main process and the interface.
-- A new device module in `src/renderer/components/device/` describes the sections and artwork
-  behavior for the device type.
-- A new editor module in the same folder renders its settings controls.
-- `device-presentation.ts` chooses the matching device module, and `control-editor.tsx` chooses its
-  editor.
-- `device-art.tsx` renders the matching artwork from `src/renderer/public/device-art/`.
+1. **Native driver**: add `src/native/<name>.h` and `.cc` with a device class and a scanner, like
+   [`hidpp_mouse.h`](src/native/hidpp_mouse.h). The scanner enumerates HIDAPI and opens what
+   answers; the device class has blocking reads and writes and marks itself `failed()` when I/O
+   fails. Neither needs locks: only the hardware thread calls them. Add the files to `APP_SOURCES`
+   in [`CMakeLists.txt`](CMakeLists.txt), plus a test against the fake HIDAPI in
+   [`src/native/test/`](src/native/test/CMakeLists.txt).
+2. **Native contract**: in [`src/native/proto/devices.proto`](src/native/proto/devices.proto),
+   add a `Connected<Name>` message with a `connection_id` and the raw hardware facts, a field for
+   it in `ConnectedDevices`, and one `Apply…` RPC that takes a complete setting. Keep app concepts,
+   such as names shown in the app or value ranges, out of it.
+3. **Hardware service**: in [`hardware_service.cc`](src/native/hardware_service.cc), add a map
+   and scanner to `Hardware`, the new devices to `Snapshot()` and `Scan()`, and an `Apply…`
+   handler that posts its write to the hardware thread.
+4. **Platform**: if the protocol behaves differently on some platform, add a function to
+   [`platform.h`](src/native/platform/platform.h) and implement it in every platform file. On
+   Linux, add the vendor to `70-modevice.rules`.
+5. **Main process mapping**: add `src/main/<name>.ts`, like [`logitech.ts`](src/main/logitech.ts),
+   that turns a `Connected<Name>` into the app's `Device` and `Settings`, and back into a raw
+   request.
+6. **Device model**: in [`device-state.ts`](src/main/device-state.ts), add the kind to the
+   `Connection` type, `connect()`, `applySettings()`, and `isValid()`. Add its write hook to
+   [`devices.ts`](src/main/devices.ts) and cases to [`devices.test.ts`](src/main/devices.test.ts).
+7. **App contract**: in [`src/renderer/proto/devices.proto`](src/renderer/proto/devices.proto),
+   add a `<Name>Spec` to the `spec` oneof of `Device` and a `<Name>Settings` to the `kind` oneof of
+   `Settings`.
+8. **Interface**: add `<name>-device.ts` (sections and artwork behaviour) and `<name>-editor.tsx`
+   (controls) in `src/renderer/components/device/`. Choose them in
+   [`device-presentation.ts`](src/renderer/components/device/device-presentation.ts) and
+   [`control-editor.tsx`](src/renderer/components/device/control-editor.tsx), and add artwork in
+   [`device-art.tsx`](src/renderer/components/art/device-art.tsx).
+
+Keep the shared device screen responsible only for layout and navigation.
 
 ## Download
 
 You can download the app from the [releases page](https://github.com/mo-browser-apps/device/releases).
-macOS releases are code-signed and notarized by Apple; Windows releases are code-signed.
+Releases are built for macOS only, code-signed and notarized by Apple. On Windows and Linux,
+[run from source](#run-from-source).
 
 ## License
 

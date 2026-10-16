@@ -58,8 +58,7 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 
 /**
  * How often a real device receives previews while a slider moves: 10 times a second,
- * which still looks continuous on the keyboard without flooding IPC and USB. The
- * native module also merges writes that queue up behind a slow keyboard.
+ * which still looks continuous on the keyboard without flooding IPC and USB.
  */
 const LIVE_PREVIEW_INTERVAL_MS = 100;
 

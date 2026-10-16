@@ -1,6 +1,5 @@
 // Checks the HID++ mouse code against a simulated Bolt receiver. Run with
 // `npm run test:native`.
-#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -8,12 +7,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "../hidpp_mouse.h"
+#include "../platform/platform.h"
 #include "hidapi.h"
 
 namespace {
@@ -30,12 +28,20 @@ struct FakeReceiver {
   uint8_t charging = 0;
   int dpi = 1000;
   int requests = 0;
+  // Short reports arrive on their own collection, as on Windows.
+  bool split = false;
   std::deque<Report> replies;
+  std::deque<Report> short_replies;
+  // Reads of the long-report collection that found nothing, so real hardware would have
+  // waited.
+  int empty_long_reads = 0;
 } receiver;
 
-// Write threads and the test share the receiver; every fake HIDAPI call holds this.
-std::recursive_mutex fake_mutex;
-#define LOCK_FAKE std::lock_guard fake_lock(fake_mutex)
+// Where a reply arrives: short reports on their own collection when the receiver is split.
+void Send(Report reply) {
+  (receiver.split && reply[0] == 0x10 ? receiver.short_replies : receiver.replies)
+      .push_back(std::move(reply));
+}
 
 // Feature indexes on the fake mouse.
 constexpr uint8_t kName = 3, kBattery = 7, kDpi = 12;
@@ -84,18 +90,20 @@ Report Answer(const uint8_t* request) {
 
 }  // namespace
 
-int hid_init() {
-  return 0;
+// Stands in for the platform file.
+std::string HidppShortReportPath(const std::string& long_report_path) {
+  return receiver.split ? long_report_path + "-short" : "";
 }
 
 hid_device_info* hid_enumerate(unsigned short vendor_id, unsigned short product_id) {
-  LOCK_FAKE;
   if (!receiver.plugged || vendor_id != 0x046D || product_id != 0xC548) return nullptr;
   hid_device_info* list = nullptr;
   // The short-report, long-report, and mouse interfaces; only the long one is used.
   for (auto [page, usage] : {std::pair{0xFF00, 1}, {0xFF00, 2}, {0x0001, 2}}) {
     list = new hid_device_info{
-        .path = strdup(page == 0xFF00 ? "hidpp" : "mouse"),
+        .path = strdup(page != 0xFF00 ? "mouse"
+                       : usage == 1 && receiver.split ? "hidpp-short"
+                                                      : "hidpp"),
         .vendor_id = vendor_id,
         .product_id = product_id,
         .usage_page = static_cast<unsigned short>(page),
@@ -116,29 +124,34 @@ void hid_free_enumeration(hid_device_info* devices) {
 }
 
 hid_device* hid_open_path(const char* path) {
+  if (std::string(path) == "hidpp-short") {
+    return reinterpret_cast<hid_device*>(&receiver.short_replies);
+  }
   assert(std::string(path) == "hidpp");
-  return reinterpret_cast<hid_device*>(&receiver);
+  return reinterpret_cast<hid_device*>(&receiver.replies);
 }
 
 void hid_close(hid_device*) {}
 
 int hid_write(hid_device*, const unsigned char* data, size_t length) {
-  LOCK_FAKE;
   assert(length == 20 && data[0] == 0x11 && (data[3] & 0x0F) == 0x0A);
   if (!receiver.plugged) return -1;
   ++receiver.requests;
   // A connection notification and another app's reply arrive first and must be skipped.
-  receiver.replies.push_back({0x10, data[1], 0x41, 0x04, 0x01, 0x4F, 0x10});
-  receiver.replies.push_back({0x11, data[1], data[2], static_cast<uint8_t>((data[3] & 0xF0) | 0x03)});
-  receiver.replies.push_back(Answer(data));
+  Send({0x10, data[1], 0x41, 0x04, 0x01, 0x4F, 0x10});
+  Send({0x11, data[1], data[2], static_cast<uint8_t>((data[3] & 0xF0) | 0x03)});
+  Send(Answer(data));
   return static_cast<int>(length);
 }
 
-int hid_read_timeout(hid_device*, unsigned char* data, size_t length, int) {
-  LOCK_FAKE;
-  if (receiver.replies.empty()) return 0;
-  Report reply = receiver.replies.front();
-  receiver.replies.pop_front();
+int hid_read_timeout(hid_device* device, unsigned char* data, size_t length, int) {
+  auto& replies = *reinterpret_cast<std::deque<Report>*>(device);
+  if (replies.empty()) {
+    receiver.empty_long_reads += &replies == &receiver.replies;
+    return 0;
+  }
+  Report reply = replies.front();
+  replies.pop_front();
   reply.resize(std::min(length, reply.size()));
   std::memcpy(data, reply.data(), reply.size());
   return static_cast<int>(reply.size());
@@ -211,26 +224,27 @@ void TestBatteryLevelOnly() {
   assert(found.at(0).battery.percent == 20 && found[0].battery.charging);
 }
 
+void TestShortReportsOnTheirOwnCollection() {
+  receiver = FakeReceiver{};
+  receiver.split = true;
+  HidppScanner scanner(0ms);
+  auto found = ScanNow(scanner);
+  assert(found.size() == 1 && found[0].mouse->name() == "Signature M650 L");
+  // The empty slots' errors are read from the short collection, so no slot waited for
+  // the reply timeout.
+  assert(receiver.empty_long_reads == 0);
+}
+
 void TestWritesClampedDpi() {
   receiver = FakeReceiver{};
   HidppScanner scanner(0ms);
   auto mouse = ScanNow(scanner).at(0).mouse;
 
-  std::atomic<int> result = -1;
-  mouse->WriteDpiAsync(9000, [&](bool ok) { result = ok; });
-  for (int i = 0; i < 200 && result == -1; ++i) std::this_thread::sleep_for(10ms);
-  assert(result == 1);
-  {
-    LOCK_FAKE;
-    assert(receiver.dpi == 4000);
-    receiver.mouse_awake = false;
-  }
+  assert(mouse->WriteDpi(9000) && receiver.dpi == 4000);
+  receiver.mouse_awake = false;
 
   // A failed write marks the mouse, so the next scan looks for it again.
-  result = -1;
-  mouse->WriteDpiAsync(800, [&](bool ok) { result = ok; });
-  for (int i = 0; i < 200 && result == -1; ++i) std::this_thread::sleep_for(10ms);
-  assert(result == 0 && mouse->failed());
+  assert(!mouse->WriteDpi(800) && mouse->failed());
 }
 
 }  // namespace
@@ -241,6 +255,7 @@ int main() {
   TestSleepingMouseComesBackAsNew();
   TestUnpluggedReceiver();
   TestBatteryLevelOnly();
+  TestShortReportsOnTheirOwnCollection();
   TestWritesClampedDpi();
   std::puts("hidpp_test: ok");
 }

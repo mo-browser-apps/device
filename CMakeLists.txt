@@ -22,6 +22,7 @@ set(APP_SOURCES
         src/native/hidpp_mouse.cc
         src/native/via_keyboard.h
         src/native/via_keyboard.cc
+        src/native/platform/platform.h
 )
 
 # Defines the main target of the application.
@@ -29,41 +30,28 @@ add_library(mobrowser_lib STATIC ${APP_SOURCES} ${GENERATED_SOURCES})
 
 mobrowser_configure_app_lib(mobrowser_lib)
 
-# Add shared third party dependencies and configuration for all platforms here.
-# HIDAPI talks to VIA keyboards over USB HID (see src/native/via_keyboard.cc).
+# Supported platforms. Each block compiles that platform's implementation of
+# src/native/platform/platform.h and sets its HIDAPI backend; see "Add a platform" in
+# README.md. Keep platform-specific dependencies, sources, and definitions inside these
+# blocks.
+if (OS_MAC)
+    target_sources(mobrowser_lib PRIVATE src/native/platform/mac.cc)
+elseif (OS_WIN)
+    target_sources(mobrowser_lib PRIVATE src/native/platform/windows.cc)
+elseif (OS_LINUX)
+    target_sources(mobrowser_lib PRIVATE src/native/platform/linux.cc)
+    # The kernel hidraw backend only (needs libudev-dev), not libusb.
+    set(HIDAPI_WITH_LIBUSB OFF)
+else ()
+    message(FATAL_ERROR "Unsupported platform: see \"Add a platform\" in README.md.")
+endif ()
+
+# HIDAPI talks to keyboards and mice over HID on every platform.
 include(FetchContent)
 set(BUILD_SHARED_LIBS OFF)
-# On Linux, use the kernel hidraw backend only (needs libudev-dev), not libusb.
-set(HIDAPI_WITH_LIBUSB OFF)
 FetchContent_Declare(hidapi
         URL https://github.com/libusb/hidapi/archive/refs/tags/hidapi-0.15.0.tar.gz
         URL_HASH SHA256=5d84dec684c27b97b921d2f3b73218cb773cf4ea915caee317ac8fc73cef8136
 )
 FetchContent_MakeAvailable(hidapi)
 target_link_libraries(mobrowser_lib PRIVATE hidapi::hidapi)
-
-# Keep platform-specific dependencies inside the matching block below.
-# Platform-only find_package calls, include directories, source files, compile definitions,
-# and libraries should not be added outside these blocks.
-if (OS_WIN)
-    # Add Windows-only dependencies, source files, definitions, and libraries here.
-    # find_package(example_windows CONFIG REQUIRED)
-    # target_sources(mobrowser_lib PRIVATE src/native/windows/example_windows.cc)
-    # target_include_directories(mobrowser_lib PRIVATE ${example_windows_INCLUDE_DIRS})
-    # target_compile_definitions(mobrowser_lib PRIVATE USE_EXAMPLE_WINDOWS)
-    # target_link_libraries(mobrowser_lib PRIVATE example_windows::example_windows)
-elseif (OS_MAC)
-    # Add macOS-only dependencies, source files, definitions, frameworks, and libraries here.
-    # find_package(example_macos CONFIG REQUIRED)
-    # target_sources(mobrowser_lib PRIVATE src/native/mac/example_macos.mm)
-    # target_include_directories(mobrowser_lib PRIVATE ${example_macos_INCLUDE_DIRS})
-    # target_compile_definitions(mobrowser_lib PRIVATE USE_EXAMPLE_MACOS)
-    # target_link_libraries(mobrowser_lib PRIVATE example_macos::example_macos "-framework Foundation")
-elseif (OS_LINUX)
-    # Add Linux-only dependencies, source files, definitions, and libraries here.
-    # find_package(example_linux CONFIG REQUIRED)
-    # target_sources(mobrowser_lib PRIVATE src/native/linux/example_linux.cc)
-    # target_include_directories(mobrowser_lib PRIVATE ${example_linux_INCLUDE_DIRS})
-    # target_compile_definitions(mobrowser_lib PRIVATE USE_EXAMPLE_LINUX)
-    # target_link_libraries(mobrowser_lib PRIVATE example_linux::example_linux)
-endif ()

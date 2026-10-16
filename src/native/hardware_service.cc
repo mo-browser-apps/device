@@ -2,7 +2,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
+#include <cstdio>
+#include <deque>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -13,6 +17,7 @@
 #include "gen/devices.rpc.h"
 #include "gen/events.rpc.h"
 #include "hidpp_mouse.h"
+#include "platform/platform.h"
 #include "rpc.h"
 #include "via_keyboard.h"
 
@@ -26,8 +31,9 @@ constexpr auto kSilentInterfaceRetry = std::chrono::seconds(30);
 // How often mice are looked for and their batteries read.
 constexpr auto kMouseScanInterval = std::chrono::seconds(3);
 
-// The open devices, shared by RPC calls, the scanning thread, and write threads.
-struct Session {
+// The open devices. Only the hardware thread touches them, so no HID handle is ever
+// used by two threads at once.
+struct Hardware {
   struct Keyboard {
     std::shared_ptr<ViaKeyboard> keyboard;
     ViaKeyboard::Lighting lighting;
@@ -38,13 +44,35 @@ struct Session {
     int dpi;
   };
 
-  // Guards every member below. HID I/O never happens while it is held.
-  std::mutex mutex;
+  ViaScanner keyboard_scanner{kSilentInterfaceRetry};
+  HidppScanner mouse_scanner{kMouseScanInterval};
   // By connection ID. IDs are never reused, so a stale one finds nothing.
   std::map<uint32_t, Keyboard> keyboards;
   std::map<uint32_t, Mouse> mice;
   uint32_t next_id = 1;
 };
+
+// RPC work waiting for the hardware thread, which runs it between scans.
+struct Queue {
+  using Task = std::function<void(Hardware&)>;
+  std::mutex mutex;
+  std::condition_variable wake;
+  std::deque<Task> tasks;
+
+  void Post(Task task) {
+    {
+      std::lock_guard lock(mutex);
+      tasks.push_back(std::move(task));
+    }
+    wake.notify_one();
+  }
+};
+
+// Callback is move-only and std::function needs a copyable target, hence the shared_ptr.
+template <typename T>
+std::shared_ptr<Callback<T>> Share(Callback<T> done) {
+  return std::make_shared<Callback<T>>(std::move(done));
+}
 
 RawLighting ToProto(const ViaKeyboard::Lighting& lighting) {
   RawLighting result;
@@ -66,10 +94,9 @@ ViaKeyboard::Lighting FromProto(const RawLighting& lighting) {
   };
 }
 
-// Requires session.mutex to be held.
-ConnectedDevices SnapshotLocked(const Session& session) {
+ConnectedDevices Snapshot(const Hardware& hardware) {
   ConnectedDevices snapshot;
-  for (const auto& [id, connection] : session.keyboards) {
+  for (const auto& [id, connection] : hardware.keyboards) {
     const ViaKeyboard& keyboard = *connection.keyboard;
     ConnectedKeyboard* entry = snapshot.add_keyboards();
     entry->set_connection_id(id);
@@ -82,7 +109,7 @@ ConnectedDevices SnapshotLocked(const Session& session) {
     entry->set_has_effect(keyboard.has_effect());
     *entry->mutable_lighting() = ToProto(connection.lighting);
   }
-  for (const auto& [id, connection] : session.mice) {
+  for (const auto& [id, connection] : hardware.mice) {
     ConnectedMouse* entry = snapshot.add_mice();
     entry->set_connection_id(id);
     entry->set_name(connection.mouse->name());
@@ -96,128 +123,83 @@ ConnectedDevices SnapshotLocked(const Session& session) {
   return snapshot;
 }
 
-// Requires session.mutex to be held, so that snapshots from different threads arrive
-// in order.
-void PublishLocked(const Session& session) {
-  mo::rpc::hardware_events.Changed(SnapshotLocked(session), [](mo::rpc::Result<Empty>) {});
+void Publish(const Hardware& hardware) {
+  mo::rpc::hardware_events.Changed(Snapshot(hardware), [](mo::rpc::Result<Empty>) {});
 }
 
-// Completes an RPC once a write finishes. Callback is move-only and std::function needs
-// a copyable target, hence the shared_ptr.
-std::function<void(bool)> CompleteWhenWritten(Callback<Empty> done, std::string error) {
-  auto shared_done = std::make_shared<Callback<Empty>>(std::move(done));
-  return [shared_done, error = std::move(error)](bool ok) {
-    if (ok) {
-      std::move(*shared_done).Complete(Empty());
-    } else {
-      std::move(*shared_done).Reject(error);
-    }
-  };
-}
-
+// Hands every request to the hardware thread, so each returns at once.
 class HardwareServiceImpl : public HardwareService {
  public:
-  explicit HardwareServiceImpl(std::shared_ptr<Session> session)
-      : session_(std::move(session)) {}
+  explicit HardwareServiceImpl(std::shared_ptr<Queue> queue) : queue_(std::move(queue)) {}
 
   void List(const Empty*, Callback<ConnectedDevices> done) override {
-    ConnectedDevices snapshot;
-    {
-      std::lock_guard lock(session_->mutex);
-      snapshot = SnapshotLocked(*session_);
-    }
-    std::move(done).Complete(std::move(snapshot));
+    queue_->Post([done = Share(std::move(done))](Hardware& hardware) {
+      std::move(*done).Complete(Snapshot(hardware));
+    });
   }
 
   void ApplyLighting(const LightingRequest* request, Callback<Empty> done) override {
     const uint32_t id = request->connection_id();
     const ViaKeyboard::Lighting lighting = FromProto(request->lighting());
-    std::shared_ptr<ViaKeyboard> keyboard;
-    {
-      std::lock_guard lock(session_->mutex);
-      auto live = session_->keyboards.find(id);
-      if (live != session_->keyboards.end()) keyboard = live->second.keyboard;
-    }
-    if (!keyboard) {
-      std::move(done).Reject("Keyboard is not connected: " + std::to_string(id));
-      return;
-    }
-
-    auto complete = CompleteWhenWritten(
-        std::move(done), "Cannot write lighting to keyboard: " + std::to_string(id));
-    // The write runs on the keyboard's own thread, so this request returns at once.
-    keyboard->WriteLightingAsync(lighting, [session = session_, id, lighting,
-                                            complete](bool ok) {
-      {
-        std::lock_guard lock(session->mutex);
-        auto live = session->keyboards.find(id);
-        if (live != session->keyboards.end()) {
-          if (ok) {
-            live->second.lighting = lighting;
-          } else {
-            // Most likely unplugged; the next scan reopens it under a new ID if it is
-            // still there.
-            session->keyboards.erase(live);
-            PublishLocked(*session);
-          }
-        }
+    queue_->Post([id, lighting, done = Share(std::move(done))](Hardware& hardware) {
+      auto live = hardware.keyboards.find(id);
+      if (live == hardware.keyboards.end()) {
+        std::move(*done).Reject("Keyboard is not connected: " + std::to_string(id));
+        return;
       }
-      complete(ok);
+      if (!live->second.keyboard->WriteLighting(lighting)) {
+        // Most likely unplugged; the next scan reopens it under a new ID if it is still
+        // there.
+        hardware.keyboards.erase(live);
+        Publish(hardware);
+        std::move(*done).Reject("Cannot write lighting to keyboard: " + std::to_string(id));
+        return;
+      }
+      live->second.lighting = lighting;
+      std::move(*done).Complete(Empty());
     });
   }
 
   void ApplyDpi(const DpiRequest* request, Callback<Empty> done) override {
     const uint32_t id = request->connection_id();
-    std::shared_ptr<HidppMouse> mouse;
-    {
-      std::lock_guard lock(session_->mutex);
-      auto live = session_->mice.find(id);
-      if (live != session_->mice.end()) mouse = live->second.mouse;
-    }
-    if (!mouse) {
-      std::move(done).Reject("Mouse is not connected: " + std::to_string(id));
-      return;
-    }
-
-    const int dpi = std::clamp(request->dpi(), mouse->min_dpi(), mouse->max_dpi());
-    auto complete =
-        CompleteWhenWritten(std::move(done), "Cannot set mouse DPI: " + std::to_string(id));
-    mouse->WriteDpiAsync(dpi, [session = session_, id, dpi, complete](bool ok) {
-      {
-        std::lock_guard lock(session->mutex);
-        auto live = session->mice.find(id);
-        if (live != session->mice.end()) {
-          if (ok) {
-            live->second.dpi = dpi;
-          } else {
-            // Most likely asleep; the next scan finds it again under a new ID once it
-            // wakes up.
-            session->mice.erase(live);
-            PublishLocked(*session);
-          }
-        }
+    const int requested = request->dpi();
+    queue_->Post([id, requested, done = Share(std::move(done))](Hardware& hardware) {
+      auto live = hardware.mice.find(id);
+      if (live == hardware.mice.end()) {
+        std::move(*done).Reject("Mouse is not connected: " + std::to_string(id));
+        return;
       }
-      complete(ok);
+      const HidppMouse& mouse = *live->second.mouse;
+      const int dpi = std::clamp(requested, mouse.min_dpi(), mouse.max_dpi());
+      if (!live->second.mouse->WriteDpi(dpi)) {
+        // Most likely asleep; the next scan finds it again under a new ID once it wakes
+        // up.
+        hardware.mice.erase(live);
+        Publish(hardware);
+        std::move(*done).Reject("Cannot set mouse DPI: " + std::to_string(id));
+        return;
+      }
+      live->second.dpi = dpi;
+      std::move(*done).Complete(Empty());
     });
   }
 
  private:
-  std::shared_ptr<Session> session_;
+  std::shared_ptr<Queue> queue_;
 };
 
-// Applies one mouse scan to the session; true if anything the snapshot shows changed.
-// Requires session.mutex to be held.
-bool UpdateMiceLocked(Session& session, const std::vector<HidppScanner::Found>& found) {
-  bool changed = std::erase_if(session.mice, [&](const auto& live) {
+// Applies one mouse scan; true if anything the snapshot shows changed.
+bool UpdateMice(Hardware& hardware, const std::vector<HidppScanner::Found>& found) {
+  bool changed = std::erase_if(hardware.mice, [&](const auto& live) {
     return std::none_of(found.begin(), found.end(), [&](const HidppScanner::Found& mouse) {
       return mouse.mouse == live.second.mouse;
     });
   });
   for (const HidppScanner::Found& mouse : found) {
-    auto live = std::find_if(session.mice.begin(), session.mice.end(),
+    auto live = std::find_if(hardware.mice.begin(), hardware.mice.end(),
                              [&](const auto& live) { return live.second.mouse == mouse.mouse; });
-    if (live == session.mice.end()) {
-      session.mice[session.next_id++] = {mouse.mouse, mouse.battery, mouse.dpi.value_or(0)};
+    if (live == hardware.mice.end()) {
+      hardware.mice[hardware.next_id++] = {mouse.mouse, mouse.battery, mouse.dpi.value_or(0)};
       changed = true;
     } else if (live->second.battery.percent != mouse.battery.percent ||
                live->second.battery.charging != mouse.battery.charging) {
@@ -228,35 +210,48 @@ bool UpdateMiceLocked(Session& session, const std::vector<HidppScanner::Found>& 
   return changed;
 }
 
+// Opens devices that were plugged in, drops the ones that went, and publishes the change.
+void Scan(Hardware& hardware) {
+  ViaScanner::Changes changes = hardware.keyboard_scanner.Scan();
+  bool changed = !changes.added.empty() || !changes.removed.empty();
+  for (const std::shared_ptr<ViaKeyboard>& keyboard : changes.removed) {
+    std::erase_if(hardware.keyboards,
+                  [&](const auto& live) { return live.second.keyboard == keyboard; });
+  }
+  for (ViaScanner::Added& added : changes.added) {
+    hardware.keyboards[hardware.next_id++] = {std::move(added.keyboard), added.lighting};
+  }
+  std::optional<std::vector<HidppScanner::Found>> found = hardware.mouse_scanner.Scan();
+  if (found && UpdateMice(hardware, *found)) changed = true;
+  if (changed) Publish(hardware);
+}
+
 }  // namespace
 
 void StartHardwareService() {
-  auto session = std::make_shared<Session>();
-  mo::rpc::RegisterService(new HardwareServiceImpl(session));
+  auto queue = std::make_shared<Queue>();
+  mo::rpc::RegisterService(new HardwareServiceImpl(queue));
 
-  // Never stopped or joined: it keeps the session alive until the app exits.
-  std::thread([session] {
-    ViaScanner keyboards(kSilentInterfaceRetry);
-    HidppScanner mice(kMouseScanInterval);
+  // Never stopped or joined: it keeps the queue alive until the app exits.
+  std::thread([queue] {
+    Hardware hardware;
+    // Without HID, scans find nothing, and requests are still answered.
+    if (!InitHid()) std::fputs("Could not initialize HIDAPI.\n", stderr);
+    auto next_scan = std::chrono::steady_clock::now();
     while (true) {
-      // Opening a new device happens here, outside the lock, so it delays no request.
-      ViaScanner::Changes changes = keyboards.Scan();
-      std::optional<std::vector<HidppScanner::Found>> found = mice.Scan();
+      std::deque<Queue::Task> tasks;
       {
-        std::lock_guard lock(session->mutex);
-        bool changed = !changes.added.empty() || !changes.removed.empty();
-        for (const std::shared_ptr<ViaKeyboard>& keyboard : changes.removed) {
-          std::erase_if(session->keyboards, [&](const auto& live) {
-            return live.second.keyboard == keyboard;
-          });
-        }
-        for (ViaScanner::Added& added : changes.added) {
-          session->keyboards[session->next_id++] = {std::move(added.keyboard), added.lighting};
-        }
-        if (found && UpdateMiceLocked(*session, *found)) changed = true;
-        if (changed) PublishLocked(*session);
+        std::unique_lock lock(queue->mutex);
+        queue->wake.wait_until(lock, next_scan, [&] { return !queue->tasks.empty(); });
+        tasks.swap(queue->tasks);
       }
-      std::this_thread::sleep_for(kScanInterval);
+      for (Queue::Task& task : tasks) task(hardware);
+      // ponytail: a write waits behind a scan that is probing a silent device (up to a
+      // few reply timeouts); move probing to its own thread if that lag shows.
+      if (std::chrono::steady_clock::now() >= next_scan) {
+        Scan(hardware);
+        next_scan = std::chrono::steady_clock::now() + kScanInterval;
+      }
     }
   }).detach();
 }

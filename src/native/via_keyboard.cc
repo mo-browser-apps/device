@@ -4,11 +4,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <thread>
-
-#ifdef __APPLE__
-#include <hidapi_darwin.h>
-#endif
 
 namespace {
 
@@ -162,60 +157,16 @@ std::optional<ViaKeyboard::Lighting> ViaKeyboard::ReadLighting() {
 }
 
 bool ViaKeyboard::WriteLighting(const Lighting& lighting) {
-  return (!channel_->effect || SetValue(kEffect, lighting.effect)) &&
-         (!channel_->color || SetValue(kColor, lighting.hue, lighting.saturation)) &&
-         SetValue(kBrightness, lighting.brightness);
-}
-
-void ViaKeyboard::WriteLightingAsync(const Lighting& lighting, WriteDone done) {
-  std::lock_guard lock(write_mutex_);
-  pending_ = lighting;
-  waiting_.push_back(std::move(done));
-  if (writing_) {
-    return;
-  }
-  writing_ = true;
-  // The thread keeps the keyboard alive until it finishes, so it is never joined.
-  std::thread([self = shared_from_this()] { self->DrainWrites(); }).detach();
-}
-
-void ViaKeyboard::DrainWrites() {
-  while (true) {
-    Lighting lighting;
-    std::vector<WriteDone> waiting;
-    {
-      std::lock_guard lock(write_mutex_);
-      if (!pending_) {
-        writing_ = false;
-        return;
-      }
-      lighting = *pending_;
-      pending_.reset();
-      waiting.swap(waiting_);
-    }
-    const bool ok = !failed_ && WriteLighting(lighting);
-    if (!ok) {
-      failed_ = true;
-    }
-    for (WriteDone& done : waiting) {
-      done(ok);
-    }
-  }
+  const bool ok = !failed_ &&
+                  (!channel_->effect || SetValue(kEffect, lighting.effect)) &&
+                  (!channel_->color || SetValue(kColor, lighting.hue, lighting.saturation)) &&
+                  SetValue(kBrightness, lighting.brightness);
+  if (!ok) failed_ = true;
+  return ok;
 }
 
 ViaScanner::Changes ViaScanner::Scan() {
   Changes changes;
-  if (!initialized_) {
-    // Once, before any handle exists, as HIDAPI requires when threads share it.
-    if (hid_init() != 0) {
-      return changes;
-    }
-#ifdef __APPLE__
-    // Share the interface so the VIA or Keychron Launcher apps can stay open.
-    hid_darwin_set_open_exclusive(0);
-#endif
-    initialized_ = true;
-  }
 
   // Enumeration only reads the system's device list; no keyboard I/O happens here.
   std::map<std::string, hid_device_info*> present;

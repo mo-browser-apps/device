@@ -2,13 +2,10 @@
 #define HIDPP_MOUSE_H_
 
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,15 +22,13 @@ class HidppReceiver;
 // also be set. Like the Logitech apps, a DPI set this way lasts until the mouse is
 // switched off.
 //
-// Opened by HidppScanner. After that, WriteDpiAsync() may be called from any thread.
-class HidppMouse : public std::enable_shared_from_this<HidppMouse> {
+// Opened by HidppScanner, and used only on the thread that calls it.
+class HidppMouse {
  public:
   struct Battery {
     int percent = 0;
     bool charging = false;
   };
-
-  using WriteDone = std::function<void(bool ok)>;
 
   HidppMouse(const HidppMouse&) = delete;
   HidppMouse& operator=(const HidppMouse&) = delete;
@@ -47,9 +42,9 @@ class HidppMouse : public std::enable_shared_from_this<HidppMouse> {
   std::optional<Battery> ReadBattery();
   std::optional<int> ReadDpi();
 
-  // Clamps dpi to the sensor's range and writes it on a background thread, then calls
-  // done there. DPI queued while a write is running is merged: only the latest is sent.
-  void WriteDpiAsync(int dpi, WriteDone done);
+  // Clamps dpi to the sensor's range and writes it; false if the mouse did not answer.
+  // A failed mouse rejects writes without touching the receiver.
+  bool WriteDpi(int dpi);
 
   // True once a request failed, most likely because the mouse fell asleep or the
   // receiver was unplugged. The next scan then looks for the mouse again.
@@ -68,7 +63,6 @@ class HidppMouse : public std::enable_shared_from_this<HidppMouse> {
                                 std::initializer_list<uint8_t> params = {});
   // The index of a HID++ 2.0 feature on this mouse, or 0 when it has none.
   uint8_t FeatureIndex(uint16_t feature);
-  void DrainWrites();
 
   std::shared_ptr<HidppReceiver> receiver_;
   uint8_t index_;
@@ -78,12 +72,7 @@ class HidppMouse : public std::enable_shared_from_this<HidppMouse> {
   uint8_t dpi_feature_ = 0;
   int min_dpi_ = 0;
   int max_dpi_ = 0;
-  std::atomic<bool> failed_ = false;
-
-  std::mutex write_mutex_;
-  std::optional<int> pending_;
-  std::vector<WriteDone> waiting_;
-  bool writing_ = false;
+  bool failed_ = false;
 };
 
 // Finds mice paired with Logitech Bolt receivers. Every call must come from the same

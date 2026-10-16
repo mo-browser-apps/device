@@ -78,11 +78,9 @@ service HardwareService {
   // Every device currently open.
   rpc List(google.protobuf.Empty) returns (ConnectedDevices);
 
-  // Writes one complete lighting snapshot to a keyboard. Writes that queue up behind a
-  // slow keyboard are merged so only the latest is sent. Fails if the keyboard is gone.
+  // Writes one complete lighting snapshot to a keyboard. Fails if the keyboard is gone.
   rpc ApplyLighting(LightingRequest) returns (google.protobuf.Empty);
 
-  // Sets a mouse's sensor DPI, merging queued writes the same way. Fails if the mouse
-  // is gone or asleep.
+  // Sets a mouse's sensor DPI. Fails if the mouse is gone or asleep.
   rpc ApplyDpi(DpiRequest) returns (google.protobuf.Empty);
 }
