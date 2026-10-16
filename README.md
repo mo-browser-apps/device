@@ -8,10 +8,11 @@ and a native C++ module that simulates the device backend.
 
 ## What the demo shows
 
-- View mice and keyboards with their connection, battery, and firmware information.
+- View simulated mice and real QMK/VIA keyboards with their connection, battery, and firmware
+  information.
 - Find, add, and remove wireless devices.
 - Assign actions to mouse buttons and adjust pointer and scrolling behavior.
-- Remap keyboard keys and configure backlight effects, color, and brightness.
+- Change a real keyboard's backlight effect, color, and brightness live as the sliders move.
 - Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
 - Keep paired devices and settings between launches.
 
@@ -25,8 +26,9 @@ and a native C++ module that simulates the device backend.
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-All devices are simulated by an in-memory C++ backend. This app does not detect or change real
-peripherals connected to the computer. It is a reference demo, not production device software.
+The mice are simulated by an in-memory C++ backend. Keyboards are real: see
+[Example: QMK keyboards with VIA over USB](#example-qmk-keyboards-with-via-over-usb). This is a
+reference demo, not production device software.
 
 The demo requires no account or API key. Packaged versions contact GitHub Releases to check for
 updates, but device data and settings are not sent anywhere.
@@ -73,17 +75,18 @@ your devices or SDK already store this data, remove that persistence and keep on
 
 ### Example: QMK keyboards with VIA over USB
 
-The app includes real devices. Every keyboard running [QMK](https://qmk.fm/) firmware with
-[VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) that is plugged in by **USB cable** at
-startup appears next to the simulated devices with a **Live device** badge. Its Lighting controls
-drive the physical backlight:
+Every keyboard running [QMK](https://qmk.fm/) firmware with
+[VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) appears within a second
+of being plugged in, first in the list, with a **Live device** badge. Unplugged, it is shown as
+disconnected until it comes back. Its Lighting controls drive the physical backlight, and the
+sliders update it about 30 times a second while they move:
 
 - **Effect**: Steady is the firmware's Solid Color and works on every keyboard. Pulse and Wave
   are offered only for models whose effect list is known (see below).
 - **Hue** sets the backlight colour. It is hidden for single-colour backlights.
 - **Brightness** sets the backlight level.
 
-The app reads each keyboard's current lighting when it starts.
+The app reads each keyboard's current lighting whenever it is plugged in.
 
 How it works:
 
@@ -114,9 +117,9 @@ To try it, connect a keyboard by cable (on wireless models, set the mode switch 
 
 Limitations:
 
-- The app looks for keyboards only once, at launch. If you unplug one, its controls are disabled
-  until you restart the app. Each interface that does not answer, such as a wireless receiver with
-  no keyboard, delays startup by up to half a second.
+- The app scans for keyboards once a second. An interface that does not answer, such as a
+  wireless receiver with no keyboard, is probed again only every 30 seconds or when plugged in
+  again.
 - Lighting changes are not saved to the keyboard's memory. Unplugging the keyboard restores its own
   saved lighting.
 - Firmware effects that have no matching editor option are shown as Wave, or with no effect
@@ -124,8 +127,9 @@ Limitations:
 - Further units of the same model get `-2`, `-3` appended to their device ID in the order they are
   found. Tested on a Keychron K10 Max; the K2 HE entry follows Keychron's published firmware and
   has not been tested on the hardware.
-- Key remapping, Bluetooth, 2.4 GHz receivers, and firmware other than QMK with VIA are not
-  supported. Only the Keychron models above have artwork.
+- Key remapping and firmware other than QMK with VIA are not supported. Bluetooth and the
+  Keychron Link receiver are labelled as such, but only work if they answer VIA. Only the Keychron
+  models above have artwork.
 
 ### Add capabilities and device types
 

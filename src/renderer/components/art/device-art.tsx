@@ -36,12 +36,6 @@ const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
     aspectRatio: '3 / 2',
     mouseProfile: 'travel',
   },
-  'compact-keyboard': {
-    detailSrc: '/device-art/compact-keyboard.webp',
-    homeSrc: '/device-art/compact-keyboard-home.webp',
-    alt: 'Graphite compact keyboard',
-    aspectRatio: '821 / 479',
-  },
   // Real keyboards reuse the demo artwork to preview their lighting.
   'keychron-k10-max': {
     detailSrc: '/device-art/compact-keyboard.webp',

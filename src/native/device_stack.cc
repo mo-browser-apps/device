@@ -74,49 +74,6 @@ DeviceSeed MakeMouse(const MouseSeed& seed) {
   return {std::move(device), std::move(settings)};
 }
 
-const char* const kRemappableKeys[] = {
-    "esc", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "minus", "equal", "backspace",
-    "tab", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "bracketleft", "bracketright",
-    "backslash",
-    "capslock", "a", "s", "d", "f", "g", "h", "j", "k", "l", "semicolon", "quote", "enter",
-    "shiftleft", "z", "x", "c", "v", "b", "n", "m", "comma", "period", "slash", "shiftright",
-    "ctrlleft", "metaleft", "altleft", "space", "altright", "menu", "ctrlright",
-};
-
-DeviceSeed MakeKeyboard() {
-  Device device;
-  device.set_id("compact-keyboard");
-  device.set_model_id("compact-keyboard");
-  device.set_model("Compact Keyboard");
-  device.set_link(WIRED);
-  device.set_firmware("2.0.5");
-  device.set_connected(true);
-  device.set_has_battery(false);
-
-  KeyboardSpec* spec = device.mutable_keyboard();
-  spec->set_backlight(true);
-  spec->set_color(true);
-  spec->add_effects(STATIC);
-  spec->add_effects(BREATHING);
-  spec->add_effects(WAVE);
-
-  Settings settings;
-  settings.set_device_id(device.id());
-  KeyboardSettings* keyboard = settings.mutable_keyboard();
-  keyboard->set_effect(STATIC);
-  keyboard->set_hue(35);
-  keyboard->set_brightness(70);
-
-  for (const char* key : kRemappableKeys) {
-    spec->add_keys(key);
-    Binding* binding = keyboard->add_bindings();
-    binding->set_control(key);
-    binding->set_action("default");
-  }
-
-  return {std::move(device), std::move(settings)};
-}
-
 // The firmware effects every keyboard shares; the rest come from ViaKeyboard::Model.
 constexpr int kViaOff = 0;
 constexpr int kViaSolid = 1;
@@ -226,7 +183,6 @@ DeviceStack::DeviceStack() {
                     .max_dpi = 3200,
                     .dpi = 1200,
                 }));
-  add(paired_, MakeKeyboard());
 
   // A second unit of the same mouse, discoverable so the pairing flow is
   // usable on a fresh launch.
