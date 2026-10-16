@@ -2,10 +2,14 @@
 
 #include <algorithm>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
 namespace {
+
+constexpr auto kScanInterval = std::chrono::seconds(1);
+constexpr auto kSilentInterfaceRetry = std::chrono::seconds(30);
 
 struct ButtonSeed {
   std::string control;
@@ -224,25 +228,75 @@ DeviceStack::DeviceStack() {
   nearby.device.set_connected(false);
   nearby.settings.set_device_id(nearby.device.id());
   available_.push_back(std::move(nearby));
+}
 
-  // A single scan at startup; plugging a keyboard in later needs an app restart.
-  std::map<std::string, int> units;
-  for (std::unique_ptr<ViaKeyboard>& keyboard : ViaKeyboard::OpenAll()) {
-    std::optional<ViaKeyboard::Lighting> lighting = keyboard->ReadLighting();
-    if (!lighting) {
-      continue;
+void DeviceStack::StartScanning() {
+  // Never stopped or joined: the stack lives until the app exits (see main.cc).
+  std::thread([this] {
+    ViaScanner scanner(kSilentInterfaceRetry);
+    while (true) {
+      // Probing a new keyboard happens here, outside the lock, so it delays no request.
+      ViaScanner::Changes changes = scanner.Scan();
+      if (!changes.added.empty() || !changes.removed.empty()) {
+        std::lock_guard lock(mutex_);
+        for (const std::shared_ptr<ViaKeyboard>& keyboard : changes.removed) {
+          DisconnectLocked(keyboard.get());
+        }
+        for (const ViaScanner::Added& added : changes.added) {
+          ConnectLocked(added);
+        }
+        PublishDevicesChangedLocked();
+      }
+      std::this_thread::sleep_for(kScanInterval);
     }
-    // Firmware rarely sets a serial number, so further units of a model are numbered.
-    std::string id = keyboard->model().id;
-    if (int unit = ++units[id]; unit > 1) {
-      id += "-" + std::to_string(unit);
+  }).detach();
+}
+
+void DeviceStack::ConnectLocked(const ViaScanner::Added& added) {
+  // A returning keyboard takes the place of the first disconnected unit of its model,
+  // so an open device page keeps working. Firmware rarely sets a serial number, so
+  // further units of a model are numbered.
+  const std::string& model_id = added.keyboard->model().id;
+  Entry* entry = nullptr;
+  int units = 0;
+  for (Entry& candidate : paired_) {
+    if (candidate.device.live() && candidate.device.model_id() == model_id) {
+      ++units;
+      if (!entry && !candidate.device.connected()) entry = &candidate;
     }
-    add(paired_, MakeViaKeyboard(id, *keyboard, *lighting));
-    live_[id] = std::move(keyboard);
+  }
+  std::string id = entry ? entry->device.id() : model_id;
+  if (!entry && units > 0) {
+    id += "-" + std::to_string(units + 1);
+  }
+
+  // The keyboard restores its own saved lighting when plugged in, so read it again.
+  DeviceSeed seed = MakeViaKeyboard(id, *added.keyboard, added.lighting);
+  if (entry) {
+    entry->device = std::move(seed.device);
+    entry->settings = std::move(seed.settings);
+  } else {
+    paired_.push_back({std::move(seed.device), std::move(seed.settings)});
+  }
+  live_[id] = added.keyboard;
+}
+
+void DeviceStack::DisconnectLocked(const ViaKeyboard* keyboard) {
+  for (auto live = live_.begin(); live != live_.end(); ++live) {
+    if (live->second.get() == keyboard) {
+      FindById(paired_, live->first)->device.set_connected(false);
+      live_.erase(live);
+      return;
+    }
   }
 }
 
 DeviceList DeviceStack::List() const {
+  std::lock_guard lock(mutex_);
+  return ListLocked();
+}
+
+DeviceList DeviceStack::ListLocked() const {
   DeviceList list;
   for (const Entry& entry : paired_) {
     *list.add_devices() = entry.device;
@@ -251,6 +305,7 @@ DeviceList DeviceStack::List() const {
 }
 
 DeviceList DeviceStack::Discover() const {
+  std::lock_guard lock(mutex_);
   DeviceList list;
   for (const Entry& entry : available_) {
     *list.add_devices() = entry.device;
@@ -259,6 +314,7 @@ DeviceList DeviceStack::Discover() const {
 }
 
 bool DeviceStack::Pair(const std::string& device_id) {
+  std::lock_guard lock(mutex_);
   auto entry = FindById(available_, device_id);
   if (entry == available_.end()) {
     return false;
@@ -266,11 +322,12 @@ bool DeviceStack::Pair(const std::string& device_id) {
   entry->device.set_connected(true);
   paired_.push_back(std::move(*entry));
   available_.erase(entry);
-  PublishDevicesChanged();
+  PublishDevicesChangedLocked();
   return true;
 }
 
 bool DeviceStack::Forget(const std::string& device_id) {
+  std::lock_guard lock(mutex_);
   auto entry = FindById(paired_, device_id);
   if (entry == paired_.end() || entry->device.link() == WIRED) {
     return false;
@@ -278,11 +335,12 @@ bool DeviceStack::Forget(const std::string& device_id) {
   entry->device.set_connected(false);
   available_.push_back(std::move(*entry));
   paired_.erase(entry);
-  PublishDevicesChanged();
+  PublishDevicesChangedLocked();
   return true;
 }
 
 std::optional<Settings> DeviceStack::GetSettings(const std::string& device_id) const {
+  std::lock_guard lock(mutex_);
   auto entry = FindById(paired_, device_id);
   if (entry == paired_.end()) {
     return std::nullopt;
@@ -290,41 +348,65 @@ std::optional<Settings> DeviceStack::GetSettings(const std::string& device_id) c
   return entry->settings;
 }
 
-bool DeviceStack::ApplySettings(const Settings& settings) {
+void DeviceStack::ApplySettings(const Settings& settings, std::function<void(bool ok)> done) {
+  std::unique_lock lock(mutex_);
   auto entry = FindById(paired_, settings.device_id());
   if (entry != paired_.end()) {
     if (entry->settings.kind_case() != settings.kind_case()) {
-      return false;
+      lock.unlock();
+      done(false);
+      return;
     }
-    if (entry->device.live()) {
-      auto keyboard = live_.find(entry->device.id());
-      if (keyboard == live_.end()) {
-        return false;
-      }
-      ViaKeyboard& hid = *keyboard->second;
-      if (!hid.WriteLighting(ToViaLighting(settings.keyboard(), hid.model()))) {
-        // Most likely unplugged; show it as disconnected until the app restarts.
-        live_.erase(keyboard);
-        entry->device.set_connected(false);
-        PublishDevicesChanged();
-        return false;
-      }
+    if (!entry->device.live()) {
+      entry->settings = settings;
+      lock.unlock();
+      done(true);
+      return;
     }
-    entry->settings = settings;
-    return true;
+    auto live = live_.find(entry->device.id());
+    if (live == live_.end()) {
+      lock.unlock();
+      done(false);
+      return;
+    }
+    // The write runs on the keyboard's own thread, so this request returns at once.
+    ViaKeyboard* keyboard = live->second.get();
+    keyboard->WriteLightingAsync(
+        ToViaLighting(settings.keyboard(), keyboard->model()),
+        [this, keyboard, settings, done = std::move(done)](bool ok) {
+          {
+            std::lock_guard lock(mutex_);
+            // Skip results for a keyboard that was unplugged or replaced meanwhile.
+            auto live = live_.find(settings.device_id());
+            if (live != live_.end() && live->second.get() == keyboard) {
+              if (ok) {
+                FindById(paired_, live->first)->settings = settings;
+              } else {
+                // Most likely unplugged; the next scan reconnects it if it is still there.
+                DisconnectLocked(keyboard);
+                PublishDevicesChangedLocked();
+              }
+            }
+          }
+          done(ok);
+        });
+    return;
   }
 
   // Keep an unpaired device's customizations so adding it again does not reset it.
   auto available = FindById(available_, settings.device_id());
-  if (available == available_.end() || available->settings.kind_case() != settings.kind_case()) {
-    return false;
+  const bool ok =
+      available != available_.end() && available->settings.kind_case() == settings.kind_case();
+  if (ok) {
+    available->settings = settings;
   }
-  available->settings = settings;
-  return true;
+  lock.unlock();
+  done(ok);
 }
 
-void DeviceStack::PublishDevicesChanged() const {
+void DeviceStack::PublishDevicesChangedLocked() const {
+  // Sent under the lock so that snapshots from different threads arrive in order.
   if (devices_changed_) {
-    devices_changed_(List());
+    devices_changed_(ListLocked());
   }
 }

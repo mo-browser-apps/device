@@ -1,15 +1,20 @@
 // Checks the VIA keyboard code against simulated QMK firmware. Run with `npm run test:native`.
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -27,8 +32,13 @@ struct FakeBoard {
   std::wstring manufacturer = L"Keychron";
   std::wstring product = L"Keychron K10 Max";
   int protocol = 12;
+  // False while unplugged: not enumerated, and writes fail.
+  bool plugged = true;
   // Exposes the interface but never answers, like a wireless receiver with no keyboard.
   bool silent = false;
+  // Requests received, and how many of them were id_custom_set_value.
+  int requests = 0;
+  int sets = 0;
   // Reports that arrive before each reply: unprompted ones (such as layer changes) and
   // replies to another app using the same interface.
   std::vector<Report> unprompted;
@@ -42,6 +52,11 @@ struct FakeBoard {
 std::vector<FakeBoard> boards;
 // Reads that found no reply, so real hardware would have waited for the timeout.
 int timed_out_reads = 0;
+// Write threads and the test share the boards; every fake HIDAPI call holds this.
+std::recursive_mutex fake_mutex;
+// Held by a test to stall writes, as a slow keyboard would.
+std::mutex write_gate;
+std::atomic<int> writes_at_gate = 0;
 
 FakeBoard& BoardOf(hid_device* device) {
   return *reinterpret_cast<FakeBoard*>(device);
@@ -53,13 +68,17 @@ int hid_init() {
   return 0;
 }
 
+#define LOCK_FAKE std::lock_guard fake_lock(fake_mutex)
+
 void hid_darwin_set_open_exclusive(int) {}
 
 hid_device_info* hid_enumerate(unsigned short vendor_id, unsigned short product_id) {
+  LOCK_FAKE;
   hid_device_info* list = nullptr;
   for (size_t i = boards.size(); i-- > 0;) {
     FakeBoard& board = boards[i];
-    if ((vendor_id && vendor_id != board.vendor_id) ||
+    if (!board.plugged ||
+        (vendor_id && vendor_id != board.vendor_id) ||
         (product_id && product_id != board.product_id)) {
       continue;
     }
@@ -91,14 +110,23 @@ void hid_free_enumeration(hid_device_info* devices) {
 }
 
 hid_device* hid_open_path(const char* path) {
+  LOCK_FAKE;
   return reinterpret_cast<hid_device*>(&boards[std::stoul(path)]);
 }
 
 void hid_close(hid_device*) {}
 
 int hid_write(hid_device* device, const unsigned char* data, size_t length) {
+  ++writes_at_gate;
+  { std::lock_guard gate(write_gate); }
+  LOCK_FAKE;
   assert(length == 1 + sizeof(Report) && data[0] == 0);
   FakeBoard& board = BoardOf(device);
+  if (!board.plugged) {
+    return -1;
+  }
+  ++board.requests;
+  board.sets += data[1] == 0x07;
   if (board.silent) {
     return static_cast<int>(length);
   }
@@ -133,6 +161,7 @@ int hid_write(hid_device* device, const unsigned char* data, size_t length) {
 }
 
 int hid_read_timeout(hid_device* device, unsigned char* data, size_t length, int) {
+  LOCK_FAKE;
   FakeBoard& board = BoardOf(device);
   if (board.replies.empty()) {
     ++timed_out_reads;
@@ -145,10 +174,21 @@ int hid_read_timeout(hid_device* device, unsigned char* data, size_t length, int
 
 namespace {
 
-std::unique_ptr<ViaKeyboard> OpenOne() {
-  auto keyboards = ViaKeyboard::OpenAll();
-  assert(keyboards.size() <= 1);
-  return keyboards.empty() ? nullptr : std::move(keyboards[0]);
+using namespace std::chrono_literals;
+
+std::shared_ptr<ViaKeyboard> OpenOne() {
+  ViaScanner scanner(0ms);
+  ViaScanner::Changes changes = scanner.Scan();
+  assert(changes.added.size() <= 1 && changes.removed.empty());
+  return changes.added.empty() ? nullptr : changes.added[0].keyboard;
+}
+
+// Waits up to two seconds for work on write threads.
+void WaitUntil(const std::function<bool()>& condition) {
+  for (int i = 0; i < 200 && !condition(); ++i) {
+    std::this_thread::sleep_for(10ms);
+  }
+  assert(condition());
 }
 
 void TestReadsAndWritesRgbMatrix() {
@@ -293,11 +333,106 @@ void TestOpensEveryKeyboard() {
   single_color.channels = {5};
   boards = {rgb, receiver, single_color};
 
-  auto keyboards = ViaKeyboard::OpenAll();
-  assert(keyboards.size() == 2 && keyboards[0]->has_color() && !keyboards[1]->has_color());
+  ViaScanner scanner(0ms);
+  auto added = scanner.Scan().added;
+  assert(added.size() == 2 && added[0].keyboard->has_color() && !added[1].keyboard->has_color());
   // Each handle drives its own keyboard.
-  assert(keyboards[1]->WriteLighting({.effect = 1, .brightness = 42}));
+  assert(added[1].keyboard->WriteLighting({.effect = 1, .brightness = 42}));
   assert((boards[2].values[{5, 1}][0] == 42 && boards[0].values[{3, 1}][0] == 0));
+}
+
+void TestScannerReportsPlugAndUnplug() {
+  boards = {FakeBoard{}};
+  ViaScanner scanner(1h);
+
+  ViaScanner::Changes changes = scanner.Scan();
+  assert(changes.added.size() == 1 && changes.added[0].lighting.effect == 0);
+  std::shared_ptr<ViaKeyboard> first = changes.added[0].keyboard;
+  changes = scanner.Scan();
+  assert(changes.added.empty() && changes.removed.empty());
+
+  boards[0].plugged = false;
+  changes = scanner.Scan();
+  assert(changes.added.empty() && changes.removed.size() == 1 && changes.removed[0] == first);
+
+  boards[0].plugged = true;
+  changes = scanner.Scan();
+  assert(changes.added.size() == 1 && changes.added[0].keyboard != first && changes.removed.empty());
+}
+
+void TestScannerRetriesSilentInterfaceLater() {
+  FakeBoard receiver;
+  receiver.silent = true;
+  boards = {receiver};
+  ViaScanner scanner(1h);
+
+  assert(scanner.Scan().added.empty() && boards[0].requests == 1);
+  // The keyboard behind the receiver wakes up, but the retry delay has not passed.
+  boards[0].silent = false;
+  assert(scanner.Scan().added.empty() && boards[0].requests == 1);
+
+  // Plugging the interface in again probes it at once.
+  boards[0].plugged = false;
+  scanner.Scan();
+  boards[0].plugged = true;
+  assert(scanner.Scan().added.size() == 1);
+}
+
+void TestFailedWriteReopensSamePath() {
+  boards = {FakeBoard{}};
+  ViaScanner scanner(1h);
+  std::shared_ptr<ViaKeyboard> keyboard = scanner.Scan().added.at(0).keyboard;
+
+  // Unplugged and plugged back in between two scans: the path never disappears.
+  boards[0].plugged = false;
+  std::atomic<int> result = -1;
+  keyboard->WriteLightingAsync({.effect = 1}, [&](bool ok) { result = ok; });
+  WaitUntil([&] { return result != -1; });
+  assert(result == 0 && keyboard->failed());
+  boards[0].plugged = true;
+
+  // A failed keyboard rejects writes without touching the device.
+  const int requests = boards[0].requests;
+  result = -1;
+  keyboard->WriteLightingAsync({.effect = 1}, [&](bool ok) { result = ok; });
+  WaitUntil([&] { return result != -1; });
+  assert(result == 0 && boards[0].requests == requests);
+
+  ViaScanner::Changes changes = scanner.Scan();
+  assert(changes.removed.size() == 1 && changes.removed[0] == keyboard);
+  assert(changes.added.size() == 1 && !changes.added[0].keyboard->failed());
+}
+
+void TestQueuedWritesSendOnlyTheLatest() {
+  boards = {FakeBoard{}};
+  std::shared_ptr<ViaKeyboard> keyboard = OpenOne();
+
+  std::mutex results_mutex;
+  std::vector<int> results;
+  auto record = [&](int id) {
+    return [&, id](bool ok) {
+      std::lock_guard lock(results_mutex);
+      results.push_back(ok ? id : -id);
+    };
+  };
+  {
+    // While the keyboard is busy, requests must return at once and queue up.
+    std::lock_guard stall(write_gate);
+    writes_at_gate = 0;
+    keyboard->WriteLightingAsync({.effect = 1, .brightness = 10}, record(1));
+    WaitUntil([] { return writes_at_gate == 1; });
+    keyboard->WriteLightingAsync({.effect = 1, .brightness = 20}, record(2));
+    keyboard->WriteLightingAsync({.effect = 1, .brightness = 30}, record(3));
+  }
+  WaitUntil([&] {
+    std::lock_guard lock(results_mutex);
+    return results.size() == 3;
+  });
+
+  std::lock_guard lock(fake_mutex);
+  assert((results == std::vector<int>{1, 2, 3}));
+  // The first write was already running; the second was replaced by the third.
+  assert((boards[0].sets == 6 && boards[0].values[{3, 1}][0] == 30));
 }
 
 }  // namespace
@@ -314,5 +449,9 @@ int main() {
   TestKnownModelAddsEffects();
   TestSkipsSilentInterfaceForNextKeyboard();
   TestOpensEveryKeyboard();
+  TestScannerReportsPlugAndUnplug();
+  TestScannerRetriesSilentInterfaceLater();
+  TestFailedWriteReopensSamePath();
+  TestQueuedWritesSendOnlyTheLatest();
   std::puts("via_test: ok");
 }

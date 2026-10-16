@@ -1,5 +1,6 @@
 #include "device_service.h"
 
+#include <memory>
 #include <optional>
 #include <utility>
 
@@ -51,11 +52,15 @@ class DeviceStackServiceImpl : public DeviceStackService {
   }
 
   void ApplySettings(const Settings* request, Callback<Empty> done) override {
-    if (!stack_.ApplySettings(*request)) {
-      std::move(done).Reject("Cannot apply settings to device: " + request->device_id());
-      return;
-    }
-    std::move(done).Complete(Empty());
+    // Callback is move-only and std::function needs a copyable target.
+    auto shared_done = std::make_shared<Callback<Empty>>(std::move(done));
+    stack_.ApplySettings(*request, [shared_done, id = request->device_id()](bool ok) {
+      if (ok) {
+        std::move(*shared_done).Complete(Empty());
+      } else {
+        std::move(*shared_done).Reject("Cannot apply settings to device: " + id);
+      }
+    });
   }
 
  private:

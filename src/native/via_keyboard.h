@@ -2,8 +2,13 @@
 #define VIA_KEYBOARD_H_
 
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -19,7 +24,10 @@ struct hid_device_info;
 // get/set commands on the keyboard's lighting channel are used. They change the live
 // lighting state without writing EEPROM, so unplugging the keyboard restores
 // its saved lighting.
-class ViaKeyboard {
+//
+// Opened by ViaScanner. After that, only WriteLightingAsync() may be called, from any
+// thread; the handle is then used by one write thread at a time.
+class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
  public:
   struct Model {
     // Shared by every unit of the product: a known model's ID, or "via-<vid>-<pid>".
@@ -50,8 +58,10 @@ class ViaKeyboard {
     int brightness = 0;
   };
 
-  // Opens every VIA interface that answers and has lighting.
-  static std::vector<std::unique_ptr<ViaKeyboard>> OpenAll();
+  using WriteDone = std::function<void(bool ok)>;
+
+  // Opens the VIA interface if it answers and has lighting; nullptr otherwise.
+  static std::shared_ptr<ViaKeyboard> Open(const hid_device_info& info);
 
   ~ViaKeyboard();
   ViaKeyboard(const ViaKeyboard&) = delete;
@@ -70,12 +80,21 @@ class ViaKeyboard {
   // Sends effect, color, and brightness; false if any command was not acknowledged.
   bool WriteLighting(const Lighting& lighting);
 
+  // Writes on a background thread and calls done there. Lighting queued while a write
+  // is running is merged: only the latest is sent, and each waiting done gets its result.
+  void WriteLightingAsync(const Lighting& lighting, WriteDone done);
+
+  // True once a write failed, most likely because the keyboard was unplugged. Later
+  // writes fail at once, and the next scan reopens the interface if it is still there.
+  bool failed() const { return failed_; }
+
  private:
   using Report = std::array<uint8_t, 32>;
 
   ViaKeyboard(hid_device_* device, Model model) : device_(device), model_(std::move(model)) {}
 
-  static std::unique_ptr<ViaKeyboard> OpenInterface(const hid_device_info& info);
+  // Runs on the write thread until no lighting is pending.
+  void DrainWrites();
 
   // Sends one VIA report and replaces it with the keyboard's reply.
   bool Transact(Report& report);
@@ -86,6 +105,40 @@ class ViaKeyboard {
   Model model_;
   const Channel* channel_ = nullptr;
   int protocol_version_ = 0;
+  std::atomic<bool> failed_ = false;
+
+  std::mutex write_mutex_;
+  std::optional<Lighting> pending_;
+  std::vector<WriteDone> waiting_;
+  bool writing_ = false;
+};
+
+// Tracks which VIA keyboards are plugged in by comparing HID enumerations. Every call
+// must come from the same thread, since HIDAPI enumeration is not thread-safe.
+class ViaScanner {
+ public:
+  struct Added {
+    std::shared_ptr<ViaKeyboard> keyboard;
+    ViaKeyboard::Lighting lighting;
+  };
+  struct Changes {
+    std::vector<Added> added;
+    std::vector<std::shared_ptr<ViaKeyboard>> removed;
+  };
+
+  // An interface that does not answer, such as a wireless receiver with no keyboard,
+  // is probed again only after retry_delay, since each probe waits for a timeout.
+  explicit ViaScanner(std::chrono::milliseconds retry_delay) : retry_delay_(retry_delay) {}
+
+  // Reports keyboards plugged in or unplugged since the last call. Keyboards whose
+  // writes failed are reported as removed and, if still present, added again.
+  Changes Scan();
+
+ private:
+  std::chrono::milliseconds retry_delay_;
+  bool initialized_ = false;
+  std::map<std::string, std::shared_ptr<ViaKeyboard>> open_;
+  std::map<std::string, std::chrono::steady_clock::time_point> retry_at_;
 };
 
 #endif  // VIA_KEYBOARD_H_
