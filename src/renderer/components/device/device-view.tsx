@@ -21,7 +21,7 @@ interface DeviceViewProps {
  */
 export function DeviceView({ device, onBack, onRemoved }: DeviceViewProps) {
   const presentation = presentationFor(device);
-  const { settings, preview, commit } = useDeviceSettings(device.id, device.connected);
+  const { settings, preview, commit } = useDeviceSettings(device);
 
   const [segment, setSegment] = useState<Segment>(presentation.segments[0][0]);
   const [selectedControl, setSelectedControl] = useState<string | null>(
