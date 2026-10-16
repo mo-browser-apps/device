@@ -27,6 +27,9 @@ constexpr unsigned short kViaUsage = 0x61;
 
 // VIA command, channel, and value IDs from QMK quantum/via.h.
 constexpr uint8_t kGetProtocolVersion = 0x01;
+// Channel-based custom value commands arrived in protocol 12 (VIA 3); older firmware
+// uses different command and value IDs.
+constexpr int kMinProtocolVersion = 12;
 constexpr uint8_t kCustomSetValue = 0x07;
 constexpr uint8_t kCustomGetValue = 0x08;
 constexpr uint8_t kRgbMatrixChannel = 3;
@@ -73,6 +76,9 @@ std::unique_ptr<KeychronHid> KeychronHid::Open() {
     return nullptr;
   }
   keyboard->protocol_version_ = (report[1] << 8) | report[2];
+  if (keyboard->protocol_version_ < kMinProtocolVersion) {
+    return nullptr;
+  }
   return keyboard;
 }
 

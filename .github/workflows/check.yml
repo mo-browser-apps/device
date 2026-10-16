@@ -37,5 +37,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Native test
+        run: mkdir -p build && npm run test:native
+
       - name: Build
         run: npm run build -- --verbose

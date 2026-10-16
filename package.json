@@ -12,7 +12,8 @@
     "gen": "mobrowser gen",
     "mobrowser": "mobrowser",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test:native": "c++ -std=c++20 -Wall -Isrc/native/test src/native/keychron_hid.cc src/native/test/via_test.cc -o build/via_test && build/via_test"
   },
   "dependencies": {
     "@mobrowser/api": "2.18.0",
