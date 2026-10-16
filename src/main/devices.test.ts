@@ -1,9 +1,19 @@
-// Checks the main-process device model and VIA mapping. Run with `npm test`.
+// Checks the main-process device model, VIA mapping, and Logitech mapping. Run with
+// `npm test`.
 import assert from 'node:assert/strict';
 import { LightEffect, LinkType, type DeviceList, type Settings } from './gen/devices';
-import { Bus, type ConnectedKeyboard, type RawLighting } from './gen/native/devices';
+import {
+  Bus,
+  type ConnectedKeyboard,
+  type ConnectedMouse,
+  type RawLighting,
+} from './gen/native/devices';
 import { DeviceState, type SavedDevices } from './device-state';
+import { logitechMouse } from './logitech';
 import { fromVia, toRawLighting, toVia, viaKeyboard, viaModel } from './via';
+
+const K10 = 'keychron-k10-max';
+const M650 = 'logitech-signature-m650-l';
 
 function keyboard(overrides: Partial<ConnectedKeyboard> = {}): ConnectedKeyboard {
   return {
@@ -20,22 +30,39 @@ function keyboard(overrides: Partial<ConnectedKeyboard> = {}): ConnectedKeyboard
   };
 }
 
+function mouse(overrides: Partial<ConnectedMouse> = {}): ConnectedMouse {
+  return {
+    connectionId: 100,
+    name: 'Signature M650 L',
+    protocol: '4.5',
+    battery: 70,
+    charging: false,
+    dpi: 1000,
+    minDpi: 400,
+    maxDpi: 4000,
+    ...overrides,
+  };
+}
+
 /** A device state with hooks that record what it did. */
-function harness(saved: SavedDevices = { settings: {} }) {
-  const writes: { connectionId: number; lighting: RawLighting }[] = [];
+function harness(saved: SavedDevices = { paired: [] }) {
+  const writes: { connectionId: number; lighting?: RawLighting; dpi?: number }[] = [];
   const published: DeviceList[] = [];
   const stored: SavedDevices[] = [];
   let finishWrite: (() => void) | undefined;
   let failWrites = false;
+  const write = (record: (typeof writes)[number]) => {
+    writes.push(record);
+    if (failWrites) return Promise.reject(new Error('unplugged'));
+    return new Promise<void>((resolve) => (finishWrite = resolve));
+  };
   const state = new DeviceState(saved, {
-    applyLighting(connectionId, lighting) {
-      writes.push({ connectionId, lighting });
-      if (failWrites) return Promise.reject(new Error('unplugged'));
-      return new Promise((resolve) => (finishWrite = resolve));
-    },
+    applyLighting: (connectionId, lighting) => write({ connectionId, lighting }),
+    applyDpi: (connectionId, dpi) => write({ connectionId, dpi }),
     changed: (devices) => published.push(devices),
     save: (devices) => stored.push(structuredClone(devices)),
   });
+  const ids = (list: DeviceList) => list.devices.map((device) => device.id);
   return {
     state,
     writes,
@@ -43,7 +70,9 @@ function harness(saved: SavedDevices = { settings: {} }) {
     stored,
     finishWrite: () => finishWrite!(),
     failWrites: () => (failWrites = true),
-    ids: () => state.list().devices.map((device) => device.id),
+    paired: () => ids(state.list()),
+    nearby: () => ids(state.discover()),
+    device: (id: string) => state.list().devices.find((device) => device.id === id)!,
   };
 }
 
@@ -125,129 +154,218 @@ function testCapabilities() {
   assert.equal(hue.settings.keyboard?.hue, 359);
 }
 
-function testReconnectAndIdenticalKeyboards() {
-  const { state, published, ids } = harness();
-  state.reconcile({ keyboards: [keyboard({ connectionId: 1 }), keyboard({ connectionId: 2 })] });
-  assert.deepEqual(ids().slice(2), ['keychron-k10-max', 'keychron-k10-max-2']);
-  assert.equal(published.length, 1);
-
-  // The same snapshot again changes nothing.
-  state.reconcile({ keyboards: [keyboard({ connectionId: 1 }), keyboard({ connectionId: 2 })] });
-  assert.equal(published.length, 1);
-
-  // The first unplugged unit stays listed as disconnected.
-  state.reconcile({ keyboards: [keyboard({ connectionId: 2 })] });
-  assert.equal(state.list().devices[2].connected, false);
-
-  // Plugged back in, it takes the first disconnected unit's place and reads its lighting again.
-  const lighting = { effect: 1, hue: 0, saturation: 255, brightness: 0 };
-  state.reconcile({ keyboards: [keyboard({ connectionId: 2 }), keyboard({ connectionId: 3, lighting })] });
-  assert.deepEqual(ids().slice(2), ['keychron-k10-max', 'keychron-k10-max-2']);
-  assert.equal(state.list().devices[2].connected, true);
-  assert.equal(state.getSettings('keychron-k10-max').keyboard?.brightness, 0);
-
-  // A third unit is numbered.
-  state.reconcile({
-    keyboards: [keyboard({ connectionId: 2 }), keyboard({ connectionId: 3 }), keyboard({ connectionId: 4 })],
-  });
-  assert.equal(ids()[4], 'keychron-k10-max-3');
+function testMouseMapping() {
+  const { device, settings } = logitechMouse(M650, mouse());
+  assert.equal(device.modelId, M650);
+  assert.equal(device.model, 'Signature M650 L');
+  assert.equal(device.link, LinkType.RECEIVER);
+  assert.equal(device.firmware, 'HID++ 4.5');
+  assert.equal(device.live && device.hasBattery && device.battery === 70, true);
+  assert.deepEqual(device.mouse, { buttons: [], minDpi: 400, maxDpi: 4000 });
+  assert.equal(settings.mouse?.dpi, 1000);
 }
 
-function testPairForgetAndRestore() {
-  const first = harness();
-  // The first launch saves the demo pairing.
-  assert.deepEqual(first.stored.at(-1)?.pairedIds, ['performance-mouse', 'travel-mouse']);
-  first.state.pair('performance-mouse-secondary');
-  first.state.forget('travel-mouse');
-  assert.deepEqual(first.ids(), ['performance-mouse', 'performance-mouse-secondary']);
-  assert.equal(first.state.discover().devices[0].connected, false);
-  assert.equal(first.published.length, 2);
-  assert.throws(() => first.state.pair('travel-mouse-unknown'));
-  assert.throws(() => first.state.forget('travel-mouse'));
+function testStartsEmptyAndPairsFromDiscovery() {
+  const { state, paired, nearby, stored, published } = harness();
+  assert.deepEqual(paired(), []);
+  assert.deepEqual(nearby(), []);
 
-  // Real keyboards cannot be forgotten.
-  first.state.reconcile({ keyboards: [keyboard({ bus: Bus.BUS_BLUETOOTH })] });
-  assert.throws(() => first.state.forget('keychron-k10-max'));
+  // Connected devices are offered for pairing, not listed.
+  state.reconcile({ keyboards: [keyboard()], mice: [mouse()] });
+  assert.deepEqual(paired(), []);
+  assert.deepEqual(nearby(), [K10, M650]);
+
+  state.pair(M650);
+  assert.deepEqual(paired(), [M650]);
+  assert.deepEqual(nearby(), [K10]);
+  assert.equal(published.at(-1)?.devices[0].battery, 70);
+  assert.equal(stored.at(-1)?.paired.length, 1);
+  assert.throws(() => state.pair(M650));
+  assert.throws(() => state.pair('nobody'));
+  assert.throws(() => state.getSettings(K10));
+
+  // An unpaired device that goes away is no longer offered.
+  state.reconcile({ keyboards: [], mice: [mouse()] });
+  assert.deepEqual(nearby(), []);
+}
+
+function testRestoresPairedDevicesDisconnected() {
+  const first = harness();
+  first.state.reconcile({ keyboards: [keyboard()], mice: [mouse()] });
+  first.state.pair(K10);
+  first.state.pair(M650);
 
   const restored = harness(first.stored.at(-1));
-  assert.deepEqual(restored.ids(), ['performance-mouse', 'performance-mouse-secondary']);
-  assert.deepEqual(restored.state.discover().devices.map((device) => device.id), ['travel-mouse']);
+  assert.deepEqual(restored.paired(), [K10, M650]);
+  assert.equal(restored.device(M650).connected, false);
+  // The last known battery and settings are shown until the device connects.
+  assert.equal(restored.device(M650).battery, 70);
+  assert.equal(restored.state.getSettings(M650).mouse?.dpi, 1000);
+
+  // Connecting again reads the hardware rather than restoring saved settings onto it.
+  restored.state.reconcile({ keyboards: [], mice: [mouse({ connectionId: 5, dpi: 1600 })] });
+  assert.equal(restored.device(M650).connected, true);
+  assert.equal(restored.state.getSettings(M650).mouse?.dpi, 1600);
+  assert.deepEqual(restored.nearby(), []);
+
+  // Invalid saved data is skipped.
+  assert.deepEqual(harness({ paired: [null, { device: { id: 'x' } }, 7] }).paired(), []);
 }
 
-async function testSettings() {
-  const { state, stored } = harness();
-  const mouse = (dpi: number): Settings => ({
-    deviceId: 'travel-mouse',
-    mouse: { bindings: [{ control: 'wheel', action: 'copy' }], dpi, scrollSpeed: 5, naturalScroll: true },
+function testForget() {
+  const { state, paired, nearby } = harness();
+  state.reconcile({ keyboards: [keyboard()], mice: [mouse()] });
+  state.pair(K10);
+  state.pair(M650);
+
+  // A connected device can be added again at once.
+  state.forget(K10);
+  assert.deepEqual(paired(), [M650]);
+  assert.deepEqual(nearby(), [K10]);
+  assert.throws(() => state.forget(K10));
+
+  // A disconnected one disappears until it connects again.
+  state.reconcile({ keyboards: [keyboard()], mice: [] });
+  state.forget(M650);
+  assert.deepEqual(paired(), []);
+  assert.deepEqual(nearby(), [K10]);
+}
+
+function testReconnectAndIdenticalDevices() {
+  const { state, paired, nearby, published, device } = harness();
+  state.reconcile({ keyboards: [keyboard({ connectionId: 1 }), keyboard({ connectionId: 2 })], mice: [] });
+  assert.deepEqual(nearby(), [K10, `${K10}-2`]);
+  state.pair(K10);
+  state.pair(`${K10}-2`);
+  const publishedBefore = published.length;
+
+  // The same snapshot again changes nothing.
+  state.reconcile({ keyboards: [keyboard({ connectionId: 1 }), keyboard({ connectionId: 2 })], mice: [] });
+  assert.equal(published.length, publishedBefore);
+
+  // The first unplugged unit stays listed as disconnected; plugged back in, it takes the
+  // first disconnected unit's place and reads its lighting again.
+  state.reconcile({ keyboards: [keyboard({ connectionId: 2 })], mice: [] });
+  assert.equal(device(K10).connected, false);
+  const lighting = { effect: 1, hue: 0, saturation: 255, brightness: 0 };
+  state.reconcile({ keyboards: [keyboard({ connectionId: 2 }), keyboard({ connectionId: 3, lighting })], mice: [] });
+  assert.deepEqual(paired(), [K10, `${K10}-2`]);
+  assert.equal(device(K10).connected, true);
+  assert.equal(state.getSettings(K10).keyboard?.brightness, 0);
+
+  // A third unit is numbered without reusing a taken ID.
+  state.reconcile({
+    keyboards: [keyboard({ connectionId: 2 }), keyboard({ connectionId: 3 }), keyboard({ connectionId: 4 })],
+    mice: [],
   });
-  await state.applySettings(mouse(2000));
-  assert.equal(state.getSettings('travel-mouse').mouse?.dpi, 2000);
-
-  // Restored on the next launch, but invalid saved settings are skipped.
-  const saved = stored.at(-1)!;
-  assert.equal(harness(saved).state.getSettings('travel-mouse').mouse?.dpi, 2000);
-  saved.settings['travel-mouse'] = { deviceId: 'travel-mouse', mouse: { dpi: 99999 } };
-  assert.equal(harness(saved).state.getSettings('travel-mouse').mouse?.dpi, 1200);
-
-  // Mismatched variants and unsupported values are rejected without changing anything.
-  await rejects(state.applySettings({ deviceId: 'travel-mouse', keyboard: { bindings: [], effect: 0, hue: 0, brightness: 0 } }));
-  await rejects(state.applySettings({ deviceId: 'travel-mouse' }));
-  await rejects(state.applySettings(mouse(100)));
-  await rejects(state.applySettings({ ...mouse(2000), mouse: { ...mouse(2000).mouse!, scrollSpeed: 6 } }));
-  await rejects(state.applySettings({ ...mouse(2000), mouse: { ...mouse(2000).mouse!, bindings: [{ control: 'back', action: 'copy' }] } }));
-  await rejects(state.applySettings({ ...mouse(2000), deviceId: 'nobody' }));
-  assert.equal(state.getSettings('travel-mouse').mouse?.dpi, 2000);
+  assert.deepEqual(nearby(), [`${K10}-3`]);
 }
 
-async function testKeyboardWrites() {
-  const { state, writes, stored, finishWrite, failWrites } = harness();
-  state.reconcile({ keyboards: [keyboard({ connectionId: 7, productId: 0x1256 })] });
-  const id = 'via-3434-1256';
-  const storedBefore = stored.length;
+function testMouseBatteryUpdates() {
+  const { state, published, device } = harness();
+  state.reconcile({ keyboards: [], mice: [mouse()] });
+  state.pair(M650);
+  const publishedBefore = published.length;
+
+  state.reconcile({ keyboards: [], mice: [mouse({ battery: 65, dpi: 400 })] });
+  assert.equal(device(M650).battery, 65);
+  assert.equal(published.length, publishedBefore + 1);
+  // DPI in a later snapshot does not replace the settings the app holds.
+  assert.equal(state.getSettings(M650).mouse?.dpi, 1000);
+
+  state.reconcile({ keyboards: [], mice: [mouse({ battery: 65 })] });
+  assert.equal(published.length, publishedBefore + 1);
+}
+
+async function testSettingsValidation() {
+  const { state, writes } = harness();
+  state.reconcile({ keyboards: [keyboard({ productId: 0x1256 })], mice: [mouse()] });
+  state.pair(M650);
+  const dpi = (value: number): Settings => ({
+    deviceId: M650,
+    mouse: { bindings: [], dpi: value, scrollSpeed: 3, naturalScroll: false },
+  });
   const lighting = (effect: LightEffect, brightness = 40): Settings => ({
-    deviceId: id,
+    deviceId: 'via-3434-1256',
     keyboard: { bindings: [], effect, hue: 0, brightness },
   });
 
-  const write = state.applySettings(lighting(LightEffect.STATIC));
+  // Mismatched variants and unsupported values never reach the hardware.
+  await rejects(state.applySettings({ deviceId: M650, keyboard: lighting(LightEffect.STATIC).keyboard }));
+  await rejects(state.applySettings({ deviceId: M650 }));
+  await rejects(state.applySettings(dpi(100)));
+  await rejects(state.applySettings(dpi(5000)));
+  await rejects(state.applySettings({ ...dpi(800), mouse: { ...dpi(800).mouse!, bindings: [{ control: 'back', action: 'copy' }] } }));
+  await rejects(state.applySettings({ ...dpi(800), deviceId: 'nobody' }));
+  // An unknown keyboard offers solid color only.
+  await rejects(state.applySettings(lighting(LightEffect.BREATHING)));
+  await rejects(state.applySettings(lighting(LightEffect.STATIC, 101)));
+  assert.equal(writes.length, 0);
+}
+
+async function testWrites() {
+  const { state, writes, stored, finishWrite, failWrites } = harness();
+  state.reconcile({ keyboards: [keyboard({ connectionId: 7, productId: 0x1256 })], mice: [mouse()] });
+  state.pair(M650);
+  state.pair('via-3434-1256');
+  const dpi = (value: number): Settings => ({
+    deviceId: M650,
+    mouse: { bindings: [], dpi: value, scrollSpeed: 3, naturalScroll: false },
+  });
+  const lighting = (brightness: number): Settings => ({
+    deviceId: 'via-3434-1256',
+    keyboard: { bindings: [], effect: LightEffect.STATIC, hue: 0, brightness },
+  });
+
+  let write = state.applySettings(lighting(40));
   assert.deepEqual(writes.at(-1), {
     connectionId: 7,
     lighting: { effect: 1, hue: 0, saturation: 255, brightness: 102 },
   });
   finishWrite();
   await write;
-  assert.equal(state.getSettings(id).keyboard?.brightness, 40);
-  // Real hardware keeps its own state, so its settings are never saved.
+  assert.equal(state.getSettings('via-3434-1256').keyboard?.brightness, 40);
+
+  const storedBefore = stored.length;
+  write = state.applySettings(dpi(1600));
+  assert.deepEqual(writes.at(-1), { connectionId: 100, dpi: 1600 });
+  finishWrite();
+  await write;
+  assert.equal(state.getSettings(M650).mouse?.dpi, 1600);
+  // Writes are not saved one by one; the latest settings are kept once the device leaves.
   assert.equal(stored.length, storedBefore);
 
-  // Unsupported values never reach the keyboard.
-  await rejects(state.applySettings(lighting(LightEffect.BREATHING)));
-  await rejects(state.applySettings(lighting(LightEffect.STATIC, 101)));
-  assert.equal(writes.length, 1);
-
-  // A write that completes after the keyboard reconnected is ignored.
-  const stale = state.applySettings(lighting(LightEffect.STATIC, 90));
-  state.reconcile({ keyboards: [] });
-  state.reconcile({ keyboards: [keyboard({ connectionId: 8, productId: 0x1256 })] });
+  // A write that completes after the mouse woke up again is ignored.
+  const stale = state.applySettings(dpi(800));
+  state.reconcile({ keyboards: [keyboard({ connectionId: 7, productId: 0x1256 })], mice: [] });
+  assert.equal(stored.length, storedBefore + 1);
+  const saved = stored.at(-1)!.paired as { settings: Settings }[];
+  assert.equal(saved.find(({ settings }) => settings.deviceId === M650)?.settings.mouse?.dpi, 1600);
+  state.reconcile({ keyboards: [keyboard({ connectionId: 7, productId: 0x1256 })], mice: [mouse({ connectionId: 101 })] });
   finishWrite();
   await stale;
-  assert.equal(state.getSettings(id).keyboard?.brightness, 50);
+  assert.equal(state.getSettings(M650).mouse?.dpi, 1000);
 
-  // While unplugged, writes fail without reaching native code.
-  state.reconcile({ keyboards: [] });
-  await rejects(state.applySettings(lighting(LightEffect.STATIC)));
-  assert.equal(writes.length, 2);
+  // While disconnected, writes fail without reaching native code.
+  state.reconcile({ keyboards: [], mice: [] });
+  const writesBefore = writes.length;
+  await rejects(state.applySettings(dpi(800)));
+  assert.equal(writes.length, writesBefore);
 
-  state.reconcile({ keyboards: [keyboard({ connectionId: 9, productId: 0x1256 })] });
+  state.reconcile({ keyboards: [], mice: [mouse({ connectionId: 102 })] });
   failWrites();
-  await rejects(state.applySettings(lighting(LightEffect.STATIC)));
+  await rejects(state.applySettings(dpi(800)));
 }
 
 testConversionBoundaries();
 testEffectMapping();
 testCapabilities();
-testReconnectAndIdenticalKeyboards();
-testPairForgetAndRestore();
-await testSettings();
-await testKeyboardWrites();
+testMouseMapping();
+testStartsEmptyAndPairsFromDiscovery();
+testRestoresPairedDevicesDisconnected();
+testForget();
+testReconnectAndIdenticalDevices();
+testMouseBatteryUpdates();
+await testSettingsValidation();
+await testWrites();
 console.log('devices.test: ok');

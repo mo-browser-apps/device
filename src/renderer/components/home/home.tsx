@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Settings, X } from 'lucide-react';
-import { LinkType, type Device } from '@/gen/devices';
+import type { Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
 import {
   DeviceBatteryStatus,
@@ -42,7 +42,7 @@ function DeviceCard({
 }: {
   device: Device;
   onOpen: () => void;
-  onRemove?: () => void;
+  onRemove: () => void;
 }) {
   return (
     <div className="group relative w-64 shrink-0 snap-center">
@@ -79,23 +79,21 @@ function DeviceCard({
         </span>
       </button>
 
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Remove ${device.model}`}
-          title={`Remove ${device.model}`}
-          className={cn(
-            'absolute right-3 top-3 flex size-7 items-center justify-center rounded-full',
-            'border border-border/60 bg-background/65 text-muted-foreground/70 shadow-sm',
-            'opacity-70 backdrop-blur-sm transition-[color,background-color,opacity]',
-            'hover:bg-accent hover:text-foreground hover:opacity-100',
-            FOCUS_RING,
-          )}
-        >
-          <X className="size-3.5" strokeWidth={1.75} />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${device.model}`}
+        title={`Remove ${device.model}`}
+        className={cn(
+          'absolute right-3 top-3 flex size-7 items-center justify-center rounded-full',
+          'border border-border/60 bg-background/65 text-muted-foreground/70 shadow-sm',
+          'opacity-70 backdrop-blur-sm transition-[color,background-color,opacity]',
+          'hover:bg-accent hover:text-foreground hover:opacity-100',
+          FOCUS_RING,
+        )}
+      >
+        <X className="size-3.5" strokeWidth={1.75} />
+      </button>
     </div>
   );
 }
@@ -221,17 +219,12 @@ export function Home({
             className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
           >
             <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
-              {/* Real hardware first; the sort is stable, so each group keeps its order. */}
-              {[...devices].sort((a, b) => Number(b.live) - Number(a.live)).map((device) => (
+              {devices.map((device) => (
                 <DeviceCard
                   key={device.id}
                   device={device}
                   onOpen={() => openDevice(device.id)}
-                  onRemove={
-                    device.link === LinkType.WIRED || device.live
-                      ? undefined
-                      : () => setDeviceToRemove(device)
-                  }
+                  onRemove={() => setDeviceToRemove(device)}
                 />
               ))}
             </div>
@@ -268,9 +261,9 @@ export function Home({
         </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center pb-12 text-center">
-          <p className="text-sm font-medium">No devices connected</p>
+          <p className="text-sm font-medium">No devices added</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Add a nearby device to get started.
+            Choose Add device to find your keyboard or mouse.
           </p>
         </div>
       )}

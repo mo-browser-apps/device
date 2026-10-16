@@ -1,6 +1,6 @@
 import { cn, FOCUS_RING } from '@/lib/utils';
 
-export type MouseArtProfile = 'performance' | 'travel';
+export type MouseArtProfile = 'travel';
 
 /**
  * Describes one mouse control and the action shown beside it.
@@ -32,12 +32,6 @@ interface MouseArtProps {
 }
 
 const HOTSPOTS_BY_PROFILE: Record<MouseArtProfile, Record<string, ControlHotspot>> = {
-  performance: {
-    wheel: { markerX: 33, markerY: 43, labelSide: 'left', labelY: 36 },
-    back: { markerX: 62, markerY: 42, labelSide: 'right', labelY: 37 },
-    forward: { markerX: 55, markerY: 49, labelSide: 'right', labelY: 52 },
-    gesture: { markerX: 52, markerY: 63, labelSide: 'right', labelY: 66 },
-  },
   travel: {
     wheel: { markerX: 39, markerY: 51, labelSide: 'left', labelY: 44 },
   },

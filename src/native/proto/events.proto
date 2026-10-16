@@ -4,7 +4,8 @@ import "devices.proto";
 import "google/protobuf/empty.proto";
 
 // Native-to-main callbacks.
-service ViaEventsService {
-  // Carries the complete set of open keyboards after a keyboard is opened or closed.
-  rpc Changed(ConnectedKeyboards) returns (google.protobuf.Empty);
+service HardwareEventsService {
+  // Carries the complete set of open devices after a device is opened or closed, or a
+  // mouse's battery changes.
+  rpc Changed(ConnectedDevices) returns (google.protobuf.Empty);
 }

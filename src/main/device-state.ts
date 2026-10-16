@@ -1,118 +1,42 @@
-import { LinkType, Settings, type Device, type DeviceList } from './gen/devices';
-import type { ConnectedKeyboard, ConnectedKeyboards, RawLighting } from './gen/native/devices';
+import { Device, Settings, type DeviceList } from './gen/devices';
+import type {
+  ConnectedDevices,
+  ConnectedKeyboard,
+  ConnectedMouse,
+  RawLighting,
+} from './gen/native/devices';
+import { logitechModelId, logitechMouse } from './logitech';
 import { toRawLighting, viaKeyboard, viaModel } from './via';
 
 interface Entry {
   device: Device;
   settings: Settings;
+  /** Added by the user, so it is listed and saved; otherwise only offered for pairing. */
+  paired: boolean;
 }
+
+/** One open device, as the native module reports it. */
+type Connection =
+  | { connectionId: number; keyboard: ConnectedKeyboard; mouse?: undefined }
+  | { connectionId: number; mouse: ConnectedMouse; keyboard?: undefined };
 
 /** What is kept between launches. */
 export interface SavedDevices {
-  /** Undefined on the first launch, so the demo devices start paired. */
-  pairedIds?: string[];
-  /** Settings of simulated devices, as JSON by device ID. */
-  settings: Record<string, unknown>;
+  /** Each paired device and its last known settings, as { device, settings } JSON. */
+  paired: unknown[];
 }
 
 export interface DeviceStateHooks {
   /** Writes lighting to an open keyboard; rejects if it is gone or the write fails. */
   applyLighting(connectionId: number, lighting: RawLighting): Promise<void>;
-  /** Receives the complete managed-device list after each change. */
+  /** Sets an open mouse's DPI; rejects if it is gone or the write fails. */
+  applyDpi(connectionId: number, dpi: number): Promise<void>;
+  /** Receives the complete paired-device list after each change. */
   changed(devices: DeviceList): void;
   save(saved: SavedDevices): void;
 }
 
 const MAX_SCROLL_SPEED = 5;
-
-function makeMouse(seed: {
-  id: string;
-  model: string;
-  link: LinkType;
-  firmware: string;
-  battery: number;
-  charging: boolean;
-  buttons: [control: string, action: string][];
-  minDpi: number;
-  maxDpi: number;
-  dpi: number;
-}): Entry {
-  return {
-    device: {
-      id: seed.id,
-      modelId: seed.id,
-      model: seed.model,
-      link: seed.link,
-      firmware: seed.firmware,
-      connected: true,
-      hasBattery: true,
-      battery: seed.battery,
-      charging: seed.charging,
-      live: false,
-      mouse: {
-        buttons: seed.buttons.map(([control]) => control),
-        minDpi: seed.minDpi,
-        maxDpi: seed.maxDpi,
-      },
-    },
-    settings: {
-      deviceId: seed.id,
-      mouse: {
-        bindings: seed.buttons.map(([control, action]) => ({ control, action })),
-        dpi: seed.dpi,
-        scrollSpeed: 3,
-        naturalScroll: false,
-      },
-    },
-  };
-}
-
-/**
- * The simulated mice: two paired, and a second unit of the first one nearby, so the
- * pairing flow is usable on a fresh launch.
- */
-function simulatedDevices(): { paired: Entry[]; available: Entry[] } {
-  const performance = makeMouse({
-    id: 'performance-mouse',
-    model: 'Performance Mouse',
-    link: LinkType.RECEIVER,
-    firmware: '3.2.1',
-    battery: 82,
-    charging: true,
-    buttons: [
-      ['wheel', 'middle-click'],
-      ['back', 'back'],
-      ['forward', 'forward'],
-      ['gesture', 'show-desktop'],
-    ],
-    minDpi: 400,
-    maxDpi: 8000,
-    dpi: 1600,
-  });
-  const travel = makeMouse({
-    id: 'travel-mouse',
-    model: 'Travel Mouse',
-    link: LinkType.BLUETOOTH,
-    firmware: '1.4.0',
-    battery: 15,
-    charging: false,
-    buttons: [['wheel', 'middle-click']],
-    minDpi: 800,
-    maxDpi: 3200,
-    dpi: 1200,
-  });
-  const nearby = structuredClone(performance);
-  nearby.device = {
-    ...nearby.device,
-    id: 'performance-mouse-secondary',
-    link: LinkType.BLUETOOTH,
-    battery: 68,
-    charging: false,
-    connected: false,
-  };
-  nearby.settings.deviceId = nearby.device.id;
-  return { paired: [performance, travel], available: [nearby] };
-}
 
 function isInRange(value: number, min: number, max: number): boolean {
   return Number.isInteger(value) && value >= min && value <= max;
@@ -145,81 +69,77 @@ function isValid({ device, settings: current }: Entry, settings: Settings): bool
 }
 
 /**
- * Owns the application's devices: the simulated mice, and the real VIA keyboards the
- * native module reports. Pairing and settings of simulated devices are saved; real
- * keyboards keep their own state, which is read again whenever they connect.
+ * Restores one saved paired device, shown as disconnected until it connects; nothing if
+ * the saved data does not describe a device.
+ */
+function restoreEntry(json: unknown): Entry | undefined {
+  const { device: deviceJson, settings: settingsJson } = (json ?? {}) as Record<string, unknown>;
+  const device = Device.fromJSON(deviceJson ?? {});
+  const settings = Settings.fromJSON(settingsJson ?? {});
+  if (!device.id || settings.deviceId !== device.id || (!device.mouse && !device.keyboard)) {
+    return undefined;
+  }
+  const entry = { device: { ...device, connected: false }, settings, paired: true };
+  return isValid(entry, settings) ? entry : undefined;
+}
+
+/**
+ * Owns the application's devices: the real keyboards and mice the native module
+ * reports. Connected devices are offered for pairing; paired ones are listed and saved,
+ * and stay listed as disconnected while they are away. Their settings are read from the
+ * hardware whenever they connect, never restored onto it.
  */
 export class DeviceState {
-  private readonly paired: Entry[];
-  private readonly available: Entry[];
-  /** Open keyboards by device ID; a disconnected keyboard keeps its entry only. */
-  private readonly live = new Map<string, ConnectedKeyboard>();
-  private readonly saved: SavedDevices;
+  private readonly entries: Entry[];
+  /** Open devices by device ID; a disconnected paired device keeps its entry only. */
+  private readonly live = new Map<string, Connection>();
 
   constructor(
     saved: SavedDevices,
     private readonly hooks: DeviceStateHooks,
   ) {
-    ({ paired: this.paired, available: this.available } = simulatedDevices());
-    this.saved = { pairedIds: saved.pairedIds, settings: { ...saved.settings } };
-
-    if (saved.pairedIds) {
-      const pairedIds = new Set(saved.pairedIds);
-      for (const entry of [...this.available]) {
-        if (pairedIds.has(entry.device.id)) this.move(entry, this.available, this.paired);
-      }
-      for (const entry of [...this.paired]) {
-        if (!pairedIds.has(entry.device.id) && canForget(entry)) {
-          this.move(entry, this.paired, this.available);
-        }
-      }
-    } else {
-      this.savePairedIds();
-    }
-
-    for (const [deviceId, json] of Object.entries(saved.settings)) {
-      const entry = this.find(deviceId);
-      const settings = Settings.fromJSON(json);
-      if (entry && !entry.device.live && isValid(entry, settings)) entry.settings = settings;
-    }
+    this.entries = saved.paired.flatMap((json) => restoreEntry(json) ?? []);
   }
 
-  /** Every managed device. */
+  /** Every paired device. */
   list(): DeviceList {
-    return { devices: this.paired.map((entry) => entry.device) };
+    return { devices: this.entries.filter((entry) => entry.paired).map((entry) => entry.device) };
   }
 
-  /** Nearby devices available to pair. */
+  /** Connected devices available to pair. */
   discover(): DeviceList {
-    return { devices: this.available.map((entry) => entry.device) };
+    return {
+      devices: this.entries.filter((entry) => !entry.paired).map((entry) => entry.device),
+    };
   }
 
   pair(deviceId: string): void {
-    const entry = this.available.find((candidate) => candidate.device.id === deviceId);
-    if (!entry) throw new Error(`Cannot pair device: ${deviceId}`);
-    this.move(entry, this.available, this.paired);
-    this.savePairedIds();
+    const entry = this.find(deviceId);
+    if (!entry || entry.paired) throw new Error(`Cannot pair device: ${deviceId}`);
+    entry.paired = true;
+    this.save();
     this.publish();
   }
 
   forget(deviceId: string): void {
-    const entry = this.paired.find((candidate) => candidate.device.id === deviceId);
-    if (!entry || !canForget(entry)) throw new Error(`Cannot forget device: ${deviceId}`);
-    this.move(entry, this.paired, this.available);
-    this.savePairedIds();
+    const entry = this.find(deviceId);
+    if (!entry?.paired) throw new Error(`Cannot forget device: ${deviceId}`);
+    entry.paired = false;
+    // A device that is still connected can be added again at once.
+    if (!entry.device.connected) this.entries.splice(this.entries.indexOf(entry), 1);
+    this.save();
     this.publish();
   }
 
   getSettings(deviceId: string): Settings {
-    const entry = this.paired.find((candidate) => candidate.device.id === deviceId);
-    if (!entry) throw new Error(`Unknown device: ${deviceId}`);
+    const entry = this.find(deviceId);
+    if (!entry?.paired) throw new Error(`Unknown device: ${deviceId}`);
     return entry.settings;
   }
 
   /**
-   * Validates and applies one complete settings snapshot. A real keyboard's settings
-   * change once it acknowledges the write; a simulated device's are saved at once,
-   * including an unpaired one, so adding it again does not reset it.
+   * Validates one complete settings snapshot and writes it to the device. The settings
+   * change once the device acknowledges the write.
    */
   async applySettings(settings: Settings): Promise<void> {
     const { deviceId } = settings;
@@ -227,97 +147,107 @@ export class DeviceState {
     if (!entry || !isValid(entry, settings)) {
       throw new Error(`Cannot apply settings to device: ${deviceId}`);
     }
+    const connection = this.live.get(deviceId);
+    if (!connection) throw new Error(`Device is not connected: ${deviceId}`);
 
-    if (!entry.device.live) {
-      entry.settings = settings;
-      this.saved.settings[deviceId] = Settings.toJSON(settings);
-      this.hooks.save(this.saved);
-      return;
+    // A failed write closes the device; the native module then reports it gone.
+    if (connection.keyboard) {
+      await this.hooks.applyLighting(
+        connection.connectionId,
+        toRawLighting(settings.keyboard!, viaModel(connection.keyboard)),
+      );
+    } else {
+      await this.hooks.applyDpi(connection.connectionId, settings.mouse!.dpi);
     }
-
-    const keyboard = this.live.get(deviceId);
-    if (!keyboard || !settings.keyboard) {
-      throw new Error(`Keyboard is not connected: ${deviceId}`);
-    }
-    // A failed write closes the keyboard; the native module then reports it gone.
-    await this.hooks.applyLighting(
-      keyboard.connectionId,
-      toRawLighting(settings.keyboard, viaModel(keyboard)),
-    );
-    // Skip results for a keyboard that was unplugged or reopened meanwhile: it has
-    // read its lighting again.
-    if (this.live.get(deviceId)?.connectionId === keyboard.connectionId) {
+    // Skip results for a device that was reconnected meanwhile: it has been read again.
+    if (this.live.get(deviceId)?.connectionId === connection.connectionId) {
       entry.settings = settings;
     }
   }
 
   /**
-   * Matches the complete set of open keyboards to devices, then publishes the change.
+   * Matches the complete set of open devices to entries, then publishes the change.
    */
-  reconcile({ keyboards }: ConnectedKeyboards): void {
-    const open = new Set(keyboards.map((keyboard) => keyboard.connectionId));
+  reconcile({ keyboards, mice }: ConnectedDevices): void {
+    const connections: Connection[] = [
+      ...keyboards.map((keyboard) => ({ connectionId: keyboard.connectionId, keyboard })),
+      ...mice.map((mouse) => ({ connectionId: mouse.connectionId, mouse })),
+    ];
+    const open = new Map(connections.map((connection) => [connection.connectionId, connection]));
     let changed = false;
+    let pairedLeft = false;
 
-    for (const [deviceId, keyboard] of this.live) {
-      if (open.has(keyboard.connectionId)) continue;
-      this.live.delete(deviceId);
+    for (const [deviceId, connection] of this.live) {
       const entry = this.find(deviceId)!;
+      const current = open.get(connection.connectionId);
+      if (current) {
+        // A mouse reports its battery again every few seconds.
+        const { battery, charging } = current.mouse ?? entry.device;
+        if (battery !== entry.device.battery || charging !== entry.device.charging) {
+          entry.device = { ...entry.device, battery, charging };
+          changed = true;
+        }
+        continue;
+      }
+      this.live.delete(deviceId);
       entry.device = { ...entry.device, connected: false };
+      if (entry.paired) pairedLeft = true;
+      else this.entries.splice(this.entries.indexOf(entry), 1);
       changed = true;
     }
 
-    const known = new Set([...this.live.values()].map((keyboard) => keyboard.connectionId));
-    for (const keyboard of keyboards) {
-      if (known.has(keyboard.connectionId)) continue;
-      this.connect(keyboard);
+    const known = new Set([...this.live.values()].map((connection) => connection.connectionId));
+    for (const connection of connections) {
+      if (known.has(connection.connectionId)) continue;
+      this.connect(connection);
       changed = true;
     }
 
+    // Keeps the last known settings to show while the device is away.
+    if (pairedLeft) this.save();
     if (changed) this.publish();
   }
 
   /**
-   * A returning keyboard takes the place of the first disconnected unit of its model, so
-   * an open device page keeps working. Firmware rarely sets a serial number, so further
-   * units of a model are numbered, and identical keyboards may swap IDs on reconnect.
+   * A returning device takes the place of the first disconnected unit of its model, so
+   * an open device page keeps working. Firmware rarely reports a serial number, so
+   * further units of a model are numbered, and identical devices may swap IDs on
+   * reconnect.
    */
-  private connect(keyboard: ConnectedKeyboard): void {
-    const modelId = viaModel(keyboard).id;
-    const units = this.paired.filter(
-      (entry) => entry.device.live && entry.device.modelId === modelId,
+  private connect(connection: Connection): void {
+    const modelId = connection.keyboard
+      ? viaModel(connection.keyboard).id
+      : logitechModelId(connection.mouse);
+    const entry = this.entries.find(
+      (unit) => unit.device.modelId === modelId && !unit.device.connected,
     );
-    const entry = units.find((unit) => !unit.device.connected);
     let deviceId = entry?.device.id ?? modelId;
-    if (!entry && units.length > 0) deviceId += `-${units.length + 1}`;
+    for (let unit = 2; !entry && this.find(deviceId); unit++) deviceId = `${modelId}-${unit}`;
 
-    // The keyboard restores its own saved lighting when plugged in, so read it again.
-    const fresh = viaKeyboard(deviceId, keyboard);
+    const fresh = connection.keyboard
+      ? viaKeyboard(deviceId, connection.keyboard)
+      : logitechMouse(deviceId, connection.mouse);
     if (entry) Object.assign(entry, fresh);
-    else this.paired.push(fresh);
-    this.live.set(deviceId, keyboard);
+    else this.entries.push({ ...fresh, paired: false });
+    this.live.set(deviceId, connection);
   }
 
   private find(deviceId: string): Entry | undefined {
-    return [...this.paired, ...this.available].find((entry) => entry.device.id === deviceId);
+    return this.entries.find((entry) => entry.device.id === deviceId);
   }
 
-  private move(entry: Entry, from: Entry[], to: Entry[]): void {
-    from.splice(from.indexOf(entry), 1);
-    entry.device = { ...entry.device, connected: to === this.paired };
-    to.push(entry);
-  }
-
-  private savePairedIds(): void {
-    this.saved.pairedIds = this.paired.map((entry) => entry.device.id);
-    this.hooks.save(this.saved);
+  private save(): void {
+    this.hooks.save({
+      paired: this.entries
+        .filter((entry) => entry.paired)
+        .map((entry) => ({
+          device: Device.toJSON(entry.device),
+          settings: Settings.toJSON(entry.settings),
+        })),
+    });
   }
 
   private publish(): void {
     this.hooks.changed(this.list());
   }
-}
-
-/** Real keyboards stay listed while plugged in, whatever their link. */
-function canForget({ device }: Entry): boolean {
-  return device.link !== LinkType.WIRED && !device.live;
 }

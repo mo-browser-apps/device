@@ -1,14 +1,13 @@
 import { ipc, prefs } from '@mobrowser/api';
 import { native } from './gen/native';
-import type { ConnectedKeyboards } from './gen/native/devices';
-import { ViaEventsServiceDescriptor } from './gen/native_service';
+import type { ConnectedDevices } from './gen/native/devices';
+import { HardwareEventsServiceDescriptor } from './gen/native_service';
 import { DevicesServiceDescriptor } from './gen/ipc_service';
 import type { DeviceId, DeviceList, Settings } from './gen/devices';
 import { DeviceState } from './device-state';
 import { checkBatteries, persistPreferences } from './settings';
 
-const STORED_SETTINGS_KEY = 'devices.settings';
-const STORED_PAIRED_IDS_KEY = 'devices.pairedIds';
+const STORED_PAIRED_KEY = 'devices.paired';
 
 let state: DeviceState;
 
@@ -20,30 +19,27 @@ export function listDevices(): DeviceList {
 }
 
 /**
- * Restores the saved devices, serves renderer device requests, and keeps the devices in
- * sync with the VIA keyboards the native module reports.
+ * Restores the paired devices, serves renderer device requests, and keeps the devices in
+ * sync with the keyboards and mice the native module reports.
  */
 export function startDevices(): void {
   const deviceUpdates = ipc.registerService(DevicesServiceDescriptor);
 
   state = new DeviceState(
-    {
-      pairedIds: prefs.hasArray(STORED_PAIRED_IDS_KEY)
-        ? prefs.getArray<string>(STORED_PAIRED_IDS_KEY, [])
-        : undefined,
-      settings: prefs.getObject<Record<string, unknown>>(STORED_SETTINGS_KEY, {}),
-    },
+    { paired: prefs.getArray<unknown>(STORED_PAIRED_KEY, []) },
     {
       async applyLighting(connectionId, lighting) {
-        await native.via.ApplyLighting({ connectionId, lighting });
+        await native.hardware.ApplyLighting({ connectionId, lighting });
+      },
+      async applyDpi(connectionId, dpi) {
+        await native.hardware.ApplyDpi({ connectionId, dpi });
       },
       changed(devices) {
         deviceUpdates.Watch(devices);
         checkBatteries(devices);
       },
-      save({ pairedIds, settings }) {
-        prefs.setArray(STORED_PAIRED_IDS_KEY, pairedIds ?? []);
-        prefs.setObject(STORED_SETTINGS_KEY, settings);
+      save({ paired }) {
+        prefs.setArray(STORED_PAIRED_KEY, paired);
         persistPreferences();
       },
     },
@@ -75,16 +71,16 @@ export function startDevices(): void {
   });
 
   let notified = false;
-  native.registerService(ViaEventsServiceDescriptor, {
-    async Changed(keyboards: ConnectedKeyboards) {
+  native.registerService(HardwareEventsServiceDescriptor, {
+    async Changed(devices: ConnectedDevices) {
       notified = true;
-      state.reconcile(keyboards);
+      state.reconcile(devices);
       return {};
     },
   });
-  native.via
+  native.hardware
     .List({})
     // A notification that arrived first carries a newer snapshot.
-    .then((keyboards) => notified || state.reconcile(keyboards))
-    .catch((error: unknown) => console.warn('Could not list VIA keyboards.', error));
+    .then((devices) => notified || state.reconcile(devices))
+    .catch((error: unknown) => console.warn('Could not list connected devices.', error));
 }

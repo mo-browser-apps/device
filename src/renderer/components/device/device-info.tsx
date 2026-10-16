@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { LinkType, type Device } from '@/gen/devices';
+import type { Device } from '@/gen/devices';
 import { connectionLabel } from '@/components/device-status';
 import { BUTTON_OUTLINE, cn } from '@/lib/utils';
 import { SettingsSection } from './editor-controls';
@@ -10,7 +10,7 @@ interface DeviceInfoProps {
 }
 
 /**
- * Shows the device details reported by the main process and offers removal when allowed.
+ * Shows the device details reported by the main process and offers removal.
  */
 export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
   const details: [label: string, value: string][] = [
@@ -44,20 +44,18 @@ export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
         </dl>
       </SettingsSection>
 
-      {device.link !== LinkType.WIRED && !device.live && (
-        <button
-          type="button"
-          onClick={onRemove}
-          className={cn(
-            BUTTON_OUTLINE,
-            'w-fit text-muted-foreground hover:border-destructive/35',
-            'hover:bg-destructive/5 hover:text-foreground',
-          )}
-        >
-          <Trash2 className="size-4" strokeWidth={1.75} />
-          Remove device
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className={cn(
+          BUTTON_OUTLINE,
+          'w-fit text-muted-foreground hover:border-destructive/35',
+          'hover:bg-destructive/5 hover:text-foreground',
+        )}
+      >
+        <Trash2 className="size-4" strokeWidth={1.75} />
+        Remove device
+      </button>
     </div>
   );
 }

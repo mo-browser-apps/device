@@ -2,8 +2,8 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-// The native module drives VIA keyboards over HID and reports only hardware facts.
-// The main process (src/main/devices.ts) owns the application device model built
+// The native module drives real devices over HID and reports only hardware facts.
+// The main process (src/main/device-state.ts) owns the application device model built
 // from them; see src/renderer/proto/devices.proto.
 
 // The bus HIDAPI reports for the keyboard's VIA interface. A wireless receiver is
@@ -21,9 +21,10 @@ message RawLighting {
   int32 brightness = 4;
 }
 
+// A QMK keyboard with VIA.
 message ConnectedKeyboard {
-  // Opaque and valid only while the keyboard stays open in this native session. A
-  // keyboard that is plugged in again, or reopened after a failed write, gets a new one.
+  // Opaque and valid only while the device stays open in this native session. A device
+  // that is plugged in again, or reopened after a failed write, gets a new one.
   uint32 connection_id = 1;
   uint32 vendor_id = 2;
   uint32 product_id = 3;
@@ -39,8 +40,27 @@ message ConnectedKeyboard {
   RawLighting lighting = 9;
 }
 
-message ConnectedKeyboards {
+// A Logitech HID++ 2.0 mouse paired with a Bolt receiver.
+message ConnectedMouse {
+  // Shares the numbering of ConnectedKeyboard.connection_id. A mouse that falls asleep
+  // and wakes up again gets a new one.
+  uint32 connection_id = 1;
+  // The name the mouse reports, such as "Signature M650 L".
+  string name = 2;
+  // The HID++ protocol version, such as "4.5".
+  string protocol = 3;
+  // Percentage from 0 to 100, read again every few seconds.
+  int32 battery = 4;
+  bool charging = 5;
+  // The sensor DPI as read when the mouse was found, updated after each write.
+  int32 dpi = 6;
+  int32 min_dpi = 7;
+  int32 max_dpi = 8;
+}
+
+message ConnectedDevices {
   repeated ConnectedKeyboard keyboards = 1;
+  repeated ConnectedMouse mice = 2;
 }
 
 message LightingRequest {
@@ -48,12 +68,21 @@ message LightingRequest {
   RawLighting lighting = 2;
 }
 
-// Native RPC for the VIA keyboards that are plugged in.
-service ViaService {
-  // Every keyboard currently open.
-  rpc List(google.protobuf.Empty) returns (ConnectedKeyboards);
+message DpiRequest {
+  uint32 connection_id = 1;
+  int32 dpi = 2;
+}
 
-  // Writes one complete lighting snapshot. Writes that queue up behind a slow keyboard
-  // are merged so only the latest is sent. Fails if the keyboard is gone.
+// Native RPC for the real devices that are connected.
+service HardwareService {
+  // Every device currently open.
+  rpc List(google.protobuf.Empty) returns (ConnectedDevices);
+
+  // Writes one complete lighting snapshot to a keyboard. Writes that queue up behind a
+  // slow keyboard are merged so only the latest is sent. Fails if the keyboard is gone.
   rpc ApplyLighting(LightingRequest) returns (google.protobuf.Empty);
+
+  // Sets a mouse's sensor DPI, merging queued writes the same way. Fails if the mouse
+  // is gone or asleep.
+  rpc ApplyDpi(DpiRequest) returns (google.protobuf.Empty);
 }

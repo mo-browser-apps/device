@@ -2,19 +2,18 @@
 
 MōDevice is a small reference application for configuring mice and keyboards, built with
 [MōBrowser](https://teamdev.com/mobrowser/). It shows how a React interface communicates with a TypeScript main process
-that owns the device model, and a native C++ module that drives real keyboards over HID.
+that owns the device model, and a native C++ module that drives real keyboards and mice over HID.
 
 <a href="assets/screenshots/windows-devices.png"><img src="assets/screenshots/windows-devices.png" width="100%" alt="Device overview on Windows"></a>
 
 ## What the demo shows
 
-- View simulated mice and real QMK/VIA keyboards with their connection, battery, and firmware
-  information.
-- Find, add, and remove wireless devices.
-- Assign actions to mouse buttons and adjust pointer and scrolling behavior.
-- Change a real keyboard's backlight effect, color, and brightness live as the sliders move.
+- Find connected QMK/VIA keyboards and Logitech mice, add them, and remove them.
+- See each device's connection, firmware, and a mouse's real battery level.
+- Change a keyboard's backlight effect, color, and brightness, and a mouse's DPI, live as the
+  sliders move.
 - Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
-- Keep paired devices and settings between launches.
+- Keep added devices between launches.
 
 <p align="center">
   <a href="assets/screenshots/macos-devices.png"><img src="assets/screenshots/macos-devices.png" width="49%" alt="Device overview on macOS"></a>
@@ -26,9 +25,11 @@ that owns the device model, and a native C++ module that drives real keyboards o
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-The mice are simulated in the main process. Keyboards are real: see
-[Example: QMK keyboards with VIA over USB](#example-qmk-keyboards-with-via-over-usb). This is a
-reference demo, not production device software.
+Every device is real hardware: see
+[Example: QMK keyboards with VIA over USB](#example-qmk-keyboards-with-via-over-usb) and
+[Example: Logitech mice with a Bolt receiver](#example-logitech-mice-with-a-bolt-receiver). On the
+first launch the list is empty; **Add device** shows what is connected. This is a reference demo,
+not production device software.
 
 The demo requires no account or API key. Packaged versions contact GitHub Releases to check for
 updates, but device data and settings are not sent anywhere.
@@ -54,13 +55,16 @@ npm run build
 
 ## Project structure
 
-- `src/main/device-state.ts` owns the device list and settings: the simulated mice, pairing,
-  validation, and the real keyboards the native module reports.
+- `src/main/device-state.ts` owns the device list and settings: pairing, validation, and the
+  keyboards and mice the native module reports.
 - `src/main/via.ts` maps VIA hardware to app devices: known models, effects, and value ranges.
+- `src/main/logitech.ts` maps Logitech mice to app devices.
 - `src/main/devices.ts` connects the device state to the interface, the native module, and saved
   preferences.
-- `src/native/via_service.*` serves the open VIA keyboards to the main process over native RPC.
+- `src/native/hardware_service.*` serves the open keyboards and mice to the main process over
+  native RPC.
 - `src/native/via_keyboard.*` speaks the VIA protocol over HIDAPI.
+- `src/native/hidpp_mouse.*` speaks Logitech's HID++ 2.0 protocol over HIDAPI.
 - `src/renderer/gateway/devices.ts` is the interface's single entry point for device operations.
 - `src/renderer/components/device/` contains the shared device screen and the separate mouse and
   keyboard editors.
@@ -73,15 +77,16 @@ native contract coarse: one call lists the complete hardware state, one applies 
 and a callback sends a complete snapshot whenever hardware comes or goes. Do not expose one RPC per
 SDK or HID command. See [`src/native/proto/devices.proto`](src/native/proto/devices.proto).
 
-The demo saves paired device IDs and settings in [`src/main/devices.ts`](src/main/devices.ts). If
-your devices or SDK already store this data, remove that persistence and keep one source of truth.
+The demo saves the added devices and their last known settings in
+[`src/main/devices.ts`](src/main/devices.ts), to show them while they are disconnected. Settings are
+always read from the hardware when a device connects, never restored onto it.
 
 ### Example: QMK keyboards with VIA over USB
 
 Every keyboard running [QMK](https://qmk.fm/) firmware with
-[VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) appears within a second
-of being plugged in, first in the list, with a **Live device** badge. Unplugged, it is shown as
-disconnected until it comes back. Its Lighting controls drive the physical backlight, and the
+[VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) appears in **Add device**
+within a second of being plugged in. Once added, it is listed with a **Live device** badge; unplugged,
+it is shown as disconnected until it comes back. Its Lighting controls drive the physical backlight, and the
 sliders update it 10 times a second while they move:
 
 - **Effect**: Steady is the firmware's Solid Color and works on every keyboard. Pulse and Wave
@@ -95,9 +100,9 @@ How it works:
 
 ```
 React slider → useDeviceSettings().commit → IPC → src/main/devices.ts
-  → DeviceState.applySettings → native RPC ViaService.ApplyLighting → ViaKeyboard → HIDAPI → keyboard
+  → DeviceState.applySettings → native RPC HardwareService.ApplyLighting → ViaKeyboard → HIDAPI
 
-ViaScanner (once a second) → ViaEventsService.Changed(complete snapshot) → DeviceState.reconcile
+ViaScanner, HidppScanner → HardwareEventsService.Changed(complete snapshot) → DeviceState.reconcile
   → IPC Watch → React device list
 ```
 
@@ -142,6 +147,27 @@ Limitations:
   has artwork: `device-art/k10-max.webp` and its key overlay in
   [`k10-max-layout.ts`](src/renderer/components/art/k10-max-layout.ts) are built from the same
   key geometry in Keychron's QMK definition.
+
+### Example: Logitech mice with a Bolt receiver
+
+A Logitech mouse paired with a Logi Bolt receiver appears in **Add device** within a few seconds of
+being awake. Once added, it shows its real battery level, and its Speed slider sets the sensor DPI
+live. [`src/native/hidpp_mouse.cc`](src/native/hidpp_mouse.cc) opens the receiver's HID++ interface
+(vendor `046D`, product `C548`, usage page `0xFF00`), asks each of its six slots for a HID++ 2.0
+device, and uses the Device Name (`0x0005`), Unified Battery (`0x1004`), and Adjustable DPI
+(`0x2201`) features. It reads the battery again every 3 seconds. `npm run test:native` also runs
+[`src/native/test/hidpp_test.cc`](src/native/test/hidpp_test.cc) against a simulated receiver.
+
+Limitations:
+
+- Only Bolt receivers, and only mice with the three features above. Tested with a Signature
+  M650 L, which uses the compact mouse artwork as a stand-in.
+- A sleeping mouse is shown as disconnected; moving it brings it back.
+- Like the Logitech apps, a DPI set this way may be lost when the mouse is switched off. The app
+  reads it again whenever the mouse connects.
+- Buttons and scrolling are not configurable: that needs the app to handle the mouse's input.
+- On Windows, the receiver reports errors on a separate HID interface, so each empty slot waits for
+  a 500 ms timeout during a scan.
 
 ### Add capabilities and device types
 

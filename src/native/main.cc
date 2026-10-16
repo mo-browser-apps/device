@@ -1,6 +1,6 @@
-#include "via_service.h"
+#include "hardware_service.h"
 
-// Starts the VIA keyboard service.
+// Starts the service for real keyboards and mice.
 void launch() {
-  StartViaService();
+  StartHardwareService();
 }

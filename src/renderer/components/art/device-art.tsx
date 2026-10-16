@@ -24,17 +24,11 @@ interface DeviceArtProps {
 }
 
 const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
-  'performance-mouse': {
-    detailSrc: '/device-art/performance-mouse.webp',
-    homeSrc: '/device-art/performance-mouse-home.webp',
-    alt: 'Graphite wireless performance mouse',
-    aspectRatio: '3 / 2',
-    mouseProfile: 'performance',
-  },
-  'travel-mouse': {
+  // ponytail: a generic compact mouse stands in until there is M650 L artwork.
+  'logitech-signature-m650-l': {
     detailSrc: '/device-art/travel-mouse.webp',
     homeSrc: '/device-art/travel-mouse-home.webp',
-    alt: 'Stone-gray compact travel mouse',
+    alt: 'Compact wireless mouse',
     aspectRatio: '3 / 2',
     mouseProfile: 'travel',
   },

@@ -1,10 +1,8 @@
 import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
-import { Switch } from '@/components/switch';
 import { BindingEditor, SettingsSection, SettingsSlider } from './editor-controls';
 import { MOUSE_ACTIONS, mouseControlLabel, resetMouseBindings } from './mouse-device';
 
 const DPI_STEP = 100;
-const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
 interface MouseEditorProps {
   settings: Settings;
@@ -72,32 +70,6 @@ export function MouseEditor({
           onPreview={(dpi) => onPreview(withMouseChanges({ dpi }))}
           onCommit={commitCurrentSettings}
         />
-      </SettingsSection>
-
-      <SettingsSection title="Scrolling">
-        <SettingsSlider
-          label="Wheel speed"
-          display={SCROLL_SPEED_LABELS[mouse.scrollSpeed - 1] ?? `${mouse.scrollSpeed}`}
-          value={mouse.scrollSpeed}
-          min={1}
-          max={SCROLL_SPEED_LABELS.length}
-          step={1}
-          minLabel="Slower"
-          maxLabel="Faster"
-          onPreview={(scrollSpeed) => onPreview(withMouseChanges({ scrollSpeed }))}
-          onCommit={commitCurrentSettings}
-        />
-
-        <div className="flex items-center justify-between gap-4">
-          <span id="reverse-scroll" className="text-sm font-medium">
-            Reverse direction
-          </span>
-          <Switch
-            checked={mouse.naturalScroll}
-            labelId="reverse-scroll"
-            onChange={(naturalScroll) => onCommit(withMouseChanges({ naturalScroll }))}
-          />
-        </div>
       </SettingsSection>
     </fieldset>
   );
