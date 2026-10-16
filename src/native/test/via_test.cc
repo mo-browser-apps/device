@@ -183,8 +183,6 @@ void TestSkipsSilentInterface() {
   assert(!KeychronHid::Open());
 }
 
-}  // namespace
-
 void TestFindsRgbLightChannel() {
   FakeBoard board;
   board.channels = {2};
@@ -239,6 +237,48 @@ void TestSkipsKeyboardWithoutLighting() {
   assert(!KeychronHid::Open());
 }
 
+void TestOpensAnyVendorsKeyboard() {
+  FakeBoard board;
+  board.vendor_id = 0xCB10;
+  board.product_id = 0x1256;
+  board.manufacturer = L"Keebio";
+  board.product = L"Iris Rev. 6  ";
+  boards = {board};
+
+  auto keyboard = KeychronHid::Open();
+  assert(keyboard);
+  const KeychronHid::Model& model = keyboard->model();
+  // Unknown models get the effects every firmware shares: solid color only.
+  assert(model.id == "via-cb10-1256" && model.name == "Iris Rev. 6" &&
+         model.breathing_effect == 0 && model.wave_effect == 0);
+}
+
+void TestKnownModelAddsEffects() {
+  boards = {FakeBoard{}};
+  auto keyboard = KeychronHid::Open();
+  assert(keyboard);
+  const KeychronHid::Model& model = keyboard->model();
+  assert(model.id == "keychron-k10-max" && model.name == "Keychron K10 Max" &&
+         model.breathing_effect == 2 && model.wave_effect == 5);
+}
+
+void TestSkipsSilentInterfaceForNextKeyboard() {
+  FakeBoard receiver;
+  receiver.product_id = 0xD030;
+  receiver.product = L"Keychron Link ";
+  receiver.silent = true;
+  FakeBoard board;
+  board.vendor_id = 0xFEED;
+  board.product = L"";
+  boards = {receiver, board};
+
+  auto keyboard = KeychronHid::Open();
+  assert(keyboard && keyboard->model().id == "via-feed-0aa0" &&
+         keyboard->model().name == "Keyboard");
+}
+
+}  // namespace
+
 int main() {
   TestReadsAndWritesRgbMatrix();
   TestSkipsFirmwareBeforeProtocol12();
@@ -247,5 +287,8 @@ int main() {
   TestSingleColorLedMatrixKeepsColorUntouched();
   TestBacklightSetsBrightnessOnly();
   TestSkipsKeyboardWithoutLighting();
+  TestOpensAnyVendorsKeyboard();
+  TestKnownModelAddsEffects();
+  TestSkipsSilentInterfaceForNextKeyboard();
   std::puts("via_test: ok");
 }

@@ -5,10 +5,13 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 
 struct hid_device_;
+struct hid_device_info;
 
-// Controls the RGB backlight of a supported Keychron keyboard connected by USB cable.
+// Controls the backlight of a QMK keyboard with VIA enabled, connected by USB cable.
 //
 // The keyboard speaks the QMK/VIA raw HID protocol on a vendor-defined interface,
 // separate from the one that carries keystrokes. Only the VIA "custom value"
@@ -17,11 +20,11 @@ struct hid_device_;
 // its saved lighting.
 class KeychronHid {
  public:
-  // A supported keyboard, identified by its USB product ID.
   struct Model {
-    unsigned short product_id;
-    const char* id;
-    const char* name;
+    // Shared by every unit of the product: a known model's ID, or "via-<vid>-<pid>".
+    std::string id;
+    // The USB product string.
+    std::string name;
     // Firmware effect numbers for the editor's Pulse and Wave, or 0 when unavailable.
     // They depend on the effects compiled into the firmware, so they come from the
     // model's VIA definition; only solid color (1) is the same on every keyboard.
@@ -46,14 +49,14 @@ class KeychronHid {
     int brightness = 0;
   };
 
-  // Opens the first supported keyboard's VIA interface; returns nullptr when none answers.
+  // Opens the first VIA interface that answers and has lighting; nullptr when none does.
   static std::unique_ptr<KeychronHid> Open();
 
   ~KeychronHid();
   KeychronHid(const KeychronHid&) = delete;
   KeychronHid& operator=(const KeychronHid&) = delete;
 
-  const Model& model() const { return *model_; }
+  const Model& model() const { return model_; }
 
   // The VIA protocol version reported by the firmware.
   int protocol_version() const { return protocol_version_; }
@@ -69,7 +72,9 @@ class KeychronHid {
  private:
   using Report = std::array<uint8_t, 32>;
 
-  KeychronHid(hid_device_* device, const Model* model) : device_(device), model_(model) {}
+  KeychronHid(hid_device_* device, Model model) : device_(device), model_(std::move(model)) {}
+
+  static std::unique_ptr<KeychronHid> OpenInterface(const hid_device_info& info);
 
   // Sends one VIA report and replaces it with the keyboard's reply.
   bool Transact(Report& report);
@@ -77,7 +82,7 @@ class KeychronHid {
   bool SetValue(uint8_t value_id, uint8_t first, uint8_t second = 0);
 
   hid_device_* device_;
-  const Model* model_;
+  Model model_;
   const Channel* channel_ = nullptr;
   int protocol_version_ = 0;
 };

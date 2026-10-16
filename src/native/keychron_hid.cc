@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 
 #ifdef __APPLE__
 #include <hidapi_darwin.h>
@@ -11,15 +12,22 @@
 
 namespace {
 
-// USB identities and effect lists from Keychron's VIA definitions
+// Keyboards whose effect lists are known, so the editor can offer more than solid color.
+// Any other VIA keyboard works with solid color only. From Keychron's VIA definitions
 // (keyboards/keychron/<model>/via_json in Keychron/qmk_firmware): 2 is Breathing and
 // 5 is Cycle Left Right on all of them.
-constexpr unsigned short kVendorId = 0x3434;
-constexpr KeychronHid::Model kModels[] = {
-    {0x0AA0, "keychron-k10-max", "Keychron K10 Max", 2, 5},  // ANSI RGB
-    {0x0E20, "keychron-k2-he", "Keychron K2 HE", 2, 5},      // ANSI RGB
-    {0x0E21, "keychron-k2-he", "Keychron K2 HE", 2, 5},      // ISO RGB
-    {0x0E22, "keychron-k2-he", "Keychron K2 HE", 2, 5},      // JIS RGB
+struct KnownModel {
+  unsigned short vendor_id;
+  unsigned short product_id;
+  const char* id;
+  int breathing_effect;
+  int wave_effect;
+};
+constexpr KnownModel kKnownModels[] = {
+    {0x3434, 0x0AA0, "keychron-k10-max", 2, 5},  // K10 Max ANSI RGB
+    {0x3434, 0x0E20, "keychron-k2-he", 2, 5},    // K2 HE ANSI RGB
+    {0x3434, 0x0E21, "keychron-k2-he", 2, 5},    // K2 HE ISO RGB
+    {0x3434, 0x0E22, "keychron-k2-he", 2, 5},    // K2 HE JIS RGB
 };
 
 // QMK exposes VIA on a raw HID interface with this vendor-defined usage.
@@ -53,6 +61,34 @@ constexpr int kSolidEffect = 1;
 
 constexpr int kReplyTimeoutMs = 500;
 
+// ponytail: non-ASCII characters become '?'; add UTF-8 encoding if a product name needs it.
+std::string Narrow(const wchar_t* text) {
+  std::string result;
+  for (; text && *text; ++text) {
+    result += *text < 0x80 ? static_cast<char>(*text) : '?';
+  }
+  // Some firmware pads its strings, such as "Keychron ".
+  result.erase(result.find_last_not_of(' ') + 1);
+  return result;
+}
+
+KeychronHid::Model MakeModel(const hid_device_info& info) {
+  char id[16];
+  std::snprintf(id, sizeof(id), "via-%04x-%04x", info.vendor_id, info.product_id);
+  KeychronHid::Model model{.id = id, .name = Narrow(info.product_string)};
+  if (model.name.empty()) {
+    model.name = "Keyboard";
+  }
+  for (const KnownModel& known : kKnownModels) {
+    if (known.vendor_id == info.vendor_id && known.product_id == info.product_id) {
+      model.id = known.id;
+      model.breathing_effect = known.breathing_effect;
+      model.wave_effect = known.wave_effect;
+    }
+  }
+  return model;
+}
+
 }  // namespace
 
 std::unique_ptr<KeychronHid> KeychronHid::Open() {
@@ -64,27 +100,26 @@ std::unique_ptr<KeychronHid> KeychronHid::Open() {
   hid_darwin_set_open_exclusive(0);
 #endif
 
-  hid_device* device = nullptr;
-  const Model* model = nullptr;
-  hid_device_info* devices = hid_enumerate(kVendorId, 0);
-  for (hid_device_info* info = devices; info && !device; info = info->next) {
-    if (info->usage_page != kViaUsagePage || info->usage != kViaUsage) {
-      continue;
-    }
-    for (const Model& candidate : kModels) {
-      if (candidate.product_id == info->product_id) {
-        model = &candidate;
-        device = hid_open_path(info->path);
-        break;
-      }
+  std::unique_ptr<KeychronHid> keyboard;
+  hid_device_info* devices = hid_enumerate(0, 0);
+  for (hid_device_info* info = devices; info && !keyboard; info = info->next) {
+    if (info->usage_page == kViaUsagePage && info->usage == kViaUsage) {
+      keyboard = OpenInterface(*info);
     }
   }
   hid_free_enumeration(devices);
+  return keyboard;
+}
+
+std::unique_ptr<KeychronHid> KeychronHid::OpenInterface(const hid_device_info& info) {
+  hid_device* device = hid_open_path(info.path);
   if (!device) {
     return nullptr;
   }
 
-  std::unique_ptr<KeychronHid> keyboard(new KeychronHid(device, model));
+  // A device that does not answer, such as a wireless receiver with no keyboard
+  // connected, costs one reply timeout here.
+  std::unique_ptr<KeychronHid> keyboard(new KeychronHid(device, MakeModel(info)));
   Report report{kGetProtocolVersion};
   if (!keyboard->Transact(report)) {
     return nullptr;
