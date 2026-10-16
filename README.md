@@ -79,7 +79,7 @@ Every keyboard running [QMK](https://qmk.fm/) firmware with
 [VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) appears within a second
 of being plugged in, first in the list, with a **Live device** badge. Unplugged, it is shown as
 disconnected until it comes back. Its Lighting controls drive the physical backlight, and the
-sliders update it about 30 times a second while they move:
+sliders update it 10 times a second while they move:
 
 - **Effect**: Steady is the firmware's Solid Color and works on every keyboard. Pulse and Wave
   are offered only for models whose effect list is known (see below).

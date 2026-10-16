@@ -57,11 +57,11 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 }
 
 /**
- * How often a real device receives previews while a slider moves: about 30 times a
- * second, which keeps up with the slider and with video recorded at 30 fps. The native
- * stack also merges writes that queue up behind a slow keyboard.
+ * How often a real device receives previews while a slider moves: 10 times a second,
+ * which still looks continuous on the keyboard without flooding IPC and USB. The
+ * native stack also merges writes that queue up behind a slow keyboard.
  */
-const LIVE_PREVIEW_INTERVAL_MS = 33;
+const LIVE_PREVIEW_INTERVAL_MS = 100;
 
 /**
  * Loads one device's settings from the main process, and again when it reconnects,
