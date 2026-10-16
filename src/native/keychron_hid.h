@@ -22,6 +22,11 @@ class KeychronHid {
     unsigned short product_id;
     const char* id;
     const char* name;
+    // Firmware effect numbers for the editor's Pulse and Wave, or 0 when unavailable.
+    // They depend on the effects compiled into the firmware, so they come from the
+    // model's VIA definition; only solid color (1) is the same on every keyboard.
+    int breathing_effect = 0;
+    int wave_effect = 0;
   };
 
   // A QMK lighting system as VIA exposes it.

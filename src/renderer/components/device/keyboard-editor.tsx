@@ -71,12 +71,13 @@ export function KeyboardEditor({
   }
 
   const commitCurrentSettings = () => onCommit(settings);
+  const effects = KEYBOARD_EFFECTS.filter(([effect]) => spec.effects.includes(effect));
 
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
       <SettingsSection title="Effect">
         <div className="flex flex-col">
-          {KEYBOARD_EFFECTS.map(([effect, label]) => (
+          {effects.map(([effect, label]) => (
             <RadioOption
               key={effect}
               group="effect"

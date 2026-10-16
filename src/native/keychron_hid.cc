@@ -11,14 +11,15 @@
 
 namespace {
 
-// USB identities from Keychron's VIA definitions (keyboards/keychron/<model>/via_json in
-// Keychron/qmk_firmware). Every model listed uses the same RGB matrix lighting commands.
+// USB identities and effect lists from Keychron's VIA definitions
+// (keyboards/keychron/<model>/via_json in Keychron/qmk_firmware): 2 is Breathing and
+// 5 is Cycle Left Right on all of them.
 constexpr unsigned short kVendorId = 0x3434;
 constexpr KeychronHid::Model kModels[] = {
-    {0x0AA0, "keychron-k10-max", "Keychron K10 Max"},  // ANSI RGB
-    {0x0E20, "keychron-k2-he", "Keychron K2 HE"},      // ANSI RGB
-    {0x0E21, "keychron-k2-he", "Keychron K2 HE"},      // ISO RGB
-    {0x0E22, "keychron-k2-he", "Keychron K2 HE"},      // JIS RGB
+    {0x0AA0, "keychron-k10-max", "Keychron K10 Max", 2, 5},  // ANSI RGB
+    {0x0E20, "keychron-k2-he", "Keychron K2 HE", 2, 5},      // ANSI RGB
+    {0x0E21, "keychron-k2-he", "Keychron K2 HE", 2, 5},      // ISO RGB
+    {0x0E22, "keychron-k2-he", "Keychron K2 HE", 2, 5},      // JIS RGB
 };
 
 // QMK exposes VIA on a raw HID interface with this vendor-defined usage.

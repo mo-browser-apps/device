@@ -92,6 +92,9 @@ DeviceSeed MakeKeyboard() {
   KeyboardSpec* spec = device.mutable_keyboard();
   spec->set_backlight(true);
   spec->set_color(true);
+  spec->add_effects(STATIC);
+  spec->add_effects(BREATHING);
+  spec->add_effects(WAVE);
 
   Settings settings;
   settings.set_device_id(device.id());
@@ -110,11 +113,9 @@ DeviceSeed MakeKeyboard() {
   return {std::move(device), std::move(settings)};
 }
 
-// The editor's three effects, mapped to entries in the supported keyboards' effect list
-// (Keychron's VIA definition: 1 Solid Color, 2 Breathing, 5 Cycle Left Right).
+// The firmware effects every keyboard shares; the rest come from KeychronHid::Model.
+constexpr int kViaOff = 0;
 constexpr int kViaSolid = 1;
-constexpr int kViaBreathing = 2;
-constexpr int kViaCycleLeftRight = 5;
 
 // The editor uses hue 0–359° and brightness 0–100%; VIA uses 0–255 for both.
 int ToVia(int value, int range) {
@@ -125,10 +126,11 @@ int FromVia(int value, int range) {
   return (value * range + 127) / 255;
 }
 
-KeychronHid::Lighting ToKeychronLighting(const KeyboardSettings& keyboard) {
+KeychronHid::Lighting ToKeychronLighting(const KeyboardSettings& keyboard,
+                                         const KeychronHid::Model& model) {
   int effect = kViaSolid;
-  if (keyboard.effect() == BREATHING) effect = kViaBreathing;
-  if (keyboard.effect() == WAVE) effect = kViaCycleLeftRight;
+  if (keyboard.effect() == BREATHING && model.breathing_effect) effect = model.breathing_effect;
+  if (keyboard.effect() == WAVE && model.wave_effect) effect = model.wave_effect;
 
   return {
       .effect = effect,
@@ -152,17 +154,22 @@ DeviceSeed MakeKeychron(const KeychronHid& keychron, const KeychronHid::Lighting
   // Lighting only: key remapping is not implemented for the real keyboard.
   device.mutable_keyboard()->set_backlight(true);
   device.mutable_keyboard()->set_color(keychron.has_color());
+  device.mutable_keyboard()->add_effects(STATIC);
+  if (keychron.model().breathing_effect) device.mutable_keyboard()->add_effects(BREATHING);
+  if (keychron.model().wave_effect) device.mutable_keyboard()->add_effects(WAVE);
 
   Settings settings;
   settings.set_device_id(device.id());
   KeyboardSettings* keyboard = settings.mutable_keyboard();
-  // Firmware effects the editor cannot show are listed as the animated "Wave".
+  // Firmware effects the editor cannot show are listed as the animated "Wave". When the
+  // keyboard has no Wave, no option is selected, and choosing Steady still applies.
   keyboard->set_effect(WAVE);
   // Effect 0 means the backlight is off; it is shown as Steady at zero brightness.
-  if (lighting.effect == kViaSolid || lighting.effect == 0) keyboard->set_effect(STATIC);
-  if (lighting.effect == kViaBreathing) keyboard->set_effect(BREATHING);
+  if (lighting.effect == kViaSolid || lighting.effect == kViaOff) keyboard->set_effect(STATIC);
+  const int breathing = keychron.model().breathing_effect;
+  if (breathing && lighting.effect == breathing) keyboard->set_effect(BREATHING);
   keyboard->set_hue(std::min(FromVia(lighting.hue, 360), 359));
-  keyboard->set_brightness(lighting.effect == 0 ? 0 : FromVia(lighting.brightness, 100));
+  keyboard->set_brightness(lighting.effect == kViaOff ? 0 : FromVia(lighting.brightness, 100));
 
   return {std::move(device), std::move(settings)};
 }
@@ -285,7 +292,7 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
       if (!keychron_) {
         return false;
       }
-      if (!keychron_->WriteLighting(ToKeychronLighting(settings.keyboard()))) {
+      if (!keychron_->WriteLighting(ToKeychronLighting(settings.keyboard(), keychron_->model()))) {
         // Most likely unplugged; show it as disconnected until the app restarts.
         keychron_.reset();
         entry->device.set_connected(false);

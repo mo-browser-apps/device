@@ -33,6 +33,8 @@ message KeyboardSpec {
   bool backlight = 2;
   // The backlight has a settable hue; single-color backlights have brightness only.
   bool color = 3;
+  // Lighting effects the backlight can show.
+  repeated LightEffect effects = 4;
 }
 
 message Device {
