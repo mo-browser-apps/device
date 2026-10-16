@@ -12,7 +12,7 @@ struct hid_device_;
 //
 // The keyboard speaks the QMK/VIA raw HID protocol on a vendor-defined interface,
 // separate from the one that carries keystrokes. Only the VIA "custom value"
-// get/set commands on the RGB matrix channel are used. They change the live
+// get/set commands on the keyboard's lighting channel are used. They change the live
 // lighting state without writing EEPROM, so unplugging the keyboard restores
 // its saved lighting.
 class KeychronHid {
@@ -22,6 +22,15 @@ class KeychronHid {
     unsigned short product_id;
     const char* id;
     const char* name;
+  };
+
+  // A QMK lighting system as VIA exposes it.
+  struct Channel {
+    uint8_t id;
+    // Has hue and saturation; single-color lighting has brightness only.
+    bool color;
+    // Has an effect list where 0 is off and 1 is solid color.
+    bool effect;
   };
 
   // Raw VIA values, each from 0 to 255. Effect 0 means lighting off.
@@ -44,6 +53,9 @@ class KeychronHid {
   // The VIA protocol version reported by the firmware.
   int protocol_version() const { return protocol_version_; }
 
+  // False for single-color lighting, which ignores hue and saturation.
+  bool has_color() const { return channel_->color; }
+
   std::optional<Lighting> ReadLighting();
 
   // Sends effect, color, and brightness; false if any command was not acknowledged.
@@ -61,6 +73,7 @@ class KeychronHid {
 
   hid_device_* device_;
   const Model* model_;
+  const Channel* channel_ = nullptr;
   int protocol_version_ = 0;
 };
 

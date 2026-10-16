@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { KeyboardSettings, Settings } from '@/gen/devices';
+import type { KeyboardSettings, KeyboardSpec, Settings } from '@/gen/devices';
 import {
   BindingEditor,
   RadioOption,
@@ -25,6 +25,7 @@ const HUE_TRACK_STYLE: CSSProperties = {
 interface KeyboardEditorProps {
   settings: Settings;
   keyboard: KeyboardSettings;
+  spec: KeyboardSpec;
   selected: string | null;
   segment: 'keys' | 'lighting';
   disabled: boolean;
@@ -38,6 +39,7 @@ interface KeyboardEditorProps {
 export function KeyboardEditor({
   settings,
   keyboard,
+  spec,
   selected,
   segment,
   disabled,
@@ -87,25 +89,27 @@ export function KeyboardEditor({
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Colour">
-        <SettingsSlider
-          label="Hue"
-          display={
-            <span
-              aria-hidden="true"
-              className="inline-block size-3.5 rounded-full border border-border/60 align-middle"
-              style={{ background: `hsl(${keyboard.hue} 95% 55%)` }}
-            />
-          }
-          value={keyboard.hue}
-          min={0}
-          max={359}
-          step={1}
-          trackStyle={HUE_TRACK_STYLE}
-          onPreview={(hue) => onPreview(withKeyboardChanges({ hue }))}
-          onCommit={commitCurrentSettings}
-        />
-      </SettingsSection>
+      {spec.color && (
+        <SettingsSection title="Colour">
+          <SettingsSlider
+            label="Hue"
+            display={
+              <span
+                aria-hidden="true"
+                className="inline-block size-3.5 rounded-full border border-border/60 align-middle"
+                style={{ background: `hsl(${keyboard.hue} 95% 55%)` }}
+              />
+            }
+            value={keyboard.hue}
+            min={0}
+            max={359}
+            step={1}
+            trackStyle={HUE_TRACK_STYLE}
+            onPreview={(hue) => onPreview(withKeyboardChanges({ hue }))}
+            onCommit={commitCurrentSettings}
+          />
+        </SettingsSection>
+      )}
 
       <SettingsSection title="Brightness">
         <SettingsSlider

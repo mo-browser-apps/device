@@ -25,17 +25,30 @@ constexpr KeychronHid::Model kModels[] = {
 constexpr unsigned short kViaUsagePage = 0xFF60;
 constexpr unsigned short kViaUsage = 0x61;
 
-// VIA command, channel, and value IDs from QMK quantum/via.h.
+// VIA command and value IDs from QMK quantum/via.h.
 constexpr uint8_t kGetProtocolVersion = 0x01;
 // Channel-based custom value commands arrived in protocol 12 (VIA 3); older firmware
 // uses different command and value IDs.
 constexpr int kMinProtocolVersion = 12;
 constexpr uint8_t kCustomSetValue = 0x07;
 constexpr uint8_t kCustomGetValue = 0x08;
-constexpr uint8_t kRgbMatrixChannel = 3;
+constexpr uint8_t kUnhandled = 0xFF;
+// The same value IDs are used on every lighting channel that has the value.
 constexpr uint8_t kBrightness = 1;
 constexpr uint8_t kEffect = 2;
 constexpr uint8_t kColor = 4;
+
+// The firmware does not report which lighting it has, so channels are probed in this
+// order and the first one it handles is used. The backlight channel's effect is a
+// breathing on/off switch, not an effect list, so it is left alone.
+constexpr KeychronHid::Channel kChannels[] = {
+    {.id = 3, .color = true, .effect = true},    // RGB matrix
+    {.id = 2, .color = true, .effect = true},    // RGB light
+    {.id = 5, .color = false, .effect = true},   // LED matrix, single color
+    {.id = 1, .color = false, .effect = false},  // Backlight, single color
+};
+// Effect 1 is the solid color effect on every channel with an effect list.
+constexpr int kSolidEffect = 1;
 
 constexpr int kReplyTimeoutMs = 500;
 
@@ -79,7 +92,13 @@ std::unique_ptr<KeychronHid> KeychronHid::Open() {
   if (keyboard->protocol_version_ < kMinProtocolVersion) {
     return nullptr;
   }
-  return keyboard;
+  for (const Channel& channel : kChannels) {
+    keyboard->channel_ = &channel;
+    if (keyboard->GetValue(kBrightness)) {
+      return keyboard;
+    }
+  }
+  return nullptr;
 }
 
 KeychronHid::~KeychronHid() {
@@ -94,7 +113,7 @@ bool KeychronHid::Transact(Report& report) {
     return false;
   }
 
-  // VIA echoes the command ID (or replies 0xFF for commands it does not handle).
+  // VIA echoes the command ID, or replies 0xFF for commands it does not handle.
   // Keychron firmware also sends unprompted reports, such as layer changes when Fn
   // is pressed, so skip anything that is not the echo until the deadline.
   const uint8_t command = report[0];
@@ -108,14 +127,14 @@ bool KeychronHid::Transact(Report& report) {
                          static_cast<int>(remaining.count())) <= 0) {
       return false;
     }
-    if (report[0] == command) {
-      return true;
+    if (report[0] == command || report[0] == kUnhandled) {
+      return report[0] == command;
     }
   }
 }
 
 std::optional<KeychronHid::Report> KeychronHid::GetValue(uint8_t value_id) {
-  Report report{kCustomGetValue, kRgbMatrixChannel, value_id};
+  Report report{kCustomGetValue, channel_->id, value_id};
   if (!Transact(report)) {
     return std::nullopt;
   }
@@ -123,28 +142,32 @@ std::optional<KeychronHid::Report> KeychronHid::GetValue(uint8_t value_id) {
 }
 
 bool KeychronHid::SetValue(uint8_t value_id, uint8_t first, uint8_t second) {
-  Report report{kCustomSetValue, kRgbMatrixChannel, value_id, first, second};
+  Report report{kCustomSetValue, channel_->id, value_id, first, second};
   return Transact(report);
 }
 
 std::optional<KeychronHid::Lighting> KeychronHid::ReadLighting() {
-  std::optional<Report> effect = GetValue(kEffect);
-  std::optional<Report> color = GetValue(kColor);
-  std::optional<Report> brightness = GetValue(kBrightness);
-  if (!effect || !color || !brightness) {
-    return std::nullopt;
-  }
   // Replies repeat [command, channel, value_id] before the value bytes.
-  return Lighting{
-      .effect = (*effect)[3],
-      .hue = (*color)[3],
-      .saturation = (*color)[4],
-      .brightness = (*brightness)[3],
-  };
+  Lighting lighting{.effect = kSolidEffect};
+  if (channel_->effect) {
+    std::optional<Report> effect = GetValue(kEffect);
+    if (!effect) return std::nullopt;
+    lighting.effect = (*effect)[3];
+  }
+  if (channel_->color) {
+    std::optional<Report> color = GetValue(kColor);
+    if (!color) return std::nullopt;
+    lighting.hue = (*color)[3];
+    lighting.saturation = (*color)[4];
+  }
+  std::optional<Report> brightness = GetValue(kBrightness);
+  if (!brightness) return std::nullopt;
+  lighting.brightness = (*brightness)[3];
+  return lighting;
 }
 
 bool KeychronHid::WriteLighting(const Lighting& lighting) {
-  return SetValue(kEffect, lighting.effect) &&
-         SetValue(kColor, lighting.hue, lighting.saturation) &&
+  return (!channel_->effect || SetValue(kEffect, lighting.effect)) &&
+         (!channel_->color || SetValue(kColor, lighting.hue, lighting.saturation)) &&
          SetValue(kBrightness, lighting.brightness);
 }

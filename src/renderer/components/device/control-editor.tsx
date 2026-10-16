@@ -33,12 +33,13 @@ export function ControlEditor({
   }
 
   if (segment === 'keys' || segment === 'lighting') {
-    if (!settings.keyboard) return null;
+    if (!settings.keyboard || !device.keyboard) return null;
 
     return (
       <KeyboardEditor
         settings={settings}
         keyboard={settings.keyboard}
+        spec={device.keyboard}
         selected={selected}
         segment={segment}
         disabled={disabled}

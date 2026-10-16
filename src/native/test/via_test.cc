@@ -38,6 +38,8 @@ struct FakeBoard {
 };
 
 std::vector<FakeBoard> boards;
+// Reads that found no reply, so real hardware would have waited for the timeout.
+int timed_out_reads = 0;
 
 FakeBoard& BoardOf(hid_device* device) {
   return *reinterpret_cast<FakeBoard*>(device);
@@ -133,6 +135,7 @@ int hid_write(hid_device* device, const unsigned char* data, size_t length) {
 int hid_read_timeout(hid_device* device, unsigned char* data, size_t length, int) {
   FakeBoard& board = BoardOf(device);
   if (board.replies.empty()) {
+    ++timed_out_reads;
     return 0;
   }
   std::memcpy(data, board.replies.front().data(), length);
@@ -178,9 +181,67 @@ void TestSkipsSilentInterface() {
 
 }  // namespace
 
+void TestFindsRgbLightChannel() {
+  FakeBoard board;
+  board.channels = {2};
+  board.values[{2, 4}] = {40, 50};
+  boards = {board};
+  timed_out_reads = 0;
+
+  auto keyboard = KeychronHid::Open();
+  // Probing past the unhandled RGB matrix channel must not wait for a timeout.
+  assert(keyboard && keyboard->has_color() && timed_out_reads == 0);
+  auto lighting = keyboard->ReadLighting();
+  assert(lighting && lighting->hue == 40 && lighting->saturation == 50);
+  assert(keyboard->WriteLighting({.effect = 1, .hue = 1, .saturation = 2, .brightness = 3}));
+  assert((boards[0].values[{2, 4}] == std::array<uint8_t, 2>{1, 2}));
+}
+
+void TestSingleColorLedMatrixKeepsColorUntouched() {
+  FakeBoard board;
+  board.channels = {5};
+  board.values[{5, 2}] = {1, 0};
+  board.values[{5, 1}] = {100, 0};
+  boards = {board};
+
+  auto keyboard = KeychronHid::Open();
+  assert(keyboard && !keyboard->has_color());
+  auto lighting = keyboard->ReadLighting();
+  assert(lighting && lighting->effect == 1 && lighting->brightness == 100);
+  assert(keyboard->WriteLighting({.effect = 0, .hue = 9, .saturation = 9, .brightness = 7}));
+  auto& values = boards[0].values;
+  assert((values[{5, 2}][0] == 0 && values[{5, 1}][0] == 7 && !values.count({5, 4})));
+}
+
+void TestBacklightSetsBrightnessOnly() {
+  FakeBoard board;
+  board.channels = {1};
+  boards = {board};
+
+  auto keyboard = KeychronHid::Open();
+  assert(keyboard && !keyboard->has_color());
+  auto lighting = keyboard->ReadLighting();
+  // Without an effect list the backlight reads as solid color.
+  assert(lighting && lighting->effect == 1);
+  assert(keyboard->WriteLighting({.effect = 5, .hue = 9, .saturation = 9, .brightness = 7}));
+  auto& values = boards[0].values;
+  assert((values[{1, 1}][0] == 7 && !values.count({1, 2}) && !values.count({1, 4})));
+}
+
+void TestSkipsKeyboardWithoutLighting() {
+  FakeBoard board;
+  board.channels = {};
+  boards = {board};
+  assert(!KeychronHid::Open());
+}
+
 int main() {
   TestReadsAndWritesRgbMatrix();
   TestSkipsFirmwareBeforeProtocol12();
   TestSkipsSilentInterface();
+  TestFindsRgbLightChannel();
+  TestSingleColorLedMatrixKeepsColorUntouched();
+  TestBacklightSetsBrightnessOnly();
+  TestSkipsKeyboardWithoutLighting();
   std::puts("via_test: ok");
 }

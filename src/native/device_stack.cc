@@ -91,6 +91,7 @@ DeviceSeed MakeKeyboard() {
 
   KeyboardSpec* spec = device.mutable_keyboard();
   spec->set_backlight(true);
+  spec->set_color(true);
 
   Settings settings;
   settings.set_device_id(device.id());
@@ -150,6 +151,7 @@ DeviceSeed MakeKeychron(const KeychronHid& keychron, const KeychronHid::Lighting
   device.set_live(true);
   // Lighting only: key remapping is not implemented for the real keyboard.
   device.mutable_keyboard()->set_backlight(true);
+  device.mutable_keyboard()->set_color(keychron.has_color());
 
   Settings settings;
   settings.set_device_id(device.id());

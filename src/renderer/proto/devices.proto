@@ -31,6 +31,8 @@ message KeyboardSpec {
   // Stable identifiers shared with Binding.control.
   repeated string keys = 1;
   bool backlight = 2;
+  // The backlight has a settable hue; single-color backlights have brightness only.
+  bool color = 3;
 }
 
 message Device {
