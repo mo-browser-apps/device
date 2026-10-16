@@ -70,24 +70,17 @@ function isAnimated(effect: LightEffect): boolean {
 }
 
 /**
- * Builds the glow style for one key from the current lighting settings.
+ * Builds the glow for one key in white. KeyboardArt tints and dims the whole layer, so
+ * moving the hue or brightness slider never repaints the 108 blurred shadows, which
+ * cost a full frame each time.
  */
-function lightingStyle(
-  { effect, hue, brightness }: Lighting,
-  keyLayout: KeyLayout,
-): CSSProperties {
-  const intensity = brightness / 100;
-  const glowColor = (alpha: number, lightness = 55) =>
-    `hsl(${hue} 100% ${lightness}% / ${(alpha * intensity).toFixed(3)})`;
+function glowStyle(effect: LightEffect, keyLayout: KeyLayout): CSSProperties {
+  const white = (alpha: number) => `rgb(255 255 255 / ${alpha})`;
 
   return {
-    mixBlendMode: 'screen',
-    boxShadow: [
-      `0 ${1.5 * intensity}px ${2.5 * intensity}px ${0.25 * intensity}px ${glowColor(0.75, 62)}`,
-      `0 ${4 * intensity}px ${8 * intensity}px ${-1.5 * intensity}px ${glowColor(0.42)}`,
-    ].join(', '),
-    color: `hsl(${hue} 100% 72% / ${(0.38 + 0.47 * intensity).toFixed(3)})`,
-    textShadow: `0 1px ${2.5 * intensity}px ${glowColor(0.7, 65)}`,
+    boxShadow: `0 1.5px 2.5px 0.25px ${white(0.75)}, 0 4px 8px -1.5px ${white(0.42)}`,
+    color: white(0.85),
+    textShadow: `0 1px 2.5px ${white(0.7)}`,
     animationDelay: effect === LightEffect.WAVE ? keyLayout.waveAnimationDelay : '0s',
     animationDuration: `${LIGHTING_CYCLE_SECONDS}s`,
   };
@@ -99,7 +92,7 @@ function lightingStyle(
 function KeyFace({ lighting, keyLayout }: { lighting: Lighting | null; keyLayout: KeyLayout }) {
   return (
     <span
-      style={{ ...keyLayout.style, ...(lighting ? lightingStyle(lighting, keyLayout) : {}) }}
+      style={{ ...keyLayout.style, ...(lighting ? glowStyle(lighting.effect, keyLayout) : {}) }}
       className={cn(
         'flex min-w-0 items-center justify-center rounded-[14%]',
         'text-[6px] font-medium leading-none',
@@ -233,13 +226,36 @@ export function KeyboardArt({
         className="pointer-events-none size-full select-none object-contain drop-shadow-[0_20px_22px_rgba(0,0,0,0.30)]"
       />
 
-      <KeyLayer
-        aria-hidden
-        className="pointer-events-none"
-        layout={layout}
-        keys={keys}
-        renderKey={(key) => <KeyFace key={key.id} lighting={activeLighting} keyLayout={key} />}
-      />
+      {activeLighting ? (
+        // White glow on black, tinted by one multiplied colour and screened onto the art,
+        // where black changes nothing. Hue and brightness only change the tint and the
+        // group's opacity, which the compositor applies without repainting the glow.
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 isolate mix-blend-screen will-change-[opacity]"
+          style={{ opacity: activeLighting.brightness / 100 }}
+        >
+          <span className="absolute inset-0 bg-black" />
+          <KeyLayer
+            className="will-change-transform"
+            layout={layout}
+            keys={keys}
+            renderKey={(key) => <KeyFace key={key.id} lighting={activeLighting} keyLayout={key} />}
+          />
+          <span
+            className="absolute inset-0 mix-blend-multiply will-change-[background-color]"
+            style={{ backgroundColor: `hsl(${activeLighting.hue} 100% 55%)` }}
+          />
+        </span>
+      ) : (
+        <KeyLayer
+          aria-hidden
+          className="pointer-events-none"
+          layout={layout}
+          keys={keys}
+          renderKey={(key) => <KeyFace key={key.id} lighting={null} keyLayout={key} />}
+        />
+      )}
 
       {onControlSelect && (
         <KeyLayer
