@@ -28,8 +28,9 @@ struct FakeBoard {
   int protocol = 12;
   // Exposes the interface but never answers, like a wireless receiver with no keyboard.
   bool silent = false;
-  // Reports the firmware sends on its own (such as layer changes) before each reply.
-  int unprompted = 0;
+  // Reports that arrive before each reply: unprompted ones (such as layer changes) and
+  // replies to another app using the same interface.
+  std::vector<Report> unprompted;
   // Lighting channels compiled into the firmware; others answer 0xFF (id_unhandled).
   std::vector<uint8_t> channels = {3};
   // Current value bytes per (channel, value ID).
@@ -125,9 +126,7 @@ int hid_write(hid_device* device, const unsigned char* data, size_t length) {
     default:
       reply[0] = 0xFF;
   }
-  for (int i = 0; i < board.unprompted; ++i) {
-    board.replies.push_back(Report{0xA0, 1});
-  }
+  board.replies.insert(board.replies.end(), board.unprompted.begin(), board.unprompted.end());
   board.replies.push_back(reply);
   return static_cast<int>(length);
 }
@@ -147,7 +146,12 @@ namespace {
 
 void TestReadsAndWritesRgbMatrix() {
   FakeBoard board;
-  board.unprompted = 2;
+  board.unprompted = {
+      Report{0xA0, 1},           // a layer change
+      Report{0xFF, 1, 1},        // VIA app: backlight channel unhandled
+      Report{0x08, 3, 9, 7},     // VIA app: some other value on our channel
+      Report{0x07, 2, 2, 7},     // VIA app: a set on another channel
+  };
   board.values[{3, 1}] = {200, 0};    // brightness
   board.values[{3, 2}] = {5, 0};      // effect
   board.values[{3, 4}] = {85, 255};   // hue, saturation

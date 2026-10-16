@@ -114,10 +114,12 @@ bool KeychronHid::Transact(Report& report) {
     return false;
   }
 
-  // VIA echoes the command ID, or replies 0xFF for commands it does not handle.
-  // Keychron firmware also sends unprompted reports, such as layer changes when Fn
-  // is pressed, so skip anything that is not the echo until the deadline.
-  const uint8_t command = report[0];
+  // VIA replies with the request, its command ID or 0xFF (unhandled) in front; custom
+  // value replies keep the channel and value ID, and unhandled ones keep every byte.
+  // Replies to other apps using the interface, such as VIA or Keychron Launcher, arrive
+  // here too, as do unprompted reports such as layer changes when Fn is pressed, so
+  // skip anything that does not answer this request until the deadline.
+  const Report request = report;
   const auto deadline =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(kReplyTimeoutMs);
   while (true) {
@@ -128,8 +130,13 @@ bool KeychronHid::Transact(Report& report) {
                          static_cast<int>(remaining.count())) <= 0) {
       return false;
     }
-    if (report[0] == command || report[0] == kUnhandled) {
-      return report[0] == command;
+    if (report[0] == kUnhandled &&
+        std::equal(report.begin() + 1, report.end(), request.begin() + 1)) {
+      return false;
+    }
+    if (report[0] == request[0] && (request[0] == kGetProtocolVersion ||
+                                    (report[1] == request[1] && report[2] == request[2]))) {
+      return true;
     }
   }
 }
