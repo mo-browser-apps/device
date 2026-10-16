@@ -2,7 +2,7 @@
 
 MōDevice is a small reference application for configuring mice and keyboards, built with
 [MōBrowser](https://teamdev.com/mobrowser/). It shows how a React interface communicates with a TypeScript main process
-and a native C++ module that simulates the device backend.
+that owns the device model, and a native C++ module that drives real keyboards over HID.
 
 <a href="assets/screenshots/windows-devices.png"><img src="assets/screenshots/windows-devices.png" width="100%" alt="Device overview on Windows"></a>
 
@@ -26,7 +26,7 @@ and a native C++ module that simulates the device backend.
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-The mice are simulated by an in-memory C++ backend. Keyboards are real: see
+The mice are simulated in the main process. Keyboards are real: see
 [Example: QMK keyboards with VIA over USB](#example-qmk-keyboards-with-via-over-usb). This is a
 reference demo, not production device software.
 
@@ -54,10 +54,13 @@ npm run build
 
 ## Project structure
 
-- `src/native/device_stack.*` contains the simulated devices and is the main starting point for a
-  real hardware integration.
-- `src/native/device_service.*` exposes the device stack to MōBrowser.
-- `src/main/devices.ts` passes device data between C++ and the interface and saves the demo state.
+- `src/main/device-state.ts` owns the device list and settings: the simulated mice, pairing,
+  validation, and the real keyboards the native module reports.
+- `src/main/via.ts` maps VIA hardware to app devices: known models, effects, and value ranges.
+- `src/main/devices.ts` connects the device state to the interface, the native module, and saved
+  preferences.
+- `src/native/via_service.*` serves the open VIA keyboards to the main process over native RPC.
+- `src/native/via_keyboard.*` speaks the VIA protocol over HIDAPI.
 - `src/renderer/gateway/devices.ts` is the interface's single entry point for device operations.
 - `src/renderer/components/device/` contains the shared device screen and the separate mouse and
   keyboard editors.
@@ -65,10 +68,10 @@ npm run build
 
 ## Connect real devices
 
-Replace the simulated implementation in
-[`src/native/device_stack.cc`](src/native/device_stack.cc) with calls to your device SDK or system
-APIs. Keep the interface in [`src/native/device_stack.h`](src/native/device_stack.h) if its operations
-fit your integration.
+The main process owns the app's device model; native code is a thin hardware adapter. Keep the
+native contract coarse: one call lists the complete hardware state, one applies a complete setting,
+and a callback sends a complete snapshot whenever hardware comes or goes. Do not expose one RPC per
+SDK or HID command. See [`src/native/proto/devices.proto`](src/native/proto/devices.proto).
 
 The demo saves paired device IDs and settings in [`src/main/devices.ts`](src/main/devices.ts). If
 your devices or SDK already store this data, remove that persistence and keep one source of truth.
@@ -92,7 +95,10 @@ How it works:
 
 ```
 React slider → useDeviceSettings().commit → IPC → src/main/devices.ts
-  → native RPC → DeviceStack::ApplySettings → ViaKeyboard → HIDAPI → keyboard
+  → DeviceState.applySettings → native RPC ViaService.ApplyLighting → ViaKeyboard → HIDAPI → keyboard
+
+ViaScanner (once a second) → ViaEventsService.Changed(complete snapshot) → DeviceState.reconcile
+  → IPC Watch → React device list
 ```
 
 - [HIDAPI](https://github.com/libusb/hidapi) 0.15.0 is downloaded and statically linked by
@@ -102,15 +108,19 @@ React slider → useDeviceSettings().commit → IPC → src/main/devices.ts
   report a VIA protocol older than 12. QMK does not say which lighting it has, so the app probes
   the RGB matrix, RGB light, LED matrix, and backlight channels and uses the first one the firmware
   handles. It then sends the VIA `custom_get_value` and `custom_set_value` commands on that
-  channel. The keyboard's name is its USB product string.
+  channel. Each open keyboard gets an opaque connection ID that changes whenever it is reopened,
+  and writes queued behind a slow keyboard are merged so only the latest is sent.
 - Effect numbers depend on the effects compiled into each firmware, so only Solid Color (1) is the
-  same everywhere. `kKnownModels` adds Pulse and Wave for the Keychron K10 Max (ANSI RGB) and K2 HE
+  same everywhere. `KNOWN_MODELS` in [`src/main/via.ts`](src/main/via.ts) adds Pulse and Wave for the Keychron K10 Max (ANSI RGB) and K2 HE
   (RGB, ANSI/ISO/JIS), as listed in Keychron's VIA definitions. Add an entry with the vendor and
   product IDs and the effect numbers from a keyboard's VIA definition to enable them for it.
-- [`src/native/device_stack.cc`](src/native/device_stack.cc) adds the keyboards to the device list
-  and converts the editor's hue (0–359°) and brightness (0–100%) to VIA's 0–255 range.
+- [`src/main/via.ts`](src/main/via.ts) names the keyboard after its USB product string and
+  converts the editor's hue (0–359°) and brightness (0–100%) to VIA's 0–255 range.
+  [`src/main/device-state.ts`](src/main/device-state.ts) adds the keyboards to the device list and
+  ignores a write that finishes after its keyboard was reopened.
 - `npm run test:native` runs [`src/native/test/via_test.cc`](src/native/test/via_test.cc), which
-  checks this code against simulated QMK firmware through a fake HIDAPI.
+  checks the HID code against simulated QMK firmware through a fake HIDAPI. `npm test` runs
+  [`src/main/devices.test.ts`](src/main/devices.test.ts) for the device model and VIA mapping.
 
 To try it, connect a keyboard by cable (on wireless models, set the mode switch to USB), then run
 `npm run dev`. The VIA app or Keychron Launcher can stay open at the same time.
@@ -137,7 +147,8 @@ Limitations:
 
 For another mouse or keyboard, reuse the existing screens where possible.
 
-- `src/native/device_stack.cc` reports the controls and value ranges supported by each device.
+- `src/main/device-state.ts` and `src/main/via.ts` report the controls and value ranges supported
+  by each device.
 - `device-art.tsx` connects each `modelId` to its artwork, while
   `src/renderer/public/device-art/` stores the image files.
 - `mouse-device.ts` and `keyboard-device.ts` define the sections, actions, and labels shown for each
@@ -147,8 +158,8 @@ For another mouse or keyboard, reuse the existing screens where possible.
 For a different device category, give it its own capabilities, settings, editor, and artwork. Keep
 the shared device screen responsible only for layout and navigation.
 
-- `src/native/proto/devices.proto` and `src/renderer/proto/devices.proto` describe the capabilities
-  and settings shared between the app layers.
+- `src/renderer/proto/devices.proto` describes the capabilities and settings shared between the
+  main process and the interface.
 - A new device module in `src/renderer/components/device/` describes the sections and artwork
   behavior for the device type.
 - A new editor module in the same folder renders its settings controls.

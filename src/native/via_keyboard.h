@@ -29,20 +29,15 @@ struct hid_device_info;
 // thread; the handle is then used by one write thread at a time.
 class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
  public:
-  // How the keyboard's VIA interface reaches the computer.
-  enum class Link { kCable, kReceiver, kBluetooth };
-
-  struct Model {
-    // Shared by every unit of the product: a known model's ID, or "via-<vid>-<pid>".
-    std::string id;
-    // The USB product string.
-    std::string name;
-    // Firmware effect numbers for the editor's Pulse and Wave, or 0 when unavailable.
-    // They depend on the effects compiled into the firmware, so they come from the
-    // model's VIA definition; only solid color (1) is the same on every keyboard.
-    int breathing_effect = 0;
-    int wave_effect = 0;
-    Link link = Link::kCable;
+  // What HIDAPI reports about the VIA interface. Known-model policy, such as effect
+  // numbers or which product is a wireless receiver, belongs to the main process.
+  struct Hardware {
+    unsigned short vendor_id = 0;
+    unsigned short product_id = 0;
+    // The USB product string with trailing spaces removed; may be empty.
+    std::string product_name;
+    // Bluetooth; anything else, including USB and a wireless receiver, is a cable.
+    bool bluetooth = false;
   };
 
   // A QMK lighting system as VIA exposes it.
@@ -71,13 +66,16 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
   ViaKeyboard(const ViaKeyboard&) = delete;
   ViaKeyboard& operator=(const ViaKeyboard&) = delete;
 
-  const Model& model() const { return model_; }
+  const Hardware& hardware() const { return hardware_; }
 
   // The VIA protocol version reported by the firmware.
   int protocol_version() const { return protocol_version_; }
 
   // False for single-color lighting, which ignores hue and saturation.
   bool has_color() const { return channel_->color; }
+
+  // False for lighting without an effect list, which ignores the effect.
+  bool has_effect() const { return channel_->effect; }
 
   std::optional<Lighting> ReadLighting();
 
@@ -95,7 +93,8 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
  private:
   using Report = std::array<uint8_t, 32>;
 
-  ViaKeyboard(hid_device_* device, Model model) : device_(device), model_(std::move(model)) {}
+  ViaKeyboard(hid_device_* device, Hardware hardware)
+      : device_(device), hardware_(std::move(hardware)) {}
 
   // Runs on the write thread until no lighting is pending.
   void DrainWrites();
@@ -106,7 +105,7 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
   bool SetValue(uint8_t value_id, uint8_t first, uint8_t second = 0);
 
   hid_device_* device_;
-  Model model_;
+  Hardware hardware_;
   const Channel* channel_ = nullptr;
   int protocol_version_ = 0;
   std::atomic<bool> failed_ = false;

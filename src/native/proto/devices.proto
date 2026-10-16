@@ -2,117 +2,58 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-// MōBrowser generates native RPC and renderer IPC from separate proto roots.
-// Keep this device model aligned with src/renderer/proto/devices.proto. The
-// main-process bridge in src/main/devices.ts owns the handoff between them.
+// The native module drives VIA keyboards over HID and reports only hardware facts.
+// The main process (src/main/devices.ts) owns the application device model built
+// from them; see src/renderer/proto/devices.proto.
 
-// How the device communicates with the computer.
-enum LinkType {
-  RECEIVER = 0;
-  BLUETOOTH = 1;
-  WIRED = 2;
+// The bus HIDAPI reports for the keyboard's VIA interface. A wireless receiver is
+// plugged in by cable; the main process recognizes it by vendor and product ID.
+enum Bus {
+  BUS_CABLE = 0;
+  BUS_BLUETOOTH = 1;
 }
 
-// Lighting effects supported by the demo keyboard.
-enum LightEffect {
-  STATIC = 0;
-  BREATHING = 1;
-  WAVE = 2;
-}
-
-message MouseSpec {
-  // Stable identifiers shared with Binding.control.
-  repeated string buttons = 1;
-  int32 min_dpi = 2;
-  int32 max_dpi = 3;
-}
-
-message KeyboardSpec {
-  // Stable identifiers shared with Binding.control.
-  repeated string keys = 1;
-  bool backlight = 2;
-  // The backlight has a settable hue; single-color backlights have brightness only.
-  bool color = 3;
-  // Lighting effects the backlight can show.
-  repeated LightEffect effects = 4;
-}
-
-message Device {
-  string id = 1;
-  // Stable product identity shared by every unit of the same model.
-  string model_id = 11;
-  string model = 2;
-  LinkType link = 3;
-  string firmware = 4;
-  bool connected = 5;
-  bool has_battery = 6;
-  // Percentage from 0 to 100; ignored when has_battery is false.
-  int32 battery = 7;
-  bool charging = 10;
-  // True for physical hardware driven by the native module, not the simulation.
-  bool live = 12;
-
-  // Hardware capabilities and device category.
-  oneof spec {
-    MouseSpec mouse = 8;
-    KeyboardSpec keyboard = 9;
-  }
-}
-
-message DeviceId {
-  string id = 1;
-}
-
-message DeviceList {
-  repeated Device devices = 1;
-}
-
-// Strings keep vendor-specific controls and actions extensible without
-// requiring schema changes.
-message Binding {
-  string control = 1;
-  string action = 2;
-}
-
-message MouseSettings {
-  repeated Binding bindings = 1;
-  int32 dpi = 2;
-  // Demo scale from 1 (slowest) to 5 (fastest).
-  int32 scroll_speed = 3;
-  bool natural_scroll = 4;
-}
-
-message KeyboardSettings {
-  repeated Binding bindings = 1;
-  LightEffect effect = 2;
-  // Hue in degrees from 0 to 360.
-  int32 hue = 3;
-  // Percentage from 0 to 100.
+// Raw VIA lighting values, each from 0 to 255. Effect 0 means lighting off.
+message RawLighting {
+  int32 effect = 1;
+  int32 hue = 2;
+  int32 saturation = 3;
   int32 brightness = 4;
 }
 
-message Settings {
-  string device_id = 1;
-
-  // Must match the corresponding Device.spec variant.
-  oneof kind {
-    MouseSettings mouse = 2;
-    KeyboardSettings keyboard = 3;
-  }
+message ConnectedKeyboard {
+  // Opaque and valid only while the keyboard stays open in this native session. A
+  // keyboard that is plugged in again, or reopened after a failed write, gets a new one.
+  uint32 connection_id = 1;
+  uint32 vendor_id = 2;
+  uint32 product_id = 3;
+  // The USB product string; may be empty.
+  string product_name = 4;
+  Bus bus = 5;
+  int32 protocol_version = 6;
+  // The lighting has hue and saturation; single-color lighting has brightness only.
+  bool has_color = 7;
+  // The lighting has an effect list where 0 is off and 1 is solid color.
+  bool has_effect = 8;
+  // The keyboard's lighting as read when it was opened, updated after each write.
+  RawLighting lighting = 9;
 }
 
-// Native RPC implemented by the replaceable device stack.
-service DeviceStackService {
-  // All devices currently managed by the stack.
-  rpc List(google.protobuf.Empty) returns (DeviceList);
+message ConnectedKeyboards {
+  repeated ConnectedKeyboard keyboards = 1;
+}
 
-  // Nearby devices available to add.
-  rpc Discover(google.protobuf.Empty) returns (DeviceList);
+message LightingRequest {
+  uint32 connection_id = 1;
+  RawLighting lighting = 2;
+}
 
-  rpc Pair(DeviceId) returns (google.protobuf.Empty);
-  rpc Forget(DeviceId) returns (google.protobuf.Empty);
-  rpc GetSettings(DeviceId) returns (Settings);
+// Native RPC for the VIA keyboards that are plugged in.
+service ViaService {
+  // Every keyboard currently open.
+  rpc List(google.protobuf.Empty) returns (ConnectedKeyboards);
 
-  // Applies one complete snapshot; the main-process bridge owns persistence.
-  rpc ApplySettings(Settings) returns (google.protobuf.Empty);
+  // Writes one complete lighting snapshot. Writes that queue up behind a slow keyboard
+  // are merged so only the latest is sent. Fails if the keyboard is gone.
+  rpc ApplyLighting(LightingRequest) returns (google.protobuf.Empty);
 }

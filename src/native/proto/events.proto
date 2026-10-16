@@ -3,8 +3,8 @@ syntax = "proto3";
 import "devices.proto";
 import "google/protobuf/empty.proto";
 
-// Native-to-main callbacks emitted by the device stack.
-service DeviceEventsService {
-  // Carries the complete managed-device snapshot after a change.
-  rpc Changed(DeviceList) returns (google.protobuf.Empty);
+// Native-to-main callbacks.
+service ViaEventsService {
+  // Carries the complete set of open keyboards after a keyboard is opened or closed.
+  rpc Changed(ConnectedKeyboards) returns (google.protobuf.Empty);
 }

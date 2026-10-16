@@ -13,6 +13,7 @@
     "mobrowser": "mobrowser",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "jiti src/main/devices.test.ts",
     "test:native": "c++ -std=c++20 -Wall -pthread -Isrc/native/test src/native/via_keyboard.cc src/native/test/via_test.cc -o build/via_test && build/via_test"
   },
   "dependencies": {
@@ -50,6 +51,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "jiti": "^2.7.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^4.1.4",
     "tar-stream": "3.2.0",

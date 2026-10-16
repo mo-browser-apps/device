@@ -3,7 +3,7 @@ import { ipc } from '@/gen/ipc';
 import type { Device, Settings } from '@/gen/devices';
 
 /**
- * Requests the devices that the native stack currently offers for pairing.
+ * Requests the devices that the main process currently offers for pairing.
  */
 export async function discoverDevices(): Promise<Device[]> {
   return (await ipc.devices.Discover({})).devices;
@@ -59,7 +59,7 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 /**
  * How often a real device receives previews while a slider moves: 10 times a second,
  * which still looks continuous on the keyboard without flooding IPC and USB. The
- * native stack also merges writes that queue up behind a slow keyboard.
+ * native module also merges writes that queue up behind a slow keyboard.
  */
 const LIVE_PREVIEW_INTERVAL_MS = 100;
 

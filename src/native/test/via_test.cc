@@ -256,7 +256,7 @@ void TestSingleColorLedMatrixKeepsColorUntouched() {
   boards = {board};
 
   auto keyboard = OpenOne();
-  assert(keyboard && !keyboard->has_color());
+  assert(keyboard && !keyboard->has_color() && keyboard->has_effect());
   auto lighting = keyboard->ReadLighting();
   assert(lighting && lighting->effect == 1 && lighting->brightness == 100);
   assert(keyboard->WriteLighting({.effect = 0, .hue = 9, .saturation = 9, .brightness = 7}));
@@ -270,7 +270,7 @@ void TestBacklightSetsBrightnessOnly() {
   boards = {board};
 
   auto keyboard = OpenOne();
-  assert(keyboard && !keyboard->has_color());
+  assert(keyboard && !keyboard->has_color() && !keyboard->has_effect());
   auto lighting = keyboard->ReadLighting();
   // Without an effect list the backlight reads as solid color.
   assert(lighting && lighting->effect == 1);
@@ -296,19 +296,9 @@ void TestOpensAnyVendorsKeyboard() {
 
   auto keyboard = OpenOne();
   assert(keyboard);
-  const ViaKeyboard::Model& model = keyboard->model();
-  // Unknown models get the effects every firmware shares: solid color only.
-  assert(model.id == "via-cb10-1256" && model.name == "Iris Rev. 6" &&
-         model.breathing_effect == 0 && model.wave_effect == 0);
-}
-
-void TestKnownModelAddsEffects() {
-  boards = {FakeBoard{}};
-  auto keyboard = OpenOne();
-  assert(keyboard);
-  const ViaKeyboard::Model& model = keyboard->model();
-  assert(model.id == "keychron-k10-max" && model.name == "Keychron K10 Max" &&
-         model.breathing_effect == 2 && model.wave_effect == 5);
+  const ViaKeyboard::Hardware& hardware = keyboard->hardware();
+  assert(hardware.vendor_id == 0xCB10 && hardware.product_id == 0x1256 &&
+         hardware.product_name == "Iris Rev. 6" && !hardware.bluetooth);
 }
 
 void TestSkipsSilentInterfaceForNextKeyboard() {
@@ -322,8 +312,8 @@ void TestSkipsSilentInterfaceForNextKeyboard() {
   boards = {receiver, board};
 
   auto keyboard = OpenOne();
-  assert(keyboard && keyboard->model().id == "via-feed-0aa0" &&
-         keyboard->model().name == "Keyboard");
+  assert(keyboard && keyboard->hardware().vendor_id == 0xFEED &&
+         keyboard->hardware().product_name.empty());
 }
 
 void TestOpensEveryKeyboard() {
@@ -449,10 +439,12 @@ void TestReportsHowTheKeyboardIsConnected() {
   ViaScanner scanner(0ms);
   auto added = scanner.Scan().added;
   assert(added.size() == 3);
-  assert(added[0].keyboard->model().link == ViaKeyboard::Link::kCable);
-  assert(added[1].keyboard->model().link == ViaKeyboard::Link::kBluetooth);
-  assert(added[2].keyboard->model().link == ViaKeyboard::Link::kReceiver &&
-         added[2].keyboard->model().name == "Keychron Link");
+  assert(!added[0].keyboard->hardware().bluetooth);
+  assert(added[1].keyboard->hardware().bluetooth);
+  // A receiver is plugged in by cable; the main process recognizes it by its product ID.
+  assert(!added[2].keyboard->hardware().bluetooth &&
+         added[2].keyboard->hardware().product_id == 0xD030 &&
+         added[2].keyboard->hardware().product_name == "Keychron Link");
 }
 
 }  // namespace
@@ -466,7 +458,6 @@ int main() {
   TestBacklightSetsBrightnessOnly();
   TestSkipsKeyboardWithoutLighting();
   TestOpensAnyVendorsKeyboard();
-  TestKnownModelAddsEffects();
   TestSkipsSilentInterfaceForNextKeyboard();
   TestOpensEveryKeyboard();
   TestScannerReportsPlugAndUnplug();

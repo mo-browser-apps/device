@@ -1,7 +1,7 @@
 import type { Binding } from '@/gen/devices';
 
 /**
- * Maps action IDs shared with the native stack to names shown in the renderer.
+ * Maps action IDs shared with the main process to names shown in the renderer.
  */
 const ACTION_LABELS: Record<string, string> = {
   default: 'Default',

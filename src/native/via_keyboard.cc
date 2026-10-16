@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdio>
 #include <thread>
 
 #ifdef __APPLE__
@@ -12,27 +11,6 @@
 #endif
 
 namespace {
-
-// Keyboards whose effect lists are known, so the editor can offer more than solid color.
-// Any other VIA keyboard works with solid color only. From Keychron's VIA definitions
-// (keyboards/keychron/<model>/via_json in Keychron/qmk_firmware): 2 is Breathing and
-// 5 is Cycle Left Right on all of them.
-struct KnownModel {
-  unsigned short vendor_id;
-  unsigned short product_id;
-  const char* id;
-  int breathing_effect;
-  int wave_effect;
-  // A wireless receiver: it is plugged in by USB, but the keyboard is not.
-  bool receiver = false;
-};
-constexpr KnownModel kKnownModels[] = {
-    {0x3434, 0x0AA0, "keychron-k10-max", 2, 5},  // K10 Max ANSI RGB
-    {0x3434, 0x0E20, "keychron-k2-he", 2, 5},    // K2 HE ANSI RGB
-    {0x3434, 0x0E21, "keychron-k2-he", 2, 5},    // K2 HE ISO RGB
-    {0x3434, 0x0E22, "keychron-k2-he", 2, 5},    // K2 HE JIS RGB
-    {0x3434, 0xD030, "keychron-link", 0, 0, true},  // Keychron Link 2.4 GHz receiver
-};
 
 // QMK exposes VIA on a raw HID interface with this vendor-defined usage.
 constexpr unsigned short kViaUsagePage = 0xFF60;
@@ -76,26 +54,13 @@ std::string Narrow(const wchar_t* text) {
   return result;
 }
 
-ViaKeyboard::Model MakeModel(const hid_device_info& info) {
-  char id[16];
-  std::snprintf(id, sizeof(id), "via-%04x-%04x", info.vendor_id, info.product_id);
-  ViaKeyboard::Model model{.id = id, .name = Narrow(info.product_string)};
-  if (model.name.empty()) {
-    model.name = "Keyboard";
-  }
-  // USB, and the I2C and SPI buses of built-in keyboards, count as a cable.
-  if (info.bus_type == HID_API_BUS_BLUETOOTH) {
-    model.link = ViaKeyboard::Link::kBluetooth;
-  }
-  for (const KnownModel& known : kKnownModels) {
-    if (known.vendor_id == info.vendor_id && known.product_id == info.product_id) {
-      model.id = known.id;
-      model.breathing_effect = known.breathing_effect;
-      model.wave_effect = known.wave_effect;
-      if (known.receiver) model.link = ViaKeyboard::Link::kReceiver;
-    }
-  }
-  return model;
+ViaKeyboard::Hardware MakeHardware(const hid_device_info& info) {
+  return {
+      .vendor_id = info.vendor_id,
+      .product_id = info.product_id,
+      .product_name = Narrow(info.product_string),
+      .bluetooth = info.bus_type == HID_API_BUS_BLUETOOTH,
+  };
 }
 
 }  // namespace
@@ -106,7 +71,7 @@ std::shared_ptr<ViaKeyboard> ViaKeyboard::Open(const hid_device_info& info) {
     return nullptr;
   }
 
-  std::shared_ptr<ViaKeyboard> keyboard(new ViaKeyboard(device, MakeModel(info)));
+  std::shared_ptr<ViaKeyboard> keyboard(new ViaKeyboard(device, MakeHardware(info)));
   Report report{kGetProtocolVersion};
   if (!keyboard->Transact(report)) {
     return nullptr;

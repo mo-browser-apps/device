@@ -2,9 +2,8 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-// MōBrowser generates renderer IPC and native RPC from separate proto roots.
-// Keep this device model aligned with src/native/proto/devices.proto. The
-// main-process bridge in src/main/devices.ts owns the handoff between them.
+// The application device model, owned by the main process (src/main/device-state.ts).
+// The native module reports only VIA hardware facts; see src/native/proto/devices.proto.
 
 // How the device communicates with the computer.
 enum LinkType {

@@ -10,7 +10,7 @@ interface DeviceInfoProps {
 }
 
 /**
- * Shows the device details reported by the native stack and offers removal when allowed.
+ * Shows the device details reported by the main process and offers removal when allowed.
  */
 export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
   const details: [label: string, value: string][] = [

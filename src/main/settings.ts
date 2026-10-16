@@ -1,8 +1,8 @@
 import { app, ipc, prefs, BrowserWindow, Notification, Theme } from '@mobrowser/api';
-import { native } from './gen/native';
 import { AppSettings } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
-import type { Device, DeviceList } from './gen/native/devices';
+import type { Device, DeviceList } from './gen/devices';
+import { listDevices } from './devices';
 
 const THEME_KEY = 'app.theme';
 const LOW_BATTERY_ALERTS_KEY = 'app.lowBatteryAlerts';
@@ -121,7 +121,7 @@ export function startSettings(win: BrowserWindow): void {
       if (!request.lowBatteryAlerts) {
         lowBattery.clear();
       } else if (!alertsWereOn) {
-        checkBatteries(await native.deviceStack.List({}));
+        checkBatteries(listDevices());
       }
       return {};
     },
