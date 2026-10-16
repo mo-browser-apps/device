@@ -192,9 +192,12 @@ Limitations:
   has not been tested on the hardware.
 - Key remapping and firmware other than QMK with VIA are not supported. Bluetooth and the
   Keychron Link receiver are labelled as such, but only work if they answer VIA. Only the K10 Max
-  has artwork: `device-art/k10-max.webp` and its key overlay in
+  has its own artwork: `device-art/k10-max.webp` and its key overlay in
   [`k10-max-layout.ts`](src/renderer/components/art/k10-max-layout.ts) are built from the same
-  key geometry in Keychron's QMK definition.
+  key geometry in Keychron's QMK definition. Other keyboards show a generic compact keyboard,
+  whose overlay in
+  [`compact-keyboard-layout.ts`](src/renderer/components/art/compact-keyboard-layout.ts) only
+  approximates their keys.
 
 ### Example: Logitech mice with a Bolt receiver
 
@@ -211,7 +214,7 @@ too. `npm run test:native` also runs
 Limitations:
 
 - Only Bolt receivers, and only mice with the three features above. Tested with a Signature
-  M650 L, which uses the compact mouse artwork as a stand-in.
+  M650 L. Every mouse shows the same generic compact mouse artwork.
 - A sleeping mouse is shown as disconnected; moving it brings it back.
 - Like the Logitech apps, a DPI set this way may be lost when the mouse is switched off. The app
   reads it again whenever the mouse connects.
@@ -224,8 +227,9 @@ no native changes:
 
 - For a VIA keyboard, add its vendor and product IDs and effect numbers to `KNOWN_MODELS` in
   [`src/main/via.ts`](src/main/via.ts). Without an entry it still works with Steady only.
-- Add its artwork to `src/renderer/public/device-art/` and connect its `modelId` in
-  [`device-art.tsx`](src/renderer/components/art/device-art.tsx).
+- Optionally, add its artwork to `src/renderer/public/device-art/` and connect its `modelId` in
+  [`device-art.tsx`](src/renderer/components/art/device-art.tsx). Without it, the device shows
+  the default artwork for its kind.
 - On Linux, add a line for a new vendor ID to
   [`70-modevice.rules`](src/native/platform/70-modevice.rules).
 

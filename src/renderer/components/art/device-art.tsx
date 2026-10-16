@@ -1,5 +1,6 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
+import { COMPACT_KEYBOARD_LAYOUT } from './compact-keyboard-layout';
 import { K10_MAX_LAYOUT } from './k10-max-layout';
 import { KeyboardArt, type KeyboardLayout, type Lighting } from './keyboard-art';
 import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
@@ -23,15 +24,25 @@ interface DeviceArtProps {
   className?: string;
 }
 
+/** Shown for any mouse without its own artwork. */
+const DEFAULT_MOUSE_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/travel-mouse.webp',
+  homeSrc: '/device-art/travel-mouse-home.webp',
+  alt: 'Compact wireless mouse',
+  aspectRatio: '3 / 2',
+  mouseProfile: 'travel',
+};
+
+/** Shown for any keyboard without its own artwork. */
+const DEFAULT_KEYBOARD_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/compact-keyboard.webp',
+  homeSrc: '/device-art/compact-keyboard-home.webp',
+  alt: 'Compact keyboard',
+  aspectRatio: '821 / 479',
+  keyboardLayout: COMPACT_KEYBOARD_LAYOUT,
+};
+
 const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
-  // ponytail: a generic compact mouse stands in until there is M650 L artwork.
-  'logitech-signature-m650-l': {
-    detailSrc: '/device-art/travel-mouse.webp',
-    homeSrc: '/device-art/travel-mouse-home.webp',
-    alt: 'Compact wireless mouse',
-    aspectRatio: '3 / 2',
-    mouseProfile: 'travel',
-  },
   'keychron-k10-max': {
     detailSrc: '/device-art/k10-max.webp',
     homeSrc: '/device-art/k10-max.webp',
@@ -53,8 +64,9 @@ export function DeviceArt({
   onControlSelect,
   className,
 }: DeviceArtProps) {
-  const artwork = ARTWORK_BY_MODEL_ID[device.modelId];
-  if (!artwork) return null;
+  const artwork =
+    ARTWORK_BY_MODEL_ID[device.modelId] ??
+    (device.keyboard ? DEFAULT_KEYBOARD_ARTWORK : DEFAULT_MOUSE_ARTWORK);
 
   const offlineClassName = !device.connected && 'grayscale opacity-45';
 
