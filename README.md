@@ -71,51 +71,61 @@ fit your integration.
 The demo saves paired device IDs and settings in [`src/main/devices.ts`](src/main/devices.ts). If
 your devices or SDK already store this data, remove that persistence and keep one source of truth.
 
-### Example: Keychron keyboards over USB
+### Example: QMK keyboards with VIA over USB
 
-The app includes one real device. When a **Keychron K10 Max (ANSI RGB)** or **Keychron K2 HE
-(RGB, ANSI/ISO/JIS)** is plugged in by **USB cable** at startup, it appears next to the simulated
-devices with a **Live device** badge. Its
-Lighting controls drive the physical backlight:
+The app includes real devices. Every keyboard running [QMK](https://qmk.fm/) firmware with
+[VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) that is plugged in by **USB cable** at
+startup appears next to the simulated devices with a **Live device** badge. Its Lighting controls
+drive the physical backlight:
 
-- **Effect**: Steady, Pulse, and Wave map to the firmware's Solid Color, Breathing, and Cycle Left
-  Right effects.
-- **Hue** sets the backlight colour.
+- **Effect**: Steady is the firmware's Solid Color and works on every keyboard. Pulse and Wave
+  are offered only for models whose effect list is known (see below).
+- **Hue** sets the backlight colour. It is hidden for single-colour backlights.
 - **Brightness** sets the backlight level.
 
-The app reads the keyboard's current lighting when it starts.
+The app reads each keyboard's current lighting when it starts.
 
 How it works:
 
 ```
 React slider → useDeviceSettings().commit → IPC → src/main/devices.ts
-  → native RPC → DeviceStack::ApplySettings → KeychronHid → HIDAPI → keyboard
+  → native RPC → DeviceStack::ApplySettings → ViaKeyboard → HIDAPI → keyboard
 ```
 
 - [HIDAPI](https://github.com/libusb/hidapi) 0.15.0 is downloaded and statically linked by
   [`CMakeLists.txt`](CMakeLists.txt) with `FetchContent`. Linux builds need `libudev-dev`.
-- [`src/native/keychron_hid.cc`](src/native/keychron_hid.cc) opens the keyboard's VIA raw HID
-  interface (VID `0x3434`, usage page `0xFF60`). The supported product IDs are listed in
-  `kModels` (K10 Max `0x0AA0`, K2 HE `0x0E20`–`0x0E22`). It sends the QMK/VIA
-  `custom_get_value` and `custom_set_value` commands on the RGB matrix channel, as listed in
-  Keychron's VIA definitions for these models.
-- [`src/native/device_stack.cc`](src/native/device_stack.cc) adds the keyboard to the device list
+- [`src/native/via_keyboard.cc`](src/native/via_keyboard.cc) opens every HID interface with the VIA
+  usage page `0xFF60` and usage `0x61`, from any vendor, and skips those that do not answer or
+  report a VIA protocol older than 12. QMK does not say which lighting it has, so the app probes
+  the RGB matrix, RGB light, LED matrix, and backlight channels and uses the first one the firmware
+  handles. It then sends the VIA `custom_get_value` and `custom_set_value` commands on that
+  channel. The keyboard's name is its USB product string.
+- Effect numbers depend on the effects compiled into each firmware, so only Solid Color (1) is the
+  same everywhere. `kKnownModels` adds Pulse and Wave for the Keychron K10 Max (ANSI RGB) and K2 HE
+  (RGB, ANSI/ISO/JIS), as listed in Keychron's VIA definitions. Add an entry with the vendor and
+  product IDs and the effect numbers from a keyboard's VIA definition to enable them for it.
+- [`src/native/device_stack.cc`](src/native/device_stack.cc) adds the keyboards to the device list
   and converts the editor's hue (0–359°) and brightness (0–100%) to VIA's 0–255 range.
+- `npm run test:native` runs [`src/native/test/via_test.cc`](src/native/test/via_test.cc), which
+  checks this code against simulated QMK firmware through a fake HIDAPI.
 
-To try it, connect the keyboard by cable with the mode switch set to USB, then run `npm run dev`.
+To try it, connect a keyboard by cable (on wireless models, set the mode switch to USB), then run
+`npm run dev`. The VIA app or Keychron Launcher can stay open at the same time.
 
 Limitations:
 
-- The app looks for the keyboard only once, at launch. If you unplug it, its controls are disabled
-  until you restart the app.
+- The app looks for keyboards only once, at launch. If you unplug one, its controls are disabled
+  until you restart the app. Each interface that does not answer, such as a wireless receiver with
+  no keyboard, delays startup by up to half a second.
 - Lighting changes are not saved to the keyboard's memory. Unplugging the keyboard restores its own
   saved lighting.
-- Firmware effects that have no matching editor option are shown as Wave. Saturation is always set
-  to full.
-- Only the first supported keyboard found is used. The K2 HE support follows Keychron's published
-  firmware and has not been tested on the hardware.
-- Key remapping, Bluetooth, the 2.4 GHz receiver, and other Keychron models are not supported. The
-  app uses the compact keyboard artwork for these keyboards.
+- Firmware effects that have no matching editor option are shown as Wave, or with no effect
+  selected when the keyboard has no Wave. Saturation is always set to full.
+- Further units of the same model get `-2`, `-3` appended to their device ID in the order they are
+  found. Tested on a Keychron K10 Max; the K2 HE entry follows Keychron's published firmware and
+  has not been tested on the hardware.
+- Key remapping, Bluetooth, 2.4 GHz receivers, and firmware other than QMK with VIA are not
+  supported. Only the Keychron models above have artwork.
 
 ### Add capabilities and device types
 

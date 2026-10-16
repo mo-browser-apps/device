@@ -1,5 +1,5 @@
-#ifndef KEYCHRON_HID_H_
-#define KEYCHRON_HID_H_
+#ifndef VIA_KEYBOARD_H_
+#define VIA_KEYBOARD_H_
 
 #include <array>
 #include <cstdint>
@@ -19,7 +19,7 @@ struct hid_device_info;
 // get/set commands on the keyboard's lighting channel are used. They change the live
 // lighting state without writing EEPROM, so unplugging the keyboard restores
 // its saved lighting.
-class KeychronHid {
+class ViaKeyboard {
  public:
   struct Model {
     // Shared by every unit of the product: a known model's ID, or "via-<vid>-<pid>".
@@ -51,11 +51,11 @@ class KeychronHid {
   };
 
   // Opens every VIA interface that answers and has lighting.
-  static std::vector<std::unique_ptr<KeychronHid>> OpenAll();
+  static std::vector<std::unique_ptr<ViaKeyboard>> OpenAll();
 
-  ~KeychronHid();
-  KeychronHid(const KeychronHid&) = delete;
-  KeychronHid& operator=(const KeychronHid&) = delete;
+  ~ViaKeyboard();
+  ViaKeyboard(const ViaKeyboard&) = delete;
+  ViaKeyboard& operator=(const ViaKeyboard&) = delete;
 
   const Model& model() const { return model_; }
 
@@ -73,9 +73,9 @@ class KeychronHid {
  private:
   using Report = std::array<uint8_t, 32>;
 
-  KeychronHid(hid_device_* device, Model model) : device_(device), model_(std::move(model)) {}
+  ViaKeyboard(hid_device_* device, Model model) : device_(device), model_(std::move(model)) {}
 
-  static std::unique_ptr<KeychronHid> OpenInterface(const hid_device_info& info);
+  static std::unique_ptr<ViaKeyboard> OpenInterface(const hid_device_info& info);
 
   // Sends one VIA report and replaces it with the keyboard's reply.
   bool Transact(Report& report);
@@ -88,4 +88,4 @@ class KeychronHid {
   int protocol_version_ = 0;
 };
 
-#endif  // KEYCHRON_HID_H_
+#endif  // VIA_KEYBOARD_H_

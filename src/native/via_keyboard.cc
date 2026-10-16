@@ -1,4 +1,4 @@
-#include "keychron_hid.h"
+#include "via_keyboard.h"
 
 #include <hidapi.h>
 
@@ -50,7 +50,7 @@ constexpr uint8_t kColor = 4;
 // The firmware does not report which lighting it has, so channels are probed in this
 // order and the first one it handles is used. The backlight channel's effect is a
 // breathing on/off switch, not an effect list, so it is left alone.
-constexpr KeychronHid::Channel kChannels[] = {
+constexpr ViaKeyboard::Channel kChannels[] = {
     {.id = 3, .color = true, .effect = true},    // RGB matrix
     {.id = 2, .color = true, .effect = true},    // RGB light
     {.id = 5, .color = false, .effect = true},   // LED matrix, single color
@@ -72,10 +72,10 @@ std::string Narrow(const wchar_t* text) {
   return result;
 }
 
-KeychronHid::Model MakeModel(const hid_device_info& info) {
+ViaKeyboard::Model MakeModel(const hid_device_info& info) {
   char id[16];
   std::snprintf(id, sizeof(id), "via-%04x-%04x", info.vendor_id, info.product_id);
-  KeychronHid::Model model{.id = id, .name = Narrow(info.product_string)};
+  ViaKeyboard::Model model{.id = id, .name = Narrow(info.product_string)};
   if (model.name.empty()) {
     model.name = "Keyboard";
   }
@@ -91,8 +91,8 @@ KeychronHid::Model MakeModel(const hid_device_info& info) {
 
 }  // namespace
 
-std::vector<std::unique_ptr<KeychronHid>> KeychronHid::OpenAll() {
-  std::vector<std::unique_ptr<KeychronHid>> keyboards;
+std::vector<std::unique_ptr<ViaKeyboard>> ViaKeyboard::OpenAll() {
+  std::vector<std::unique_ptr<ViaKeyboard>> keyboards;
   if (hid_init() != 0) {
     return keyboards;
   }
@@ -106,7 +106,7 @@ std::vector<std::unique_ptr<KeychronHid>> KeychronHid::OpenAll() {
     if (info->usage_page != kViaUsagePage || info->usage != kViaUsage) {
       continue;
     }
-    if (std::unique_ptr<KeychronHid> keyboard = OpenInterface(*info)) {
+    if (std::unique_ptr<ViaKeyboard> keyboard = OpenInterface(*info)) {
       keyboards.push_back(std::move(keyboard));
     }
   }
@@ -114,7 +114,7 @@ std::vector<std::unique_ptr<KeychronHid>> KeychronHid::OpenAll() {
   return keyboards;
 }
 
-std::unique_ptr<KeychronHid> KeychronHid::OpenInterface(const hid_device_info& info) {
+std::unique_ptr<ViaKeyboard> ViaKeyboard::OpenInterface(const hid_device_info& info) {
   hid_device* device = hid_open_path(info.path);
   if (!device) {
     return nullptr;
@@ -122,7 +122,7 @@ std::unique_ptr<KeychronHid> KeychronHid::OpenInterface(const hid_device_info& i
 
   // A device that does not answer, such as a wireless receiver with no keyboard
   // connected, costs one reply timeout here.
-  std::unique_ptr<KeychronHid> keyboard(new KeychronHid(device, MakeModel(info)));
+  std::unique_ptr<ViaKeyboard> keyboard(new ViaKeyboard(device, MakeModel(info)));
   Report report{kGetProtocolVersion};
   if (!keyboard->Transact(report)) {
     return nullptr;
@@ -140,11 +140,11 @@ std::unique_ptr<KeychronHid> KeychronHid::OpenInterface(const hid_device_info& i
   return nullptr;
 }
 
-KeychronHid::~KeychronHid() {
+ViaKeyboard::~ViaKeyboard() {
   hid_close(device_);
 }
 
-bool KeychronHid::Transact(Report& report) {
+bool ViaKeyboard::Transact(Report& report) {
   // hidapi expects a leading report ID; VIA reports have none, so it is 0.
   uint8_t out[1 + sizeof(Report)] = {0};
   std::copy(report.begin(), report.end(), out + 1);
@@ -179,7 +179,7 @@ bool KeychronHid::Transact(Report& report) {
   }
 }
 
-std::optional<KeychronHid::Report> KeychronHid::GetValue(uint8_t value_id) {
+std::optional<ViaKeyboard::Report> ViaKeyboard::GetValue(uint8_t value_id) {
   Report report{kCustomGetValue, channel_->id, value_id};
   if (!Transact(report)) {
     return std::nullopt;
@@ -187,12 +187,12 @@ std::optional<KeychronHid::Report> KeychronHid::GetValue(uint8_t value_id) {
   return report;
 }
 
-bool KeychronHid::SetValue(uint8_t value_id, uint8_t first, uint8_t second) {
+bool ViaKeyboard::SetValue(uint8_t value_id, uint8_t first, uint8_t second) {
   Report report{kCustomSetValue, channel_->id, value_id, first, second};
   return Transact(report);
 }
 
-std::optional<KeychronHid::Lighting> KeychronHid::ReadLighting() {
+std::optional<ViaKeyboard::Lighting> ViaKeyboard::ReadLighting() {
   // Replies repeat [command, channel, value_id] before the value bytes.
   Lighting lighting{.effect = kSolidEffect};
   if (channel_->effect) {
@@ -212,7 +212,7 @@ std::optional<KeychronHid::Lighting> KeychronHid::ReadLighting() {
   return lighting;
 }
 
-bool KeychronHid::WriteLighting(const Lighting& lighting) {
+bool ViaKeyboard::WriteLighting(const Lighting& lighting) {
   return (!channel_->effect || SetValue(kEffect, lighting.effect)) &&
          (!channel_->color || SetValue(kColor, lighting.hue, lighting.saturation)) &&
          SetValue(kBrightness, lighting.brightness);

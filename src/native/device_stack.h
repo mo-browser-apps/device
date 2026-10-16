@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "gen/devices.pb.h"
-#include "keychron_hid.h"
+#include "via_keyboard.h"
 
-// Holds the simulated devices, plus a real Keychron keyboard when one is plugged in.
+// Holds the simulated devices, plus real VIA keyboards plugged in at startup.
 class DeviceStack {
  public:
   using DevicesChangedHandler = std::function<void(const DeviceList&)>;
@@ -54,7 +54,7 @@ class DeviceStack {
   std::vector<Entry> available_;
   DevicesChangedHandler devices_changed_;
   // Open keyboards by device ID; removed when a write fails.
-  std::map<std::string, std::unique_ptr<KeychronHid>> live_;
+  std::map<std::string, std::unique_ptr<ViaKeyboard>> live_;
 
   // Sends the latest managed-device snapshot to the registered callback.
   void PublishDevicesChanged() const;

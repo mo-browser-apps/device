@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "../keychron_hid.h"
+#include "../via_keyboard.h"
 #include "hidapi.h"
 
 namespace {
@@ -145,8 +145,8 @@ int hid_read_timeout(hid_device* device, unsigned char* data, size_t length, int
 
 namespace {
 
-std::unique_ptr<KeychronHid> OpenOne() {
-  auto keyboards = KeychronHid::OpenAll();
+std::unique_ptr<ViaKeyboard> OpenOne() {
+  auto keyboards = ViaKeyboard::OpenAll();
   assert(keyboards.size() <= 1);
   return keyboards.empty() ? nullptr : std::move(keyboards[0]);
 }
@@ -254,7 +254,7 @@ void TestOpensAnyVendorsKeyboard() {
 
   auto keyboard = OpenOne();
   assert(keyboard);
-  const KeychronHid::Model& model = keyboard->model();
+  const ViaKeyboard::Model& model = keyboard->model();
   // Unknown models get the effects every firmware shares: solid color only.
   assert(model.id == "via-cb10-1256" && model.name == "Iris Rev. 6" &&
          model.breathing_effect == 0 && model.wave_effect == 0);
@@ -264,7 +264,7 @@ void TestKnownModelAddsEffects() {
   boards = {FakeBoard{}};
   auto keyboard = OpenOne();
   assert(keyboard);
-  const KeychronHid::Model& model = keyboard->model();
+  const ViaKeyboard::Model& model = keyboard->model();
   assert(model.id == "keychron-k10-max" && model.name == "Keychron K10 Max" &&
          model.breathing_effect == 2 && model.wave_effect == 5);
 }
@@ -293,7 +293,7 @@ void TestOpensEveryKeyboard() {
   single_color.channels = {5};
   boards = {rgb, receiver, single_color};
 
-  auto keyboards = KeychronHid::OpenAll();
+  auto keyboards = ViaKeyboard::OpenAll();
   assert(keyboards.size() == 2 && keyboards[0]->has_color() && !keyboards[1]->has_color());
   // Each handle drives its own keyboard.
   assert(keyboards[1]->WriteLighting({.effect = 1, .brightness = 42}));

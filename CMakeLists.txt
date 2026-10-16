@@ -20,8 +20,8 @@ set(APP_SOURCES
         src/native/device_stack.cc
         src/native/device_service.h
         src/native/device_service.cc
-        src/native/keychron_hid.h
-        src/native/keychron_hid.cc
+        src/native/via_keyboard.h
+        src/native/via_keyboard.cc
 )
 
 # Defines the main target of the application.
@@ -30,7 +30,7 @@ add_library(mobrowser_lib STATIC ${APP_SOURCES} ${GENERATED_SOURCES})
 mobrowser_configure_app_lib(mobrowser_lib)
 
 # Add shared third party dependencies and configuration for all platforms here.
-# HIDAPI talks to the Keychron keyboard over USB HID (see src/native/keychron_hid.cc).
+# HIDAPI talks to VIA keyboards over USB HID (see src/native/via_keyboard.cc).
 include(FetchContent)
 set(BUILD_SHARED_LIBS OFF)
 # On Linux, use the kernel hidraw backend only (needs libudev-dev), not libusb.

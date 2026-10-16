@@ -113,7 +113,7 @@ DeviceSeed MakeKeyboard() {
   return {std::move(device), std::move(settings)};
 }
 
-// The firmware effects every keyboard shares; the rest come from KeychronHid::Model.
+// The firmware effects every keyboard shares; the rest come from ViaKeyboard::Model.
 constexpr int kViaOff = 0;
 constexpr int kViaSolid = 1;
 
@@ -126,8 +126,8 @@ int FromVia(int value, int range) {
   return (value * range + 127) / 255;
 }
 
-KeychronHid::Lighting ToKeychronLighting(const KeyboardSettings& keyboard,
-                                         const KeychronHid::Model& model) {
+ViaKeyboard::Lighting ToViaLighting(const KeyboardSettings& keyboard,
+                                   const ViaKeyboard::Model& model) {
   int effect = kViaSolid;
   if (keyboard.effect() == BREATHING && model.breathing_effect) effect = model.breathing_effect;
   if (keyboard.effect() == WAVE && model.wave_effect) effect = model.wave_effect;
@@ -141,24 +141,24 @@ KeychronHid::Lighting ToKeychronLighting(const KeyboardSettings& keyboard,
   };
 }
 
-DeviceSeed MakeKeychron(const std::string& id,
-                        const KeychronHid& keychron,
-                        const KeychronHid::Lighting& lighting) {
+DeviceSeed MakeViaKeyboard(const std::string& id,
+                           const ViaKeyboard& hid,
+                           const ViaKeyboard::Lighting& lighting) {
   Device device;
   device.set_id(id);
-  device.set_model_id(keychron.model().id);
-  device.set_model(keychron.model().name);
+  device.set_model_id(hid.model().id);
+  device.set_model(hid.model().name);
   device.set_link(WIRED);
-  device.set_firmware("VIA protocol " + std::to_string(keychron.protocol_version()));
+  device.set_firmware("VIA protocol " + std::to_string(hid.protocol_version()));
   device.set_connected(true);
   device.set_has_battery(false);
   device.set_live(true);
   // Lighting only: key remapping is not implemented for the real keyboard.
   device.mutable_keyboard()->set_backlight(true);
-  device.mutable_keyboard()->set_color(keychron.has_color());
+  device.mutable_keyboard()->set_color(hid.has_color());
   device.mutable_keyboard()->add_effects(STATIC);
-  if (keychron.model().breathing_effect) device.mutable_keyboard()->add_effects(BREATHING);
-  if (keychron.model().wave_effect) device.mutable_keyboard()->add_effects(WAVE);
+  if (hid.model().breathing_effect) device.mutable_keyboard()->add_effects(BREATHING);
+  if (hid.model().wave_effect) device.mutable_keyboard()->add_effects(WAVE);
 
   Settings settings;
   settings.set_device_id(device.id());
@@ -168,7 +168,7 @@ DeviceSeed MakeKeychron(const std::string& id,
   keyboard->set_effect(WAVE);
   // Effect 0 means the backlight is off; it is shown as Steady at zero brightness.
   if (lighting.effect == kViaSolid || lighting.effect == kViaOff) keyboard->set_effect(STATIC);
-  const int breathing = keychron.model().breathing_effect;
+  const int breathing = hid.model().breathing_effect;
   if (breathing && lighting.effect == breathing) keyboard->set_effect(BREATHING);
   keyboard->set_hue(std::min(FromVia(lighting.hue, 360), 359));
   keyboard->set_brightness(lighting.effect == kViaOff ? 0 : FromVia(lighting.brightness, 100));
@@ -227,8 +227,8 @@ DeviceStack::DeviceStack() {
 
   // A single scan at startup; plugging a keyboard in later needs an app restart.
   std::map<std::string, int> units;
-  for (std::unique_ptr<KeychronHid>& keyboard : KeychronHid::OpenAll()) {
-    std::optional<KeychronHid::Lighting> lighting = keyboard->ReadLighting();
+  for (std::unique_ptr<ViaKeyboard>& keyboard : ViaKeyboard::OpenAll()) {
+    std::optional<ViaKeyboard::Lighting> lighting = keyboard->ReadLighting();
     if (!lighting) {
       continue;
     }
@@ -237,7 +237,7 @@ DeviceStack::DeviceStack() {
     if (int unit = ++units[id]; unit > 1) {
       id += "-" + std::to_string(unit);
     }
-    add(paired_, MakeKeychron(id, *keyboard, *lighting));
+    add(paired_, MakeViaKeyboard(id, *keyboard, *lighting));
     live_[id] = std::move(keyboard);
   }
 }
@@ -301,8 +301,8 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
       if (keyboard == live_.end()) {
         return false;
       }
-      KeychronHid& hid = *keyboard->second;
-      if (!hid.WriteLighting(ToKeychronLighting(settings.keyboard(), hid.model()))) {
+      ViaKeyboard& hid = *keyboard->second;
+      if (!hid.WriteLighting(ToViaLighting(settings.keyboard(), hid.model()))) {
         // Most likely unplugged; show it as disconnected until the app restarts.
         live_.erase(keyboard);
         entry->device.set_connected(false);
