@@ -3,94 +3,64 @@ import { LightEffect, type KeyboardSettings, type KeyboardSpec } from '@/gen/dev
 import { keyboardControlLabel } from '@/components/device/keyboard-device';
 import { cn } from '@/lib/utils';
 
-const KEYBOARD_ROWS = [
-  'esc 1 2 3 4 5 6 7 8 9 0 minus equal backspace:2',
-  'tab:1.5 q w e r t y u i o p bracketleft bracketright backslash:1.5',
-  'capslock:1.75 a s d f g h j k l semicolon quote enter:2.25',
-  'shiftleft:2.25 z x c v b n m comma period slash shiftright:2.75',
-  'ctrlleft:1.25 metaleft:1.25 altleft:1.25 space:6.25 altright:1.25 fn:1.25 menu:1.25 ctrlright:1.25',
-];
+/**
+ * One key in key units (1 = a standard key), with the label drawn on its cap.
+ */
+export interface KeyRect {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 /**
- * Provides the short labels drawn on special key caps.
+ * The keys of one keyboard artwork, and where their grid sits in the image.
  */
-const KEY_FACE_LABELS: Record<string, string> = {
-  esc: 'Esc',
-  minus: '−',
-  equal: '=',
-  backspace: '⌫',
-  tab: 'Tab',
-  bracketleft: '[',
-  bracketright: ']',
-  backslash: '\\',
-  capslock: 'Caps',
-  semicolon: ';',
-  quote: "'",
-  enter: 'Enter',
-  shiftleft: 'Shift',
-  comma: ',',
-  period: '.',
-  slash: '/',
-  shiftright: 'Shift',
-  ctrlleft: 'Ctrl',
-  metaleft: 'Win',
-  altleft: 'Alt',
-  space: '',
-  altright: 'Alt',
-  fn: 'Fn',
-  menu: 'Menu',
-  ctrlright: 'Ctrl',
-};
+export interface KeyboardLayout {
+  /** Fractions of the image's width and height. */
+  area: { left: number; top: number; width: number; height: number };
+  keys: KeyRect[];
+}
 
-const KEY_ROW_INSETS = ['1.4%', '1%', '0.55%', '0.2%', '0%'];
+/**
+ * The gap between a key's slot and its cap face, in key units.
+ */
+const KEY_INSET = 0.09;
 
 /**
  * Sets the length of one glow cycle and one wave across the keyboard.
  */
 const LIGHTING_CYCLE_SECONDS = 2.4;
 
-interface KeyLayout {
-  id: string;
-  width: number;
+interface KeyLayout extends KeyRect {
+  style: CSSProperties;
   waveAnimationDelay: string;
 }
 
-const KEY_LAYOUT: KeyLayout[][] = KEYBOARD_ROWS.map((row) => {
-  const keys = row.split(' ').map((key) => {
-    const [id, width = '1'] = key.split(':');
-    return { id, width: Number(width) };
-  });
-
-  const totalWidth = keys.reduce((sum, key) => sum + key.width, 0);
-  let currentWidth = 0;
-
-  return keys.map((key) => {
-    const centerOffset = (currentWidth + key.width / 2) / totalWidth;
-    currentWidth += key.width;
-
-    return {
-      ...key,
-      waveAnimationDelay: `-${(centerOffset * LIGHTING_CYCLE_SECONDS).toFixed(2)}s`,
-    };
-  });
-});
-
 /**
- * Builds the fixed grid geometry that keeps both keyboard layers aligned.
+ * Positions every key as a percentage of the grid, so the layers scale with the image.
  */
-const KEY_ROW_STYLES: CSSProperties[] = KEY_LAYOUT.map((row, index) => ({
-  gridTemplateColumns: row.map(({ width }) => `${width}fr`).join(' '),
-  marginInline: KEY_ROW_INSETS[index],
-}));
+function placeKeys(keys: KeyRect[]): KeyLayout[] {
+  const width = Math.max(...keys.map((key) => key.x + key.w));
+  const height = Math.max(...keys.map((key) => key.y + key.h));
+  const percent = (value: number, total: number) => `${(value / total) * 100}%`;
+
+  return keys.map((key) => ({
+    ...key,
+    style: {
+      position: 'absolute',
+      left: percent(key.x + KEY_INSET, width),
+      top: percent(key.y + KEY_INSET, height),
+      width: percent(key.w - 2 * KEY_INSET, width),
+      height: percent(key.h - 2 * KEY_INSET, height),
+    },
+    waveAnimationDelay: `-${(((key.x + key.w / 2) / width) * LIGHTING_CYCLE_SECONDS).toFixed(2)}s`,
+  }));
+}
 
 export type Lighting = Pick<KeyboardSettings, 'effect' | 'hue' | 'brightness'>;
-
-/**
- * Returns the short label drawn on one key cap.
- */
-function keyFaceLabel(id: string): string {
-  return KEY_FACE_LABELS[id] ?? id.toUpperCase();
-}
 
 /**
  * Reports whether a lighting effect should animate the key layer.
@@ -126,27 +96,19 @@ function lightingStyle(
 /**
  * Draws the decorative label and glow for one key.
  */
-function KeyFace({
-  id,
-  lighting,
-  keyLayout,
-}: {
-  id: string;
-  lighting: Lighting | null;
-  keyLayout: KeyLayout;
-}) {
+function KeyFace({ lighting, keyLayout }: { lighting: Lighting | null; keyLayout: KeyLayout }) {
   return (
     <span
-      style={lighting ? lightingStyle(lighting, keyLayout) : undefined}
+      style={{ ...keyLayout.style, ...(lighting ? lightingStyle(lighting, keyLayout) : {}) }}
       className={cn(
         'flex min-w-0 items-center justify-center rounded-[14%]',
-        'text-[8px] font-medium leading-none',
+        'text-[6px] font-medium leading-none',
         !lighting && 'text-white/45',
         lighting && isAnimated(lighting.effect) &&
           'animate-[key-glow_ease-in-out_infinite] motion-reduce:animate-none',
       )}
     >
-      {keyFaceLabel(id)}
+      {keyLayout.label}
     </span>
   );
 }
@@ -156,11 +118,13 @@ function KeyFace({
  */
 function KeyCap({
   id,
+  style,
   selectable,
   selected,
   onSelect,
 }: {
   id: string;
+  style: CSSProperties;
   selectable: boolean;
   selected: boolean;
   onSelect?: (control: string) => void;
@@ -175,6 +139,7 @@ function KeyCap({
       aria-pressed={selectable ? selected : undefined}
       title={selectable ? `${keyName} key` : 'Fixed in firmware'}
       onClick={() => onSelect?.(id)}
+      style={style}
       className={cn(
         'min-w-0 rounded-[14%] border border-transparent bg-transparent',
         'outline-hidden transition-colors',
@@ -193,6 +158,8 @@ function KeyCap({
  * Both the visual keys and hit targets use it so they stay aligned.
  */
 interface KeyLayerProps {
+  layout: KeyboardLayout;
+  keys: KeyLayout[];
   renderKey: (key: KeyLayout) => ReactNode;
   className?: string;
   role?: string;
@@ -203,30 +170,27 @@ interface KeyLayerProps {
 /**
  * Renders every key in one shared keyboard layer.
  */
-function KeyLayer({ renderKey, className, ...ariaProps }: KeyLayerProps) {
+function KeyLayer({ layout, keys, renderKey, className, ...ariaProps }: KeyLayerProps) {
+  const { left, top, width, height } = layout.area;
   return (
     <span
       {...ariaProps}
-      className={cn(
-        'absolute left-[7.4%] top-[24.1%] flex h-[43.9%] w-[85.2%] flex-col gap-[2.6%]',
-        className,
-      )}
+      className={cn('absolute', className)}
+      style={{
+        left: `${left * 100}%`,
+        top: `${top * 100}%`,
+        width: `${width * 100}%`,
+        height: `${height * 100}%`,
+      }}
     >
-      {KEY_LAYOUT.map((row, rowIndex) => (
-        <span
-          key={rowIndex}
-          className="grid min-h-0 flex-1 gap-[0.32%]"
-          style={KEY_ROW_STYLES[rowIndex]}
-        >
-          {row.map(renderKey)}
-        </span>
-      ))}
+      {keys.map(renderKey)}
     </span>
   );
 }
 
 interface KeyboardArtProps {
   spec: KeyboardSpec;
+  layout: KeyboardLayout;
   src: string;
   alt: string;
   aspect: string;
@@ -247,6 +211,7 @@ interface KeyboardArtProps {
  */
 export function KeyboardArt({
   spec,
+  layout,
   src,
   alt,
   aspect,
@@ -257,6 +222,7 @@ export function KeyboardArt({
 }: KeyboardArtProps) {
   const selectableKeys = new Set(spec.keys);
   const activeLighting = lighting && lighting.brightness > 0 ? lighting : null;
+  const keys = placeKeys(layout.keys);
 
   return (
     <span className={cn('relative block w-full', className)} style={{ aspectRatio: aspect }}>
@@ -270,19 +236,22 @@ export function KeyboardArt({
       <KeyLayer
         aria-hidden
         className="pointer-events-none"
-        renderKey={(key) => (
-          <KeyFace key={key.id} id={key.id} lighting={activeLighting} keyLayout={key} />
-        )}
+        layout={layout}
+        keys={keys}
+        renderKey={(key) => <KeyFace key={key.id} lighting={activeLighting} keyLayout={key} />}
       />
 
       {onControlSelect && (
         <KeyLayer
           role="group"
           aria-label="Keys"
+          layout={layout}
+          keys={keys}
           renderKey={(key) => (
             <KeyCap
               key={key.id}
               id={key.id}
+              style={key.style}
               selectable={selectableKeys.has(key.id)}
               selected={selectedControl === key.id}
               onSelect={onControlSelect}

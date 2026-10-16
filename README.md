@@ -128,8 +128,10 @@ Limitations:
   found. Tested on a Keychron K10 Max; the K2 HE entry follows Keychron's published firmware and
   has not been tested on the hardware.
 - Key remapping and firmware other than QMK with VIA are not supported. Bluetooth and the
-  Keychron Link receiver are labelled as such, but only work if they answer VIA. Only the Keychron
-  models above have artwork.
+  Keychron Link receiver are labelled as such, but only work if they answer VIA. Only the K10 Max
+  has artwork: `device-art/k10-max.webp` and its key overlay in
+  [`k10-max-layout.ts`](src/renderer/components/art/k10-max-layout.ts) are built from the same
+  key geometry in Keychron's QMK definition.
 
 ### Add capabilities and device types
 

@@ -1,6 +1,7 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
-import { KeyboardArt, type Lighting } from './keyboard-art';
+import { K10_MAX_LAYOUT } from './k10-max-layout';
+import { KeyboardArt, type KeyboardLayout, type Lighting } from './keyboard-art';
 import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
 
 interface DeviceArtwork {
@@ -9,6 +10,7 @@ interface DeviceArtwork {
   alt: string;
   aspectRatio: string;
   mouseProfile?: MouseArtProfile;
+  keyboardLayout?: KeyboardLayout;
 }
 
 interface DeviceArtProps {
@@ -36,15 +38,14 @@ const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
     aspectRatio: '3 / 2',
     mouseProfile: 'travel',
   },
-  // Real keyboards reuse the demo artwork to preview their lighting.
   'keychron-k10-max': {
-    detailSrc: '/device-art/compact-keyboard.webp',
-    homeSrc: '/device-art/compact-keyboard-home.webp',
-    alt: 'Keyboard illustration',
-    aspectRatio: '821 / 479',
+    detailSrc: '/device-art/k10-max.webp',
+    homeSrc: '/device-art/k10-max.webp',
+    alt: 'Keychron K10 Max full-size keyboard',
+    aspectRatio: '2349 / 1022',
+    keyboardLayout: K10_MAX_LAYOUT,
   },
 };
-ARTWORK_BY_MODEL_ID['keychron-k2-he'] = ARTWORK_BY_MODEL_ID['keychron-k10-max'];
 
 /**
  * Shows device artwork and adds interactive mouse or keyboard controls when requested.
@@ -79,10 +80,11 @@ export function DeviceArt({
     );
   }
 
-  if (device.keyboard) {
+  if (device.keyboard && artwork.keyboardLayout) {
     return (
       <KeyboardArt
         spec={device.keyboard}
+        layout={artwork.keyboardLayout}
         src={artwork.detailSrc}
         alt={artwork.alt}
         aspect={artwork.aspectRatio}
