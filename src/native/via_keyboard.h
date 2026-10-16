@@ -17,7 +17,7 @@
 struct hid_device_;
 struct hid_device_info;
 
-// Controls the backlight of a QMK keyboard with VIA enabled, connected by USB cable.
+// Controls the backlight of a QMK keyboard with VIA enabled.
 //
 // The keyboard speaks the QMK/VIA raw HID protocol on a vendor-defined interface,
 // separate from the one that carries keystrokes. Only the VIA "custom value"
@@ -29,6 +29,9 @@ struct hid_device_info;
 // thread; the handle is then used by one write thread at a time.
 class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
  public:
+  // How the keyboard's VIA interface reaches the computer.
+  enum class Link { kCable, kReceiver, kBluetooth };
+
   struct Model {
     // Shared by every unit of the product: a known model's ID, or "via-<vid>-<pid>".
     std::string id;
@@ -39,6 +42,7 @@ class ViaKeyboard : public std::enable_shared_from_this<ViaKeyboard> {
     // model's VIA definition; only solid color (1) is the same on every keyboard.
     int breathing_effect = 0;
     int wave_effect = 0;
+    Link link = Link::kCable;
   };
 
   // A QMK lighting system as VIA exposes it.

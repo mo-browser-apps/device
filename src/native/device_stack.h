@@ -35,7 +35,7 @@ class DeviceStack {
   // Moves one nearby device into the managed device list.
   bool Pair(const std::string& device_id);
 
-  // Removes one wireless device from the managed device list.
+  // Removes one simulated wireless device from the managed device list.
   bool Forget(const std::string& device_id);
 
   // Returns the current settings for one managed device.

@@ -23,12 +23,15 @@ struct KnownModel {
   const char* id;
   int breathing_effect;
   int wave_effect;
+  // A wireless receiver: it is plugged in by USB, but the keyboard is not.
+  bool receiver = false;
 };
 constexpr KnownModel kKnownModels[] = {
     {0x3434, 0x0AA0, "keychron-k10-max", 2, 5},  // K10 Max ANSI RGB
     {0x3434, 0x0E20, "keychron-k2-he", 2, 5},    // K2 HE ANSI RGB
     {0x3434, 0x0E21, "keychron-k2-he", 2, 5},    // K2 HE ISO RGB
     {0x3434, 0x0E22, "keychron-k2-he", 2, 5},    // K2 HE JIS RGB
+    {0x3434, 0xD030, "keychron-link", 0, 0, true},  // Keychron Link 2.4 GHz receiver
 };
 
 // QMK exposes VIA on a raw HID interface with this vendor-defined usage.
@@ -80,11 +83,16 @@ ViaKeyboard::Model MakeModel(const hid_device_info& info) {
   if (model.name.empty()) {
     model.name = "Keyboard";
   }
+  // USB, and the I2C and SPI buses of built-in keyboards, count as a cable.
+  if (info.bus_type == HID_API_BUS_BLUETOOTH) {
+    model.link = ViaKeyboard::Link::kBluetooth;
+  }
   for (const KnownModel& known : kKnownModels) {
     if (known.vendor_id == info.vendor_id && known.product_id == info.product_id) {
       model.id = known.id;
       model.breathing_effect = known.breathing_effect;
       model.wave_effect = known.wave_effect;
+      if (known.receiver) model.link = ViaKeyboard::Link::kReceiver;
     }
   }
   return model;

@@ -152,7 +152,17 @@ DeviceSeed MakeViaKeyboard(const std::string& id,
   device.set_id(id);
   device.set_model_id(hid.model().id);
   device.set_model(hid.model().name);
-  device.set_link(WIRED);
+  switch (hid.model().link) {
+    case ViaKeyboard::Link::kCable:
+      device.set_link(WIRED);
+      break;
+    case ViaKeyboard::Link::kReceiver:
+      device.set_link(RECEIVER);
+      break;
+    case ViaKeyboard::Link::kBluetooth:
+      device.set_link(BLUETOOTH);
+      break;
+  }
   device.set_firmware("VIA protocol " + std::to_string(hid.protocol_version()));
   device.set_connected(true);
   device.set_has_battery(false);
@@ -329,7 +339,8 @@ bool DeviceStack::Pair(const std::string& device_id) {
 bool DeviceStack::Forget(const std::string& device_id) {
   std::lock_guard lock(mutex_);
   auto entry = FindById(paired_, device_id);
-  if (entry == paired_.end() || entry->device.link() == WIRED) {
+  // Real keyboards stay listed while plugged in, whatever their link.
+  if (entry == paired_.end() || entry->device.link() == WIRED || entry->device.live()) {
     return false;
   }
   entry->device.set_connected(false);

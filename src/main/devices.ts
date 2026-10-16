@@ -60,7 +60,7 @@ async function restorePairedDevices(): Promise<void> {
     }
   }
   for (const device of paired.devices) {
-    if (!storedIds.has(device.id) && device.link !== NativeLinkType.WIRED) {
+    if (!storedIds.has(device.id) && device.link !== NativeLinkType.WIRED && !device.live) {
       await native.deviceStack.Forget({ id: device.id });
     }
   }

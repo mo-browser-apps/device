@@ -228,7 +228,9 @@ export function Home({
                   device={device}
                   onOpen={() => openDevice(device.id)}
                   onRemove={
-                    device.link === LinkType.WIRED ? undefined : () => setDeviceToRemove(device)
+                    device.link === LinkType.WIRED || device.live
+                      ? undefined
+                      : () => setDeviceToRemove(device)
                   }
                 />
               ))}

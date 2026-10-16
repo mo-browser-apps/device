@@ -7,6 +7,8 @@
 
 typedef struct hid_device_ hid_device;
 
+typedef enum { HID_API_BUS_UNKNOWN = 0, HID_API_BUS_USB = 1, HID_API_BUS_BLUETOOTH = 2 } hid_bus_type;
+
 struct hid_device_info {
   char* path;
   unsigned short vendor_id;
@@ -17,6 +19,7 @@ struct hid_device_info {
   unsigned short usage_page;
   unsigned short usage;
   hid_device_info* next;
+  hid_bus_type bus_type;
 };
 
 int hid_init();

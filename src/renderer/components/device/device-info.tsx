@@ -44,7 +44,7 @@ export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
         </dl>
       </SettingsSection>
 
-      {device.link !== LinkType.WIRED && (
+      {device.link !== LinkType.WIRED && !device.live && (
         <button
           type="button"
           onClick={onRemove}

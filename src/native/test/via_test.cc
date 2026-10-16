@@ -32,6 +32,7 @@ struct FakeBoard {
   std::wstring manufacturer = L"Keychron";
   std::wstring product = L"Keychron K10 Max";
   int protocol = 12;
+  hid_bus_type bus = HID_API_BUS_USB;
   // False while unplugged: not enumerated, and writes fail.
   bool plugged = true;
   // Exposes the interface but never answers, like a wireless receiver with no keyboard.
@@ -94,6 +95,7 @@ hid_device_info* hid_enumerate(unsigned short vendor_id, unsigned short product_
           .usage_page = usage_page,
           .usage = static_cast<unsigned short>(usage_page == 0xFF60 ? 0x61 : 0x06),
           .next = list,
+          .bus_type = board.bus,
       };
     }
   }
@@ -435,6 +437,24 @@ void TestQueuedWritesSendOnlyTheLatest() {
   assert((boards[0].sets == 6 && boards[0].values[{3, 1}][0] == 30));
 }
 
+void TestReportsHowTheKeyboardIsConnected() {
+  FakeBoard cable;
+  FakeBoard bluetooth;
+  bluetooth.bus = HID_API_BUS_BLUETOOTH;
+  FakeBoard receiver;
+  receiver.product_id = 0xD030;
+  receiver.product = L"Keychron Link ";
+  boards = {cable, bluetooth, receiver};
+
+  ViaScanner scanner(0ms);
+  auto added = scanner.Scan().added;
+  assert(added.size() == 3);
+  assert(added[0].keyboard->model().link == ViaKeyboard::Link::kCable);
+  assert(added[1].keyboard->model().link == ViaKeyboard::Link::kBluetooth);
+  assert(added[2].keyboard->model().link == ViaKeyboard::Link::kReceiver &&
+         added[2].keyboard->model().name == "Keychron Link");
+}
+
 }  // namespace
 
 int main() {
@@ -453,5 +473,6 @@ int main() {
   TestScannerRetriesSilentInterfaceLater();
   TestFailedWriteReopensSamePath();
   TestQueuedWritesSendOnlyTheLatest();
+  TestReportsHowTheKeyboardIsConnected();
   std::puts("via_test: ok");
 }
