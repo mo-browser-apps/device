@@ -221,7 +221,8 @@ export function Home({
             className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
           >
             <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
-              {devices.map((device) => (
+              {/* Real hardware first; the sort is stable, so each group keeps its order. */}
+              {[...devices].sort((a, b) => Number(b.live) - Number(a.live)).map((device) => (
                 <DeviceCard
                   key={device.id}
                   device={device}
