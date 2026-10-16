@@ -8,6 +8,7 @@
 #include <cstring>
 #include <deque>
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -144,6 +145,12 @@ int hid_read_timeout(hid_device* device, unsigned char* data, size_t length, int
 
 namespace {
 
+std::unique_ptr<KeychronHid> OpenOne() {
+  auto keyboards = KeychronHid::OpenAll();
+  assert(keyboards.size() <= 1);
+  return keyboards.empty() ? nullptr : std::move(keyboards[0]);
+}
+
 void TestReadsAndWritesRgbMatrix() {
   FakeBoard board;
   board.unprompted = {
@@ -157,7 +164,7 @@ void TestReadsAndWritesRgbMatrix() {
   board.values[{3, 4}] = {85, 255};   // hue, saturation
   boards = {board};
 
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   assert(keyboard && keyboard->protocol_version() == 12);
   auto lighting = keyboard->ReadLighting();
   assert(lighting && lighting->effect == 5 && lighting->hue == 85 &&
@@ -173,14 +180,14 @@ void TestSkipsFirmwareBeforeProtocol12() {
   FakeBoard board;
   board.protocol = 11;
   boards = {board};
-  assert(!KeychronHid::Open());
+  assert(!OpenOne());
 }
 
 void TestSkipsSilentInterface() {
   FakeBoard board;
   board.silent = true;
   boards = {board};
-  assert(!KeychronHid::Open());
+  assert(!OpenOne());
 }
 
 void TestFindsRgbLightChannel() {
@@ -190,7 +197,7 @@ void TestFindsRgbLightChannel() {
   boards = {board};
   timed_out_reads = 0;
 
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   // Probing past the unhandled RGB matrix channel must not wait for a timeout.
   assert(keyboard && keyboard->has_color() && timed_out_reads == 0);
   auto lighting = keyboard->ReadLighting();
@@ -206,7 +213,7 @@ void TestSingleColorLedMatrixKeepsColorUntouched() {
   board.values[{5, 1}] = {100, 0};
   boards = {board};
 
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   assert(keyboard && !keyboard->has_color());
   auto lighting = keyboard->ReadLighting();
   assert(lighting && lighting->effect == 1 && lighting->brightness == 100);
@@ -220,7 +227,7 @@ void TestBacklightSetsBrightnessOnly() {
   board.channels = {1};
   boards = {board};
 
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   assert(keyboard && !keyboard->has_color());
   auto lighting = keyboard->ReadLighting();
   // Without an effect list the backlight reads as solid color.
@@ -234,7 +241,7 @@ void TestSkipsKeyboardWithoutLighting() {
   FakeBoard board;
   board.channels = {};
   boards = {board};
-  assert(!KeychronHid::Open());
+  assert(!OpenOne());
 }
 
 void TestOpensAnyVendorsKeyboard() {
@@ -245,7 +252,7 @@ void TestOpensAnyVendorsKeyboard() {
   board.product = L"Iris Rev. 6  ";
   boards = {board};
 
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   assert(keyboard);
   const KeychronHid::Model& model = keyboard->model();
   // Unknown models get the effects every firmware shares: solid color only.
@@ -255,7 +262,7 @@ void TestOpensAnyVendorsKeyboard() {
 
 void TestKnownModelAddsEffects() {
   boards = {FakeBoard{}};
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   assert(keyboard);
   const KeychronHid::Model& model = keyboard->model();
   assert(model.id == "keychron-k10-max" && model.name == "Keychron K10 Max" &&
@@ -272,9 +279,25 @@ void TestSkipsSilentInterfaceForNextKeyboard() {
   board.product = L"";
   boards = {receiver, board};
 
-  auto keyboard = KeychronHid::Open();
+  auto keyboard = OpenOne();
   assert(keyboard && keyboard->model().id == "via-feed-0aa0" &&
          keyboard->model().name == "Keyboard");
+}
+
+void TestOpensEveryKeyboard() {
+  FakeBoard rgb;
+  FakeBoard receiver;
+  receiver.silent = true;
+  FakeBoard single_color;
+  single_color.vendor_id = 0xFEED;
+  single_color.channels = {5};
+  boards = {rgb, receiver, single_color};
+
+  auto keyboards = KeychronHid::OpenAll();
+  assert(keyboards.size() == 2 && keyboards[0]->has_color() && !keyboards[1]->has_color());
+  // Each handle drives its own keyboard.
+  assert(keyboards[1]->WriteLighting({.effect = 1, .brightness = 42}));
+  assert((boards[2].values[{5, 1}][0] == 42 && boards[0].values[{3, 1}][0] == 0));
 }
 
 }  // namespace
@@ -290,5 +313,6 @@ int main() {
   TestOpensAnyVendorsKeyboard();
   TestKnownModelAddsEffects();
   TestSkipsSilentInterfaceForNextKeyboard();
+  TestOpensEveryKeyboard();
   std::puts("via_test: ok");
 }

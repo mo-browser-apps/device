@@ -141,9 +141,11 @@ KeychronHid::Lighting ToKeychronLighting(const KeyboardSettings& keyboard,
   };
 }
 
-DeviceSeed MakeKeychron(const KeychronHid& keychron, const KeychronHid::Lighting& lighting) {
+DeviceSeed MakeKeychron(const std::string& id,
+                        const KeychronHid& keychron,
+                        const KeychronHid::Lighting& lighting) {
   Device device;
-  device.set_id(keychron.model().id);
+  device.set_id(id);
   device.set_model_id(keychron.model().id);
   device.set_model(keychron.model().name);
   device.set_link(WIRED);
@@ -223,14 +225,20 @@ DeviceStack::DeviceStack() {
   nearby.settings.set_device_id(nearby.device.id());
   available_.push_back(std::move(nearby));
 
-  // A single scan at startup; plugging the keyboard in later needs an app restart.
-  keychron_ = KeychronHid::Open();
-  std::optional<KeychronHid::Lighting> lighting;
-  if (keychron_) lighting = keychron_->ReadLighting();
-  if (lighting) {
-    add(paired_, MakeKeychron(*keychron_, *lighting));
-  } else {
-    keychron_.reset();
+  // A single scan at startup; plugging a keyboard in later needs an app restart.
+  std::map<std::string, int> units;
+  for (std::unique_ptr<KeychronHid>& keyboard : KeychronHid::OpenAll()) {
+    std::optional<KeychronHid::Lighting> lighting = keyboard->ReadLighting();
+    if (!lighting) {
+      continue;
+    }
+    // Firmware rarely sets a serial number, so further units of a model are numbered.
+    std::string id = keyboard->model().id;
+    if (int unit = ++units[id]; unit > 1) {
+      id += "-" + std::to_string(unit);
+    }
+    add(paired_, MakeKeychron(id, *keyboard, *lighting));
+    live_[id] = std::move(keyboard);
   }
 }
 
@@ -289,12 +297,14 @@ bool DeviceStack::ApplySettings(const Settings& settings) {
       return false;
     }
     if (entry->device.live()) {
-      if (!keychron_) {
+      auto keyboard = live_.find(entry->device.id());
+      if (keyboard == live_.end()) {
         return false;
       }
-      if (!keychron_->WriteLighting(ToKeychronLighting(settings.keyboard(), keychron_->model()))) {
+      KeychronHid& hid = *keyboard->second;
+      if (!hid.WriteLighting(ToKeychronLighting(settings.keyboard(), hid.model()))) {
         // Most likely unplugged; show it as disconnected until the app restarts.
-        keychron_.reset();
+        live_.erase(keyboard);
         entry->device.set_connected(false);
         PublishDevicesChanged();
         return false;

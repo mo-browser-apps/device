@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 struct hid_device_;
 struct hid_device_info;
@@ -49,8 +50,8 @@ class KeychronHid {
     int brightness = 0;
   };
 
-  // Opens the first VIA interface that answers and has lighting; nullptr when none does.
-  static std::unique_ptr<KeychronHid> Open();
+  // Opens every VIA interface that answers and has lighting.
+  static std::vector<std::unique_ptr<KeychronHid>> OpenAll();
 
   ~KeychronHid();
   KeychronHid(const KeychronHid&) = delete;

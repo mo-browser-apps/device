@@ -2,6 +2,7 @@
 #define DEVICE_STACK_H_
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,7 +18,7 @@ class DeviceStack {
   using DevicesChangedHandler = std::function<void(const DeviceList&)>;
 
   // Creates the managed demo devices and one nearby device available to pair,
-  // and adds a wired Keychron K10 Max or K2 HE if one is connected at startup.
+  // and adds every wired VIA keyboard with lighting connected at startup.
   DeviceStack();
 
   // Returns every device currently managed by the stack.
@@ -52,7 +53,8 @@ class DeviceStack {
   std::vector<Entry> paired_;
   std::vector<Entry> available_;
   DevicesChangedHandler devices_changed_;
-  std::unique_ptr<KeychronHid> keychron_;
+  // Open keyboards by device ID; removed when a write fails.
+  std::map<std::string, std::unique_ptr<KeychronHid>> live_;
 
   // Sends the latest managed-device snapshot to the registered callback.
   void PublishDevicesChanged() const;

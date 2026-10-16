@@ -91,24 +91,27 @@ KeychronHid::Model MakeModel(const hid_device_info& info) {
 
 }  // namespace
 
-std::unique_ptr<KeychronHid> KeychronHid::Open() {
+std::vector<std::unique_ptr<KeychronHid>> KeychronHid::OpenAll() {
+  std::vector<std::unique_ptr<KeychronHid>> keyboards;
   if (hid_init() != 0) {
-    return nullptr;
+    return keyboards;
   }
 #ifdef __APPLE__
   // Share the interface so the VIA or Keychron Launcher apps can stay open.
   hid_darwin_set_open_exclusive(0);
 #endif
 
-  std::unique_ptr<KeychronHid> keyboard;
   hid_device_info* devices = hid_enumerate(0, 0);
-  for (hid_device_info* info = devices; info && !keyboard; info = info->next) {
-    if (info->usage_page == kViaUsagePage && info->usage == kViaUsage) {
-      keyboard = OpenInterface(*info);
+  for (hid_device_info* info = devices; info; info = info->next) {
+    if (info->usage_page != kViaUsagePage || info->usage != kViaUsage) {
+      continue;
+    }
+    if (std::unique_ptr<KeychronHid> keyboard = OpenInterface(*info)) {
+      keyboards.push_back(std::move(keyboard));
     }
   }
   hid_free_enumeration(devices);
-  return keyboard;
+  return keyboards;
 }
 
 std::unique_ptr<KeychronHid> KeychronHid::OpenInterface(const hid_device_info& info) {
