@@ -14,6 +14,7 @@ import { fromVia, toRawLighting, toVia, viaKeyboard, viaModel } from './via';
 
 const K10 = 'keychron-k10-max';
 const M650 = 'logitech-signature-m650-l';
+const DUMMIES = ['performance-mouse', 'travel-mouse', 'compact-keyboard'];
 
 function keyboard(overrides: Partial<ConnectedKeyboard> = {}): ConnectedKeyboard {
   return {
@@ -167,12 +168,13 @@ function testMouseMapping() {
 
 function testStartsEmptyAndPairsFromDiscovery() {
   const { state, paired, nearby, stored, published } = harness();
-  assert.deepEqual(paired(), []);
+  assert.deepEqual(paired(), DUMMIES);
+  assert.equal(state.list().devices.every((device) => !device.live), true);
   assert.deepEqual(nearby(), []);
 
-  // Connected devices are offered for pairing, not listed.
+  // Connected devices are offered for pairing; dummies remain until a real one is added.
   state.reconcile({ keyboards: [keyboard()], mice: [mouse()] });
-  assert.deepEqual(paired(), []);
+  assert.deepEqual(paired(), DUMMIES);
   assert.deepEqual(nearby(), [K10, M650]);
 
   state.pair(M650);
@@ -209,7 +211,7 @@ function testRestoresPairedDevicesDisconnected() {
   assert.deepEqual(restored.nearby(), []);
 
   // Invalid saved data is skipped.
-  assert.deepEqual(harness({ paired: [null, { device: { id: 'x' } }, 7] }).paired(), []);
+  assert.deepEqual(harness({ paired: [null, { device: { id: 'x' } }, 7] }).paired(), DUMMIES);
 }
 
 function testForget() {
@@ -227,8 +229,22 @@ function testForget() {
   // A disconnected one disappears until it connects again.
   state.reconcile({ keyboards: [keyboard()], mice: [] });
   state.forget(M650);
-  assert.deepEqual(paired(), []);
+  assert.deepEqual(paired(), DUMMIES);
   assert.deepEqual(nearby(), [K10]);
+}
+
+async function testDummySettingsStayInMemory() {
+  const { state, writes, stored } = harness();
+  const settings: Settings = {
+    ...state.getSettings('performance-mouse'),
+    mouse: { ...state.getSettings('performance-mouse').mouse!, dpi: 2400 },
+  };
+
+  await state.applySettings(settings);
+  assert.equal(state.getSettings('performance-mouse').mouse?.dpi, 2400);
+  assert.deepEqual(writes, []);
+  assert.deepEqual(stored, []);
+  assert.throws(() => state.forget('performance-mouse'));
 }
 
 function testReconnectAndIdenticalDevices() {
@@ -366,6 +382,7 @@ testRestoresPairedDevicesDisconnected();
 testForget();
 testReconnectAndIdenticalDevices();
 testMouseBatteryUpdates();
+await testDummySettingsStayInMemory();
 await testSettingsValidation();
 await testWrites();
 console.log('devices.test: ok');

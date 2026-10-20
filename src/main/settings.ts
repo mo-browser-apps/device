@@ -57,7 +57,13 @@ function notifyLowBattery(device: Device): void {
  * Reports whether a device should currently show a low-battery alert.
  */
 function isLow(device: Device): boolean {
-  return device.connected && device.hasBattery && !device.charging && device.battery <= LOW_BATTERY;
+  return (
+    device.live &&
+    device.connected &&
+    device.hasBattery &&
+    !device.charging &&
+    device.battery <= LOW_BATTERY
+  );
 }
 
 /**

@@ -124,11 +124,9 @@ export function DeviceBatteryStatus({ device, className }: DeviceStatusProps) {
 }
 
 /**
- * Marks physical hardware so it stands apart from the simulated devices.
+ * Marks whether a listed device is physical hardware or a simulation.
  */
-export function LiveDeviceBadge({ device, className }: DeviceStatusProps) {
-  if (!device.live) return null;
-
+export function DeviceKindBadge({ device, className }: DeviceStatusProps) {
   return (
     <span
       className={cn(
@@ -141,10 +139,10 @@ export function LiveDeviceBadge({ device, className }: DeviceStatusProps) {
         aria-hidden="true"
         className={cn(
           'size-1.5 rounded-full',
-          device.connected ? 'bg-status-charging' : 'bg-muted-foreground/35',
+          device.live && device.connected ? 'bg-status-charging' : 'bg-muted-foreground/35',
         )}
       />
-      Live device
+      {device.live ? 'Live device' : 'Dummy device'}
     </span>
   );
 }
@@ -155,7 +153,7 @@ export function LiveDeviceBadge({ device, className }: DeviceStatusProps) {
 export function DeviceStatus({ device, className }: DeviceStatusProps) {
   return (
     <span className={cn('flex items-center gap-4', className)}>
-      <LiveDeviceBadge device={device} />
+      <DeviceKindBadge device={device} />
       <DeviceConnectionIcon device={device} className="[&_svg]:size-5" />
       <DeviceBatteryStatus device={device} className="gap-2 text-sm [&_svg]:size-5" />
     </span>

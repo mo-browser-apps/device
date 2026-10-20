@@ -43,6 +43,13 @@ const DEFAULT_KEYBOARD_ARTWORK: DeviceArtwork = {
 };
 
 const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
+  'performance-mouse': {
+    detailSrc: '/device-art/performance-mouse.webp',
+    homeSrc: '/device-art/performance-mouse-home.webp',
+    alt: 'Performance mouse',
+    aspectRatio: '3 / 2',
+    mouseProfile: 'performance',
+  },
   'keychron-k10-max': {
     detailSrc: '/device-art/k10-max.webp',
     homeSrc: '/device-art/k10-max.webp',

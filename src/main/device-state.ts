@@ -5,6 +5,7 @@ import type {
   ConnectedMouse,
   RawLighting,
 } from './gen/native/devices';
+import { dummyDevices } from './dummy-devices';
 import { logitechModelId, logitechMouse } from './logitech';
 import { toRawLighting, viaKeyboard, viaModel } from './via';
 
@@ -76,7 +77,12 @@ function restoreEntry(json: unknown): Entry | undefined {
   const { device: deviceJson, settings: settingsJson } = (json ?? {}) as Record<string, unknown>;
   const device = Device.fromJSON(deviceJson ?? {});
   const settings = Settings.fromJSON(settingsJson ?? {});
-  if (!device.id || settings.deviceId !== device.id || (!device.mouse && !device.keyboard)) {
+  if (
+    !device.id ||
+    !device.live ||
+    settings.deviceId !== device.id ||
+    (!device.mouse && !device.keyboard)
+  ) {
     return undefined;
   }
   const entry = { device: { ...device, connected: false }, settings, paired: true };
@@ -84,13 +90,13 @@ function restoreEntry(json: unknown): Entry | undefined {
 }
 
 /**
- * Owns the application's devices: the real keyboards and mice the native module
- * reports. Connected devices are offered for pairing; paired ones are listed and saved,
- * and stay listed as disconnected while they are away. Their settings are read from the
- * hardware whenever they connect, never restored onto it.
+ * Owns the application's devices. Paired hardware is listed and saved; the dummy devices
+ * are listed instead when there is no paired hardware. Real settings are read from the
+ * hardware whenever it connects, never restored onto it.
  */
 export class DeviceState {
   private readonly entries: Entry[];
+  private readonly dummies: Entry[] = dummyDevices().map((entry) => ({ ...entry, paired: true }));
   /** Open devices by device ID; a disconnected paired device keeps its entry only. */
   private readonly live = new Map<string, Connection>();
 
@@ -101,9 +107,10 @@ export class DeviceState {
     this.entries = saved.paired.flatMap((json) => restoreEntry(json) ?? []);
   }
 
-  /** Every paired device. */
+  /** Every paired real device, or the dummy devices when there are none. */
   list(): DeviceList {
-    return { devices: this.entries.filter((entry) => entry.paired).map((entry) => entry.device) };
+    const paired = this.entries.filter((entry) => entry.paired);
+    return { devices: (paired.length > 0 ? paired : this.dummies).map((entry) => entry.device) };
   }
 
   /** Connected devices available to pair. */
@@ -123,7 +130,7 @@ export class DeviceState {
 
   forget(deviceId: string): void {
     const entry = this.find(deviceId);
-    if (!entry?.paired) throw new Error(`Cannot forget device: ${deviceId}`);
+    if (!entry?.paired || !entry.device.live) throw new Error(`Cannot forget device: ${deviceId}`);
     entry.paired = false;
     // A device that is still connected can be added again at once.
     if (!entry.device.connected) this.entries.splice(this.entries.indexOf(entry), 1);
@@ -146,6 +153,10 @@ export class DeviceState {
     const entry = this.find(deviceId);
     if (!entry || !isValid(entry, settings)) {
       throw new Error(`Cannot apply settings to device: ${deviceId}`);
+    }
+    if (!entry.device.live) {
+      entry.settings = settings;
+      return;
     }
     const connection = this.live.get(deviceId);
     if (!connection) throw new Error(`Device is not connected: ${deviceId}`);
@@ -233,7 +244,9 @@ export class DeviceState {
   }
 
   private find(deviceId: string): Entry | undefined {
-    return this.entries.find((entry) => entry.device.id === deviceId);
+    const entry = this.entries.find((candidate) => candidate.device.id === deviceId);
+    if (entry || this.entries.some((candidate) => candidate.paired)) return entry;
+    return this.dummies.find((candidate) => candidate.device.id === deviceId);
   }
 
   private save(): void {

@@ -5,7 +5,7 @@ import { DeviceArt } from '@/components/art/device-art';
 import {
   DeviceBatteryStatus,
   DeviceConnectionIcon,
-  LiveDeviceBadge,
+  DeviceKindBadge,
 } from '@/components/device-status';
 import { RemoveDeviceDialog } from '@/components/device/remove-device-dialog';
 import { useCarousel } from '@/lib/use-carousel';
@@ -42,7 +42,7 @@ function DeviceCard({
 }: {
   device: Device;
   onOpen: () => void;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   return (
     <div className="group relative w-64 shrink-0 snap-center">
@@ -72,28 +72,30 @@ function DeviceCard({
             <span>{device.model}</span>
             <DeviceConnectionIcon device={device} />
           </span>
-          <span className="flex min-h-4 items-center">
+          <span className="flex min-h-4 items-center gap-2">
             <DeviceBatteryStatus device={device} />
-            <LiveDeviceBadge device={device} />
+            <DeviceKindBadge device={device} />
           </span>
         </span>
       </button>
 
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${device.model}`}
-        title={`Remove ${device.model}`}
-        className={cn(
-          'absolute right-3 top-3 flex size-7 items-center justify-center rounded-full',
-          'border border-border/60 bg-background/65 text-muted-foreground/70 shadow-sm',
-          'opacity-70 backdrop-blur-sm transition-[color,background-color,opacity]',
-          'hover:bg-accent hover:text-foreground hover:opacity-100',
-          FOCUS_RING,
-        )}
-      >
-        <X className="size-3.5" strokeWidth={1.75} />
-      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${device.model}`}
+          title={`Remove ${device.model}`}
+          className={cn(
+            'absolute right-3 top-3 flex size-7 items-center justify-center rounded-full',
+            'border border-border/60 bg-background/65 text-muted-foreground/70 shadow-sm',
+            'opacity-70 backdrop-blur-sm transition-[color,background-color,opacity]',
+            'hover:bg-accent hover:text-foreground hover:opacity-100',
+            FOCUS_RING,
+          )}
+        >
+          <X className="size-3.5" strokeWidth={1.75} />
+        </button>
+      )}
     </div>
   );
 }
@@ -224,7 +226,7 @@ export function Home({
                   key={device.id}
                   device={device}
                   onOpen={() => openDevice(device.id)}
-                  onRemove={() => setDeviceToRemove(device)}
+                  onRemove={device.live ? () => setDeviceToRemove(device) : undefined}
                 />
               ))}
             </div>

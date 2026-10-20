@@ -44,18 +44,20 @@ export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
         </dl>
       </SettingsSection>
 
-      <button
-        type="button"
-        onClick={onRemove}
-        className={cn(
-          BUTTON_OUTLINE,
-          'w-fit text-muted-foreground hover:border-destructive/35',
-          'hover:bg-destructive/5 hover:text-foreground',
-        )}
-      >
-        <Trash2 className="size-4" strokeWidth={1.75} />
-        Remove device
-      </button>
+      {device.live && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className={cn(
+            BUTTON_OUTLINE,
+            'w-fit text-muted-foreground hover:border-destructive/35',
+            'hover:bg-destructive/5 hover:text-foreground',
+          )}
+        >
+          <Trash2 className="size-4" strokeWidth={1.75} />
+          Remove device
+        </button>
+      )}
     </div>
   );
 }
