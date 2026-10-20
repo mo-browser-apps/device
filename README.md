@@ -102,8 +102,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 3. If users need permission to open HID devices, ship that setup next to the file, as Linux does
    with `70-modevice.rules`, and describe it above.
 4. Add the platform's runner to the `os` matrix in
-   [`.github/workflows/check.yml`](.github/workflows/check.yml). It runs the TypeScript and native
-   tests and builds the app.
+   [`.github/workflows/check.yml`](.github/workflows/check.yml). It checks and builds the app.
 5. Configure the platform under `app.bundle` in [`mobrowser.conf.json`](mobrowser.conf.json), and
    add a build job to [`.github/workflows/ci.yml`](.github/workflows/ci.yml) to release it.
 6. Add a row to the table above. Mark it tested only once a keyboard and a mouse work on it.
