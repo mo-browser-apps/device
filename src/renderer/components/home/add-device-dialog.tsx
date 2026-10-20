@@ -97,7 +97,8 @@ export function AddDeviceDialog({
               Searching for devices…
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Plug in a VIA keyboard, or move a mouse paired with a Logi Bolt receiver.
+              Plug in a VIA keyboard or a Razer device, or move a mouse paired with a Logi
+              Bolt receiver.
             </p>
           </div>
         )}

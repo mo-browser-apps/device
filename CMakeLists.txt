@@ -16,6 +16,8 @@ include(${PROJECT_ROOT_DIR}/node_modules/@mobrowser/native/cmake/MoBrowser.cmake
 # The source files of your app.
 set(APP_SOURCES
         src/native/main.cc
+        src/native/chroma_device.h
+        src/native/chroma_device.cc
         src/native/hardware_service.h
         src/native/hardware_service.cc
         src/native/hidpp_mouse.h

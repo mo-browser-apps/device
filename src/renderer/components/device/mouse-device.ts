@@ -69,7 +69,9 @@ function buttonCallouts(spec: MouseSpec, settings: MouseSettings | undefined, se
 export function mousePresentation(spec: MouseSpec): DevicePresentation {
   const segments: SegmentOption[] = [];
   if (spec.buttons.length > 0) segments.push(['buttons', 'Buttons']);
-  segments.push(['movement', 'Movement'], ['info', 'Info']);
+  if (spec.maxDpi > 0) segments.push(['movement', 'Movement']);
+  if (spec.backlight) segments.push(['lighting', 'Lighting']);
+  segments.push(['info', 'Info']);
 
   return {
     segments,

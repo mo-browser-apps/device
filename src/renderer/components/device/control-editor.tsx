@@ -32,8 +32,8 @@ export function ControlEditor({
     return <DeviceInfo device={device} onRemove={onRemove} />;
   }
 
-  if (segment === 'keys' || segment === 'lighting') {
-    if (!settings.keyboard || !device.keyboard) return null;
+  if (device.keyboard && settings.keyboard) {
+    if (segment !== 'keys' && segment !== 'lighting') return null;
 
     return (
       <KeyboardEditor
@@ -49,18 +49,22 @@ export function ControlEditor({
     );
   }
 
-  if (!settings.mouse || !device.mouse) return null;
+  if (device.mouse && settings.mouse) {
+    if (segment !== 'buttons' && segment !== 'movement' && segment !== 'lighting') return null;
 
-  return (
-    <MouseEditor
-      settings={settings}
-      mouse={settings.mouse}
-      spec={device.mouse}
-      selected={selected}
-      segment={segment}
-      disabled={disabled}
-      onPreview={onPreview}
-      onCommit={onCommit}
-    />
-  );
+    return (
+      <MouseEditor
+        settings={settings}
+        mouse={settings.mouse}
+        spec={device.mouse}
+        selected={selected}
+        segment={segment}
+        disabled={disabled}
+        onPreview={onPreview}
+        onCommit={onCommit}
+      />
+    );
+  }
+
+  return null;
 }

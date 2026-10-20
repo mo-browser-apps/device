@@ -22,8 +22,11 @@ enum LightEffect {
 message MouseSpec {
   // Stable identifiers shared with Binding.control.
   repeated string buttons = 1;
+  // Both 0 when the sensor DPI cannot be set.
   int32 min_dpi = 2;
   int32 max_dpi = 3;
+  // The mouse has RGB lighting with a settable hue and brightness.
+  bool backlight = 4;
 }
 
 message KeyboardSpec {
@@ -79,6 +82,10 @@ message MouseSettings {
   // Demo scale from 1 (slowest) to 5 (fastest).
   int32 scroll_speed = 3;
   bool natural_scroll = 4;
+  // Lighting, used when MouseSpec.backlight is set: hue in degrees from 0 to 360 and
+  // brightness as a percentage from 0 to 100.
+  int32 hue = 5;
+  int32 brightness = 6;
 }
 
 message KeyboardSettings {

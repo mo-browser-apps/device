@@ -99,6 +99,7 @@ function mouse(seed: MouseSeed): DummyDevice {
         buttons: bindings.map(({ control }) => control),
         minDpi: seed.minDpi,
         maxDpi: seed.maxDpi,
+        backlight: false,
       },
     },
     settings: {
@@ -108,6 +109,8 @@ function mouse(seed: MouseSeed): DummyDevice {
         dpi: seed.dpi,
         scrollSpeed: 3,
         naturalScroll: false,
+        hue: 0,
+        brightness: 0,
       },
     },
   };

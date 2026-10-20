@@ -8,9 +8,11 @@ that owns the device model, and a native C++ module that drives real keyboards a
 
 ## What the demo shows
 
-- Find connected QMK/VIA keyboards and Logitech mice, add them, and remove them.
+- Find connected QMK/VIA keyboards, Logitech mice, and, on Windows, Razer keyboards and mice;
+  add them, and remove them.
 - See each device's connection, firmware, and a mouse's real battery level.
 - Change a keyboard's backlight effect, color, and brightness, and a mouse's DPI.
+- Change the color and brightness of a Razer keyboard or mouse through the Razer Chroma SDK.
 - Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
 - Keep added devices between launches.
 
@@ -24,9 +26,10 @@ that owns the device model, and a native C++ module that drives real keyboards a
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-The app supports QMK/VIA keyboards and Logitech mice connected through a Bolt receiver. When no
-real device has been added, it shows clearly labelled dummy devices; **Add device** shows connected
-hardware. This is a reference demo, not production device software.
+The app supports QMK/VIA keyboards, Logitech mice connected through a Bolt receiver, and, on
+Windows, Razer keyboards and mice lit through the [Razer Chroma SDK](https://developer.razer.com/chroma/).
+When no real device has been added, it shows clearly labelled dummy devices; **Add device** shows
+connected hardware. This is a reference demo, not production device software.
 
 The demo requires no account or API key. Packaged versions contact GitHub Releases to check for
 updates, but device data and settings are not sent anywhere.
@@ -37,6 +40,9 @@ updates, but device data and settings are not sent anywhere.
   [Supported platforms](#supported-platforms).
 - [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
 - [MōBrowser](https://teamdev.com/mobrowser/) 2.18.0 or later.
+- For Razer devices on Windows: [Razer Synapse](https://www.razer.com/synapse) with its
+  **Chroma Connect** module, which installs the Chroma SDK runtime (`RzChromaSDK64.dll`) and its
+  service. Without it, Razer devices are not listed. Chroma apps must be allowed in Synapse.
 
 ## Run from source
 
@@ -57,12 +63,15 @@ npm run build
   keyboards and mice the native module reports.
 - `src/main/via.ts` maps VIA hardware to app devices: known models, effects, and value ranges.
 - `src/main/logitech.ts` maps Logitech mice to app devices.
+- `src/main/razer.ts` maps Razer keyboards and mice to app devices.
 - `src/main/devices.ts` connects the device state to the interface, the native module, and saved
   preferences.
 - `src/native/hardware_service.*` serves the open keyboards and mice to the main process over
   native RPC.
 - `src/native/via_keyboard.*` speaks the VIA protocol over HIDAPI.
 - `src/native/hidpp_mouse.*` speaks Logitech's HID++ 2.0 protocol over HIDAPI.
+- `src/native/chroma_device.*` finds Razer keyboards and mice over HIDAPI; the Chroma SDK lights
+  them.
 - `src/native/platform/` holds everything that differs per operating system: `platform.h` and
   one implementation file per supported platform.
 - `src/renderer/gateway/devices.ts` is the interface's single entry point for device operations.
@@ -72,16 +81,22 @@ npm run build
 
 ## Supported platforms
 
-| Platform | Platform file | HIDAPI backend | Device access | CI checks | Release | Tested with devices |
-|---|---|---|---|---|---|---|
-| macOS 14+, Apple silicon | [`mac.cc`](src/native/platform/mac.cc) | IOHIDManager | Nothing to set up | Yes | Yes, signed and notarized | Yes |
-| Windows 10+, x64 | [`windows.cc`](src/native/platform/windows.cc) | WinAPI | Nothing to set up | Yes | No | No |
-| Linux, x64 | [`linux.cc`](src/native/platform/linux.cc) | hidraw (needs `libudev-dev` to build) | Install [`70-modevice.rules`](src/native/platform/70-modevice.rules) | Yes | No | No |
+| Platform | Platform file | HIDAPI backend | Razer Chroma SDK | Device access | CI checks | Release | Tested with devices |
+|---|---|---|---|---|---|---|---|
+| macOS 14+, Apple silicon | [`mac.cc`](src/native/platform/mac.cc) | IOHIDManager | No | Nothing to set up | Yes | Yes, signed and notarized | Yes |
+| Windows 10+, x64 | [`windows.cc`](src/native/platform/windows.cc) | WinAPI | Yes, loaded at run time | Nothing to set up | Yes | No | No |
+| Linux, x64 | [`linux.cc`](src/native/platform/linux.cc) | hidraw (needs `libudev-dev` to build) | No | Install [`70-modevice.rules`](src/native/platform/70-modevice.rules) | Yes | No | No |
 
 All device code is shared. Only the functions declared in
 [`src/native/platform/platform.h`](src/native/platform/platform.h) differ per platform, and
 [`CMakeLists.txt`](CMakeLists.txt) compiles one implementation of them. Building on any other
 platform stops with an error that points here.
+
+The Razer Chroma SDK exists for Windows only. `windows.cc` loads its runtime from the system
+directory when the app runs, so nothing from the SDK is needed to build, and the other platforms
+report that the SDK is unavailable. The SDK lights every Razer keyboard, or every Razer mouse, as
+one, and cannot read what a device shows: the app starts from a default color and keeps the last
+color written while it runs.
 
 On Linux, HID devices are readable only by root until a udev rule grants access. Run this once,
 then plug the devices in again:
@@ -104,11 +119,12 @@ always read from the hardware when a device connects, never restored onto it.
 
 ### Add a device
 
-**Another model of a supported kind** (a VIA keyboard or a mouse behind a Bolt receiver) needs
-no native changes:
+**Another model of a supported kind** (a VIA keyboard, a mouse behind a Bolt receiver, or a Razer
+keyboard or mouse) needs no native changes:
 
 - For a VIA keyboard, add its vendor and product IDs and effect numbers to `KNOWN_MODELS` in
   [`src/main/via.ts`](src/main/via.ts). Without an entry it still works with Steady only.
+- A Razer keyboard or mouse is found by its USB vendor ID and lit through the Chroma SDK as is.
 - Optionally, add its artwork to `src/renderer/public/device-art/` and connect its `modelId` in
   [`device-art.tsx`](src/renderer/components/art/device-art.tsx). Without it, the device shows
   the default artwork for its kind.

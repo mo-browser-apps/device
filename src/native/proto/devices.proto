@@ -13,7 +13,9 @@ enum Bus {
   BUS_BLUETOOTH = 1;
 }
 
-// Raw VIA lighting values, each from 0 to 255. Effect 0 means lighting off.
+// Lighting values in VIA's form, each from 0 to 255. Effect 0 means lighting off. A
+// Chroma device shows hue, saturation, and brightness as one solid color and ignores
+// the effect.
 message RawLighting {
   int32 effect = 1;
   int32 hue = 2;
@@ -58,9 +60,32 @@ message ConnectedMouse {
   int32 max_dpi = 8;
 }
 
+// What a Razer device is to the Chroma SDK, which lights every keyboard, or every
+// mouse, as one.
+enum ChromaKind {
+  CHROMA_KEYBOARD = 0;
+  CHROMA_MOUSE = 1;
+}
+
+// A Razer keyboard or mouse lit through the Razer Chroma SDK. Windows only: the SDK
+// runtime comes with Razer Synapse, and devices are listed only once it is ready.
+message ConnectedChromaDevice {
+  // Shares the numbering of ConnectedKeyboard.connection_id.
+  uint32 connection_id = 1;
+  ChromaKind kind = 2;
+  uint32 vendor_id = 3;
+  uint32 product_id = 4;
+  // The USB product string, such as "Razer Huntsman"; may be empty.
+  string product_name = 5;
+  // The color last written to this kind of device in this native session, or a
+  // default before any write: the SDK cannot read what a device shows.
+  RawLighting lighting = 6;
+}
+
 message ConnectedDevices {
   repeated ConnectedKeyboard keyboards = 1;
   repeated ConnectedMouse mice = 2;
+  repeated ConnectedChromaDevice chroma_devices = 3;
 }
 
 message LightingRequest {
@@ -78,7 +103,8 @@ service HardwareService {
   // Every device currently open.
   rpc List(google.protobuf.Empty) returns (ConnectedDevices);
 
-  // Writes one complete lighting snapshot to a keyboard. Fails if the keyboard is gone.
+  // Writes one complete lighting snapshot to a keyboard or a Chroma device. Fails if
+  // the device is gone.
   rpc ApplyLighting(LightingRequest) returns (google.protobuf.Empty);
 
   // Sets a mouse's sensor DPI. Fails if the mouse is gone or asleep.

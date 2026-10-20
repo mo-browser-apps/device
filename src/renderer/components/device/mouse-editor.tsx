@@ -1,5 +1,11 @@
 import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
-import { BindingEditor, SettingsSection, SettingsSlider } from './editor-controls';
+import {
+  BindingEditor,
+  BrightnessSlider,
+  HueSlider,
+  SettingsSection,
+  SettingsSlider,
+} from './editor-controls';
 import { MOUSE_ACTIONS, mouseControlLabel, resetMouseBindings } from './mouse-device';
 
 const DPI_STEP = 100;
@@ -9,14 +15,14 @@ interface MouseEditorProps {
   mouse: MouseSettings;
   spec: MouseSpec;
   selected: string | null;
-  segment: 'buttons' | 'movement';
+  segment: 'buttons' | 'movement' | 'lighting';
   disabled: boolean;
   onPreview: (settings: Settings) => void;
   onCommit: (settings: Settings) => void;
 }
 
 /**
- * Shows button assignments or movement settings for a mouse.
+ * Shows button assignments, movement, or lighting settings for a mouse.
  */
 export function MouseEditor({
   settings,
@@ -53,6 +59,24 @@ export function MouseEditor({
   }
 
   const commitCurrentSettings = () => onCommit(settings);
+
+  if (segment === 'lighting') {
+    return (
+      <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
+        <HueSlider
+          hue={mouse.hue}
+          onPreview={(hue) => onPreview(withMouseChanges({ hue }))}
+          onCommit={commitCurrentSettings}
+        />
+
+        <BrightnessSlider
+          brightness={mouse.brightness}
+          onPreview={(brightness) => onPreview(withMouseChanges({ brightness }))}
+          onCommit={commitCurrentSettings}
+        />
+      </fieldset>
+    );
+  }
 
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">

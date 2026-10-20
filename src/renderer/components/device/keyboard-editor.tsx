@@ -1,10 +1,10 @@
-import type { CSSProperties } from 'react';
 import type { KeyboardSettings, KeyboardSpec, Settings } from '@/gen/devices';
 import {
   BindingEditor,
+  BrightnessSlider,
+  HueSlider,
   RadioOption,
   SettingsSection,
-  SettingsSlider,
 } from './editor-controls';
 import {
   KEY_ACTIONS,
@@ -12,15 +12,6 @@ import {
   keyboardControlLabel,
   resetKeyBindings,
 } from './keyboard-device';
-
-/**
- * Draws the color range behind the keyboard hue slider.
- */
-const HUE_TRACK_STYLE: CSSProperties = {
-  background: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360]
-    .map((hue) => `hsl(${hue} 95% 55%)`)
-    .join(', ')})`,
-};
 
 interface KeyboardEditorProps {
   settings: Settings;
@@ -91,41 +82,18 @@ export function KeyboardEditor({
       </SettingsSection>
 
       {spec.color && (
-        <SettingsSection title="Colour">
-          <SettingsSlider
-            label="Hue"
-            display={
-              <span
-                aria-hidden="true"
-                className="inline-block size-3.5 rounded-full border border-border/60 align-middle"
-                style={{ background: `hsl(${keyboard.hue} 95% 55%)` }}
-              />
-            }
-            value={keyboard.hue}
-            min={0}
-            max={359}
-            step={1}
-            trackStyle={HUE_TRACK_STYLE}
-            onPreview={(hue) => onPreview(withKeyboardChanges({ hue }))}
-            onCommit={commitCurrentSettings}
-          />
-        </SettingsSection>
-      )}
-
-      <SettingsSection title="Brightness">
-        <SettingsSlider
-          label="Level"
-          display={`${keyboard.brightness}%`}
-          value={keyboard.brightness}
-          min={0}
-          max={100}
-          step={1}
-          minLabel="Off"
-          maxLabel="Bright"
-          onPreview={(brightness) => onPreview(withKeyboardChanges({ brightness }))}
+        <HueSlider
+          hue={keyboard.hue}
+          onPreview={(hue) => onPreview(withKeyboardChanges({ hue }))}
           onCommit={commitCurrentSettings}
         />
-      </SettingsSection>
+      )}
+
+      <BrightnessSlider
+        brightness={keyboard.brightness}
+        onPreview={(brightness) => onPreview(withKeyboardChanges({ brightness }))}
+        onCommit={commitCurrentSettings}
+      />
     </fieldset>
   );
 }

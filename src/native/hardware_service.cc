@@ -14,6 +14,7 @@
 #include <thread>
 #include <utility>
 
+#include "chroma_device.h"
 #include "gen/devices.rpc.h"
 #include "gen/events.rpc.h"
 #include "hidpp_mouse.h"
@@ -30,6 +31,13 @@ constexpr auto kScanInterval = std::chrono::seconds(1);
 constexpr auto kSilentInterfaceRetry = std::chrono::seconds(30);
 // How often mice are looked for and their batteries read.
 constexpr auto kMouseScanInterval = std::chrono::seconds(3);
+// How often the Chroma SDK is tried again while it is missing or not running.
+constexpr auto kChromaSdkRetry = std::chrono::seconds(30);
+
+// Razer green, as VIA values: what a Chroma device is assumed to show before the first
+// write, since the SDK cannot read it.
+constexpr ViaKeyboard::Lighting kChromaDefault = {
+    .effect = 1, .hue = 85, .saturation = 255, .brightness = 255};
 
 // The open devices. Only the hardware thread touches them, so no HID handle is ever
 // used by two threads at once.
@@ -46,10 +54,20 @@ struct Hardware {
 
   ViaScanner keyboard_scanner{kSilentInterfaceRetry};
   HidppScanner mouse_scanner{kMouseScanInterval};
+  ChromaScanner chroma_scanner{kChromaSdkRetry};
   // By connection ID. IDs are never reused, so a stale one finds nothing.
   std::map<uint32_t, Keyboard> keyboards;
   std::map<uint32_t, Mouse> mice;
+  std::map<uint32_t, ChromaDevice> chroma_devices;
+  // The Chroma SDK lights every Razer keyboard, or every mouse, as one: the color last
+  // written to each kind.
+  ViaKeyboard::Lighting chroma_keyboards = kChromaDefault;
+  ViaKeyboard::Lighting chroma_mice = kChromaDefault;
   uint32_t next_id = 1;
+
+  ViaKeyboard::Lighting& chroma_lighting(ChromaDeviceKind kind) {
+    return kind == ChromaDeviceKind::kKeyboard ? chroma_keyboards : chroma_mice;
+  }
 };
 
 // RPC work waiting for the hardware thread, which runs it between scans.
@@ -94,7 +112,38 @@ ViaKeyboard::Lighting FromProto(const RawLighting& lighting) {
   };
 }
 
-ConnectedDevices Snapshot(const Hardware& hardware) {
+struct Rgb {
+  uint8_t red;
+  uint8_t green;
+  uint8_t blue;
+};
+
+// The solid color a Chroma device shows for VIA values: the hue and saturation, dimmed
+// by the brightness. An effect of 0 is off, like no brightness.
+Rgb ToRgb(const ViaKeyboard::Lighting& lighting) {
+  if (lighting.effect == 0) return {0, 0, 0};
+  const double hue = lighting.hue * 6.0 / 256.0;  // Sector 0 to 6 around the wheel.
+  const double saturation = lighting.saturation / 255.0;
+  const double value = lighting.brightness / 255.0;
+  const int sector = static_cast<int>(hue);
+  const double fraction = hue - sector;
+  const double low = value * (1 - saturation);
+  const double falling = value * (1 - saturation * fraction);
+  const double rising = value * (1 - saturation * (1 - fraction));
+  double red = value, green = low, blue = falling;
+  switch (sector) {
+    case 0: red = value, green = rising, blue = low; break;
+    case 1: red = falling, green = value, blue = low; break;
+    case 2: red = low, green = value, blue = rising; break;
+    case 3: red = low, green = falling, blue = value; break;
+    case 4: red = rising, green = low, blue = value; break;
+    default: break;
+  }
+  auto byte = [](double channel) { return static_cast<uint8_t>(channel * 255 + 0.5); };
+  return {byte(red), byte(green), byte(blue)};
+}
+
+ConnectedDevices Snapshot(Hardware& hardware) {
   ConnectedDevices snapshot;
   for (const auto& [id, connection] : hardware.keyboards) {
     const ViaKeyboard& keyboard = *connection.keyboard;
@@ -120,10 +169,19 @@ ConnectedDevices Snapshot(const Hardware& hardware) {
     entry->set_min_dpi(connection.mouse->min_dpi());
     entry->set_max_dpi(connection.mouse->max_dpi());
   }
+  for (const auto& [id, device] : hardware.chroma_devices) {
+    ConnectedChromaDevice* entry = snapshot.add_chroma_devices();
+    entry->set_connection_id(id);
+    entry->set_kind(device.kind == ChromaDeviceKind::kKeyboard ? CHROMA_KEYBOARD : CHROMA_MOUSE);
+    entry->set_vendor_id(device.vendor_id);
+    entry->set_product_id(device.product_id);
+    entry->set_product_name(device.product_name);
+    *entry->mutable_lighting() = ToProto(hardware.chroma_lighting(device.kind));
+  }
   return snapshot;
 }
 
-void Publish(const Hardware& hardware) {
+void Publish(Hardware& hardware) {
   mo::rpc::hardware_events.Changed(Snapshot(hardware), [](mo::rpc::Result<Empty>) {});
 }
 
@@ -142,6 +200,19 @@ class HardwareServiceImpl : public HardwareService {
     const uint32_t id = request->connection_id();
     const ViaKeyboard::Lighting lighting = FromProto(request->lighting());
     queue_->Post([id, lighting, done = Share(std::move(done))](Hardware& hardware) {
+      if (auto chroma = hardware.chroma_devices.find(id);
+          chroma != hardware.chroma_devices.end()) {
+        const ChromaDeviceKind kind = chroma->second.kind;
+        const Rgb color = ToRgb(lighting);
+        if (!SetChromaColor(kind, color.red, color.green, color.blue)) {
+          std::move(*done).Reject("Cannot set the color of Chroma device: " +
+                                  std::to_string(id));
+          return;
+        }
+        hardware.chroma_lighting(kind) = lighting;
+        std::move(*done).Complete(Empty());
+        return;
+      }
       auto live = hardware.keyboards.find(id);
       if (live == hardware.keyboards.end()) {
         std::move(*done).Reject("Keyboard is not connected: " + std::to_string(id));
@@ -210,6 +281,24 @@ bool UpdateMice(Hardware& hardware, const std::vector<HidppScanner::Found>& foun
   return changed;
 }
 
+// Applies one Chroma scan; true if a Razer device came or went.
+bool UpdateChromaDevices(Hardware& hardware, const std::vector<ChromaDevice>& found) {
+  bool changed = std::erase_if(hardware.chroma_devices, [&](const auto& live) {
+    return std::none_of(found.begin(), found.end(), [&](const ChromaDevice& device) {
+      return device.path == live.second.path;
+    });
+  });
+  for (const ChromaDevice& device : found) {
+    const bool known =
+        std::any_of(hardware.chroma_devices.begin(), hardware.chroma_devices.end(),
+                    [&](const auto& live) { return live.second.path == device.path; });
+    if (known) continue;
+    hardware.chroma_devices[hardware.next_id++] = device;
+    changed = true;
+  }
+  return changed;
+}
+
 // Opens devices that were plugged in, drops the ones that went, and publishes the change.
 void Scan(Hardware& hardware) {
   ViaScanner::Changes changes = hardware.keyboard_scanner.Scan();
@@ -223,6 +312,7 @@ void Scan(Hardware& hardware) {
   }
   std::optional<std::vector<HidppScanner::Found>> found = hardware.mouse_scanner.Scan();
   if (found && UpdateMice(hardware, *found)) changed = true;
+  if (UpdateChromaDevices(hardware, hardware.chroma_scanner.Scan())) changed = true;
   if (changed) Publish(hardware);
 }
 

@@ -1,5 +1,6 @@
 import { Device, Settings, type DeviceList } from './gen/devices';
 import type {
+  ConnectedChromaDevice,
   ConnectedDevices,
   ConnectedKeyboard,
   ConnectedMouse,
@@ -7,6 +8,7 @@ import type {
 } from './gen/native/devices';
 import { dummyDevices } from './dummy-devices';
 import { logitechModelId, logitechMouse } from './logitech';
+import { chromaDevice, chromaModelId, chromaRawLighting } from './razer';
 import { toRawLighting, viaKeyboard, viaModel } from './via';
 
 interface Entry {
@@ -18,8 +20,9 @@ interface Entry {
 
 /** One open device, as the native module reports it. */
 type Connection =
-  | { connectionId: number; keyboard: ConnectedKeyboard; mouse?: undefined }
-  | { connectionId: number; mouse: ConnectedMouse; keyboard?: undefined };
+  | { connectionId: number; keyboard: ConnectedKeyboard; mouse?: undefined; chroma?: undefined }
+  | { connectionId: number; mouse: ConnectedMouse; keyboard?: undefined; chroma?: undefined }
+  | { connectionId: number; chroma: ConnectedChromaDevice; keyboard?: undefined; mouse?: undefined };
 
 /** What is kept between launches. */
 export interface SavedDevices {
@@ -28,7 +31,7 @@ export interface SavedDevices {
 }
 
 export interface DeviceStateHooks {
-  /** Writes lighting to an open keyboard; rejects if it is gone or the write fails. */
+  /** Writes lighting to an open keyboard or Razer device; rejects if it is gone or the write fails. */
   applyLighting(connectionId: number, lighting: RawLighting): Promise<void>;
   /** Sets an open mouse's DPI; rejects if it is gone or the write fails. */
   applyDpi(connectionId: number, dpi: number): Promise<void>;
@@ -53,6 +56,8 @@ function isValid({ device, settings: current }: Entry, settings: Settings): bool
     return (
       isInRange(mouse.dpi, spec.minDpi, spec.maxDpi) &&
       isInRange(mouse.scrollSpeed, 1, MAX_SCROLL_SPEED) &&
+      (!spec.backlight ||
+        (isInRange(mouse.hue, 0, 359) && isInRange(mouse.brightness, 0, 100))) &&
       mouse.bindings.every((binding) => spec.buttons.includes(binding.control))
     );
   }
@@ -87,6 +92,24 @@ function restoreEntry(json: unknown): Entry | undefined {
   }
   const entry = { device: { ...device, connected: false }, settings, paired: true };
   return isValid(entry, settings) ? entry : undefined;
+}
+
+/**
+ * The ID shared by every unit of the connected device's model.
+ */
+function modelIdOf(connection: Connection): string {
+  if (connection.keyboard) return viaModel(connection.keyboard).id;
+  if (connection.chroma) return chromaModelId(connection.chroma);
+  return logitechModelId(connection.mouse);
+}
+
+/**
+ * The device and settings to show for a connection, from what the hardware reported.
+ */
+function describe(deviceId: string, connection: Connection): { device: Device; settings: Settings } {
+  if (connection.keyboard) return viaKeyboard(deviceId, connection.keyboard);
+  if (connection.chroma) return chromaDevice(deviceId, connection.chroma);
+  return logitechMouse(deviceId, connection.mouse);
 }
 
 /**
@@ -167,6 +190,8 @@ export class DeviceState {
         connection.connectionId,
         toRawLighting(settings.keyboard!, viaModel(connection.keyboard)),
       );
+    } else if (connection.chroma) {
+      await this.hooks.applyLighting(connection.connectionId, chromaRawLighting(settings));
     } else {
       await this.hooks.applyDpi(connection.connectionId, settings.mouse!.dpi);
     }
@@ -179,10 +204,11 @@ export class DeviceState {
   /**
    * Matches the complete set of open devices to entries, then publishes the change.
    */
-  reconcile({ keyboards, mice }: ConnectedDevices): void {
+  reconcile({ keyboards, mice, chromaDevices }: ConnectedDevices): void {
     const connections: Connection[] = [
       ...keyboards.map((keyboard) => ({ connectionId: keyboard.connectionId, keyboard })),
       ...mice.map((mouse) => ({ connectionId: mouse.connectionId, mouse })),
+      ...chromaDevices.map((chroma) => ({ connectionId: chroma.connectionId, chroma })),
     ];
     const open = new Map(connections.map((connection) => [connection.connectionId, connection]));
     let changed = false;
@@ -226,18 +252,14 @@ export class DeviceState {
    * reconnect.
    */
   private connect(connection: Connection): void {
-    const modelId = connection.keyboard
-      ? viaModel(connection.keyboard).id
-      : logitechModelId(connection.mouse);
+    const modelId = modelIdOf(connection);
     const entry = this.entries.find(
       (unit) => unit.device.modelId === modelId && !unit.device.connected,
     );
     let deviceId = entry?.device.id ?? modelId;
     for (let unit = 2; !entry && this.find(deviceId); unit++) deviceId = `${modelId}-${unit}`;
 
-    const fresh = connection.keyboard
-      ? viaKeyboard(deviceId, connection.keyboard)
-      : logitechMouse(deviceId, connection.mouse);
+    const fresh = describe(deviceId, connection);
     if (entry) Object.assign(entry, fresh);
     else this.entries.push({ ...fresh, paired: false });
     this.live.set(deviceId, connection);
