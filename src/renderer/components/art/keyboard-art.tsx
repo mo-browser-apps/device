@@ -22,6 +22,10 @@ export interface KeyboardLayout {
   /** Fractions of the image's width and height. */
   area: { left: number; top: number; width: number; height: number };
   keys: KeyRect[];
+  mark?: {
+    src: string;
+    area: { left: number; top: number; width: number; height: number };
+  };
 }
 
 /**
@@ -103,6 +107,45 @@ function KeyFace({ lighting, keyLayout }: { lighting: Lighting | null; keyLayout
     >
       {keyLayout.label}
     </span>
+  );
+}
+
+/** Draws a device mark with the same tint, brightness, and animation as the keys. */
+function KeyboardMark({
+  mark,
+  lighting,
+}: {
+  mark: NonNullable<KeyboardLayout['mark']>;
+  lighting: Lighting | null;
+}) {
+  const { left, top, width, height } = mark.area;
+  const animated = lighting && isAnimated(lighting.effect);
+
+  return (
+    <img
+      src={mark.src}
+      alt=""
+      draggable={false}
+      style={{
+        left: `${left * 100}%`,
+        top: `${top * 100}%`,
+        width: `${width * 100}%`,
+        height: `${height * 100}%`,
+        filter: lighting
+          ? 'drop-shadow(0 1.5px 2.5px rgb(255 255 255 / 0.75)) drop-shadow(0 4px 8px rgb(255 255 255 / 0.42))'
+          : undefined,
+        animationDelay:
+          lighting?.effect === LightEffect.WAVE
+            ? `-${((left + width / 2) * LIGHTING_CYCLE_SECONDS).toFixed(2)}s`
+            : '0s',
+        animationDuration: `${LIGHTING_CYCLE_SECONDS}s`,
+      }}
+      className={cn(
+        'pointer-events-none absolute object-contain',
+        !lighting && 'opacity-45',
+        animated && 'animate-[key-glow_ease-in-out_infinite] motion-reduce:animate-none',
+      )}
+    />
   );
 }
 
@@ -242,19 +285,23 @@ export function KeyboardArt({
             keys={keys}
             renderKey={(key) => <KeyFace key={key.id} lighting={activeLighting} keyLayout={key} />}
           />
+          {layout.mark && <KeyboardMark mark={layout.mark} lighting={activeLighting} />}
           <span
             className="absolute inset-0 mix-blend-multiply will-change-[background-color]"
             style={{ backgroundColor: `hsl(${activeLighting.hue} 100% 55%)` }}
           />
         </span>
       ) : (
-        <KeyLayer
-          aria-hidden
-          className="pointer-events-none"
-          layout={layout}
-          keys={keys}
-          renderKey={(key) => <KeyFace key={key.id} lighting={null} keyLayout={key} />}
-        />
+        <>
+          <KeyLayer
+            aria-hidden
+            className="pointer-events-none"
+            layout={layout}
+            keys={keys}
+            renderKey={(key) => <KeyFace key={key.id} lighting={null} keyLayout={key} />}
+          />
+          {layout.mark && <KeyboardMark mark={layout.mark} lighting={null} />}
+        </>
       )}
 
       {onControlSelect && (

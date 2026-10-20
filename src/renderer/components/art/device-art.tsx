@@ -1,6 +1,7 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
 import { COMPACT_KEYBOARD_LAYOUT } from './compact-keyboard-layout';
+import { HUNTSMAN_LAYOUT } from './huntsman-layout';
 import { K10_MAX_LAYOUT } from './k10-max-layout';
 import { KeyboardArt, type KeyboardLayout, type Lighting } from './keyboard-art';
 import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
@@ -42,6 +43,21 @@ const DEFAULT_KEYBOARD_ARTWORK: DeviceArtwork = {
   keyboardLayout: COMPACT_KEYBOARD_LAYOUT,
 };
 
+const HUNTSMAN_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/razer-huntsman.webp',
+  homeSrc: '/device-art/razer-huntsman.webp',
+  alt: 'Razer Huntsman full-size keyboard',
+  aspectRatio: '1909 / 824',
+  keyboardLayout: HUNTSMAN_LAYOUT,
+};
+
+const MAMBA_WIRELESS_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/razer-mamba-wireless.webp',
+  homeSrc: '/device-art/razer-mamba-wireless-home.webp',
+  alt: 'Razer Mamba Wireless mouse',
+  aspectRatio: '3 / 2',
+};
+
 const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
   'performance-mouse': {
     detailSrc: '/device-art/performance-mouse.webp',
@@ -57,6 +73,12 @@ const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
     aspectRatio: '2349 / 1022',
     keyboardLayout: K10_MAX_LAYOUT,
   },
+  'razer-mamba-wireless': MAMBA_WIRELESS_ARTWORK,
+  'razer-razer-mamba-wireless': MAMBA_WIRELESS_ARTWORK,
+  'razer-huntsman': HUNTSMAN_ARTWORK,
+  'razer-huntsman-eng': HUNTSMAN_ARTWORK,
+  'razer-razer-huntsman': HUNTSMAN_ARTWORK,
+  'razer-razer-huntsman-eng': HUNTSMAN_ARTWORK,
 };
 
 /**
