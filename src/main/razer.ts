@@ -37,6 +37,32 @@ export function chromaRawLighting(settings: Settings): RawLighting {
 }
 
 /**
+ * The editor's hue and brightness for the values the native module reports.
+ */
+function fromChromaLighting(raw: RawLighting): { hue: number; brightness: number } {
+  return { hue: Math.min(fromVia(raw.hue, 360), 359), brightness: fromVia(raw.brightness, 100) };
+}
+
+/**
+ * The settings updated to the color the native module reports for a Razer device, or
+ * undefined when they show it already. The SDK lights every Razer keyboard, or every
+ * mouse, as one, so a color written to one unit reaches the others too.
+ */
+export function syncChromaLighting(
+  settings: Settings,
+  device: ConnectedChromaDevice,
+): Settings | undefined {
+  const raw = device.lighting;
+  if (!raw) return undefined;
+  const shown = chromaRawLighting(settings);
+  if (shown.hue === raw.hue && shown.brightness === raw.brightness) return undefined;
+  const lighting = fromChromaLighting(raw);
+  if (settings.keyboard) return { ...settings, keyboard: { ...settings.keyboard, ...lighting } };
+  if (settings.mouse) return { ...settings, mouse: { ...settings.mouse, ...lighting } };
+  return undefined;
+}
+
+/**
  * Builds the device and settings shown for a Razer device that was just found. The
  * Chroma SDK sets one solid color and reads nothing back, so the settings start from
  * the color last written in this native session, or a default.
@@ -45,9 +71,9 @@ export function chromaDevice(
   id: string,
   device: ConnectedChromaDevice,
 ): { device: Device; settings: Settings } {
-  const raw = device.lighting ?? { effect: 1, hue: 0, saturation: 0, brightness: 0 };
-  const hue = Math.min(fromVia(raw.hue, 360), 359);
-  const brightness = fromVia(raw.brightness, 100);
+  const { hue, brightness } = fromChromaLighting(
+    device.lighting ?? { effect: 1, hue: 0, saturation: 0, brightness: 0 },
+  );
   const isKeyboard = device.kind === ChromaKind.CHROMA_KEYBOARD;
 
   const shared = {

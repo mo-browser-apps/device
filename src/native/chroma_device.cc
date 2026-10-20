@@ -40,6 +40,12 @@ std::optional<ChromaDeviceKind> KindOf(const hid_device_info& info) {
 
 }  // namespace
 
+void ChromaScanner::Reset() {
+  UninitChromaSdk();
+  ready_ = false;
+  retry_at_.reset();
+}
+
 bool ChromaScanner::SdkReady() {
   if (ready_) return true;
   const auto now = std::chrono::steady_clock::now();
@@ -59,19 +65,22 @@ std::vector<ChromaDevice> ChromaScanner::Scan() {
   if (!SdkReady()) return devices;
 
   // Enumeration only reads the system's device list. A device shows up once per
-  // interface and collection; its main interface identifies it.
+  // interface and collection; its main interface identifies it. A main interface with
+  // both a keyboard and a pointer, such as a keyboard with a trackpad, is a keyboard.
   std::map<std::string, ChromaDevice> found;
   hid_device_info* infos = hid_enumerate(kRazer, 0);
   for (hid_device_info* info = infos; info; info = info->next) {
     const std::optional<ChromaDeviceKind> kind = KindOf(*info);
     if (!kind) continue;
-    found[info->path] = {
-        .kind = *kind,
-        .vendor_id = info->vendor_id,
-        .product_id = info->product_id,
-        .product_name = Narrow(info->product_string),
-        .path = info->path,
-    };
+    const std::string path = HidInterfacePath(info->path);
+    auto [entry, added] = found.try_emplace(path, ChromaDevice{
+                                                      .kind = *kind,
+                                                      .vendor_id = info->vendor_id,
+                                                      .product_id = info->product_id,
+                                                      .product_name = Narrow(info->product_string),
+                                                      .path = path,
+                                                  });
+    if (!added && *kind == ChromaDeviceKind::kKeyboard) entry->second.kind = *kind;
   }
   hid_free_enumeration(infos);
 

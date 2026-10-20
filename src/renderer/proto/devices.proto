@@ -82,7 +82,7 @@ message MouseSettings {
   // Demo scale from 1 (slowest) to 5 (fastest).
   int32 scroll_speed = 3;
   bool natural_scroll = 4;
-  // Lighting, used when MouseSpec.backlight is set: hue in degrees from 0 to 360 and
+  // Lighting, used when MouseSpec.backlight is set: hue in degrees from 0 to 359 and
   // brightness as a percentage from 0 to 100.
   int32 hue = 5;
   int32 brightness = 6;
@@ -91,7 +91,7 @@ message MouseSettings {
 message KeyboardSettings {
   repeated Binding bindings = 1;
   LightEffect effect = 2;
-  // Hue in degrees from 0 to 360.
+  // Hue in degrees from 0 to 359.
   int32 hue = 3;
   // Percentage from 0 to 100.
   int32 brightness = 4;

@@ -43,6 +43,7 @@ struct MouseStaticEffect {
 
 // The SDK applies an effect at once when no effect ID is asked for.
 using Init = Result (*)();
+using UnInit = Result (*)();
 using InitSdk = Result (*)(AppInfo* app_info);
 using CreateKeyboardEffect = Result (*)(int effect, void* param, GUID* effect_id);
 using CreateMouseEffect = Result (*)(int effect, void* param, GUID* effect_id);
@@ -54,6 +55,7 @@ constexpr wchar_t kChromaLibrary[] = L"RzChromaSDK64.dll";
 
 struct ChromaSdk {
   HMODULE library = nullptr;
+  chroma::UnInit uninit = nullptr;
   chroma::CreateKeyboardEffect create_keyboard_effect = nullptr;
   chroma::CreateMouseEffect create_mouse_effect = nullptr;
   bool ready = false;
@@ -76,13 +78,22 @@ bool InitHid() {
 }
 
 // Windows opens each top-level collection under its own path, such as
-// "\?\hid#vid_046d&pid_c548&mi_02&col02#..." for long reports and "...&col01#..." for
+// "\\?\hid#vid_046d&pid_c548&mi_02&col02#..." for long reports and "...&col01#..." for
 // short ones. HIDAPI lowercases the path.
 std::string HidppShortReportPath(const std::string& long_report_path) {
   std::string path = long_report_path;
   const size_t collection = path.find("&col02");
   if (collection == std::string::npos) return {};
   path.replace(collection, 6, "&col01");
+  return path;
+}
+
+// Strips the collection from a path such as
+// "\\?\hid#vid_1532&pid_0227&mi_00&col02#...".
+std::string HidInterfacePath(const std::string& collection_path) {
+  std::string path = collection_path;
+  const size_t collection = path.find("&col");
+  if (collection != std::string::npos) path.erase(collection, 6);
   return path;
 }
 
@@ -96,6 +107,7 @@ bool InitChromaSdk() {
     sdk.create_keyboard_effect =
         Resolve<chroma::CreateKeyboardEffect>(sdk.library, "CreateKeyboardEffect");
     sdk.create_mouse_effect = Resolve<chroma::CreateMouseEffect>(sdk.library, "CreateMouseEffect");
+    sdk.uninit = Resolve<chroma::UnInit>(sdk.library, "UnInit");
   }
   auto init_sdk = Resolve<chroma::InitSdk>(sdk.library, "InitSDK");
   auto init = Resolve<chroma::Init>(sdk.library, "Init");
@@ -121,6 +133,14 @@ bool InitChromaSdk() {
   }
   sdk.ready = result == chroma::kSuccess;
   return sdk.ready;
+}
+
+// ponytail: not called on exit; the SDK service drops an app whose process has ended,
+// so the devices return to Synapse's lighting shortly after the app quits.
+void UninitChromaSdk() {
+  ChromaSdk& sdk = Sdk();
+  if (sdk.ready && sdk.uninit) sdk.uninit();
+  sdk.ready = false;
 }
 
 bool SetChromaColor(ChromaDeviceKind kind, uint8_t red, uint8_t green, uint8_t blue) {

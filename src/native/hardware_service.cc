@@ -68,6 +68,9 @@ struct Hardware {
   ViaKeyboard::Lighting& chroma_lighting(ChromaDeviceKind kind) {
     return kind == ChromaDeviceKind::kKeyboard ? chroma_keyboards : chroma_mice;
   }
+  const ViaKeyboard::Lighting& chroma_lighting(ChromaDeviceKind kind) const {
+    return kind == ChromaDeviceKind::kKeyboard ? chroma_keyboards : chroma_mice;
+  }
 };
 
 // RPC work waiting for the hardware thread, which runs it between scans.
@@ -143,7 +146,7 @@ Rgb ToRgb(const ViaKeyboard::Lighting& lighting) {
   return {byte(red), byte(green), byte(blue)};
 }
 
-ConnectedDevices Snapshot(Hardware& hardware) {
+ConnectedDevices Snapshot(const Hardware& hardware) {
   ConnectedDevices snapshot;
   for (const auto& [id, connection] : hardware.keyboards) {
     const ViaKeyboard& keyboard = *connection.keyboard;
@@ -181,7 +184,7 @@ ConnectedDevices Snapshot(Hardware& hardware) {
   return snapshot;
 }
 
-void Publish(Hardware& hardware) {
+void Publish(const Hardware& hardware) {
   mo::rpc::hardware_events.Changed(Snapshot(hardware), [](mo::rpc::Result<Empty>) {});
 }
 
@@ -205,11 +208,19 @@ class HardwareServiceImpl : public HardwareService {
         const ChromaDeviceKind kind = chroma->second.kind;
         const Rgb color = ToRgb(lighting);
         if (!SetChromaColor(kind, color.red, color.green, color.blue)) {
+          // Most likely the SDK service stopped; the next scan connects again and lists
+          // the devices under new IDs if it can.
+          hardware.chroma_scanner.Reset();
+          hardware.chroma_devices.clear();
+          Publish(hardware);
           std::move(*done).Reject("Cannot set the color of Chroma device: " +
                                   std::to_string(id));
           return;
         }
         hardware.chroma_lighting(kind) = lighting;
+        // Every Razer device of this kind shows the new color; the snapshot tells the
+        // main process, so the other units' settings match it.
+        Publish(hardware);
         std::move(*done).Complete(Empty());
         return;
       }

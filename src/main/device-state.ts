@@ -8,7 +8,7 @@ import type {
 } from './gen/native/devices';
 import { dummyDevices } from './dummy-devices';
 import { logitechModelId, logitechMouse } from './logitech';
-import { chromaDevice, chromaModelId, chromaRawLighting } from './razer';
+import { chromaDevice, chromaModelId, chromaRawLighting, syncChromaLighting } from './razer';
 import { toRawLighting, viaKeyboard, viaModel } from './via';
 
 interface Entry {
@@ -184,7 +184,8 @@ export class DeviceState {
     const connection = this.live.get(deviceId);
     if (!connection) throw new Error(`Device is not connected: ${deviceId}`);
 
-    // A failed write closes the device; the native module then reports it gone.
+    // A failed write closes the device, or every Razer device after a failed Chroma
+    // write; the native module then reports it gone.
     if (connection.keyboard) {
       await this.hooks.applyLighting(
         connection.connectionId,
@@ -218,6 +219,9 @@ export class DeviceState {
       const entry = this.find(deviceId)!;
       const current = open.get(connection.connectionId);
       if (current) {
+        // A color written to one Razer device reaches every device of its kind.
+        const synced = current.chroma && syncChromaLighting(entry.settings, current.chroma);
+        if (synced) entry.settings = synced;
         // A mouse reports its battery again every few seconds.
         const { battery, charging } = current.mouse ?? entry.device;
         if (battery !== entry.device.battery || charging !== entry.device.charging) {

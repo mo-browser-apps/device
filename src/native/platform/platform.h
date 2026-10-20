@@ -18,6 +18,10 @@ bool InitHid();
 // both arrive on the long-report path.
 std::string HidppShortReportPath(const std::string& long_report_path);
 
+// The path shared by every top-level HID collection of one device interface, given the
+// path of one of them. The same path on platforms that list an interface only once.
+std::string HidInterfacePath(const std::string& collection_path);
+
 // The Razer Chroma SDK lights Razer devices on Windows, where its runtime comes with
 // Razer Synapse. Other platforms have no SDK, so InitChromaSdk is always false there.
 
@@ -28,6 +32,10 @@ enum class ChromaDeviceKind { kKeyboard, kMouse };
 // missing or not running yet. Calling it again retries, and once it has succeeded it
 // returns true at once.
 bool InitChromaSdk();
+
+// Disconnects from the SDK service, so the next InitChromaSdk connects again. Use it
+// when the service stops answering, such as after Synapse was restarted.
+void UninitChromaSdk();
 
 // Shows one solid color on every Razer device of the kind; false if the SDK refused.
 // Requires InitChromaSdk to have returned true.

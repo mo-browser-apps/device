@@ -84,7 +84,7 @@ npm run build
 | Platform | Platform file | HIDAPI backend | Razer Chroma SDK | Device access | CI checks | Release | Tested with devices |
 |---|---|---|---|---|---|---|---|
 | macOS 14+, Apple silicon | [`mac.cc`](src/native/platform/mac.cc) | IOHIDManager | No | Nothing to set up | Yes | Yes, signed and notarized | Yes |
-| Windows 10+, x64 | [`windows.cc`](src/native/platform/windows.cc) | WinAPI | Yes, loaded at run time | Nothing to set up | Yes | No | No |
+| Windows 10+, x64 | [`windows.cc`](src/native/platform/windows.cc) | WinAPI | Yes, loaded at run time | Nothing to set up | Yes | No | Razer devices only |
 | Linux, x64 | [`linux.cc`](src/native/platform/linux.cc) | hidraw (needs `libudev-dev` to build) | No | Install [`70-modevice.rules`](src/native/platform/70-modevice.rules) | Yes | No | No |
 
 All device code is shared. Only the functions declared in
@@ -115,7 +115,9 @@ SDK or HID command. See [`src/native/proto/devices.proto`](src/native/proto/devi
 
 The demo saves the added devices and their last known settings in
 [`src/main/devices.ts`](src/main/devices.ts), to show them while they are disconnected. Settings are
-always read from the hardware when a device connects, never restored onto it.
+always read from the hardware when a device connects, never restored onto it. Razer devices are
+the exception: the Chroma SDK cannot read them, so the native module reports the color it last
+wrote, or a default.
 
 ### Add a device
 

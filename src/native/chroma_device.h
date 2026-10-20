@@ -16,7 +16,7 @@ struct ChromaDevice {
   unsigned short product_id;
   // The USB product string with trailing spaces removed; may be empty.
   std::string product_name;
-  // The HID path of the device's first interface; stable while it stays plugged in.
+  // The HID path of the device's main interface; stable while it stays plugged in.
   std::string path;
 };
 
@@ -31,6 +31,10 @@ class ChromaScanner {
 
   // The devices plugged in now, or none while the SDK is not ready.
   std::vector<ChromaDevice> Scan();
+
+  // Disconnects from the SDK after it refused a color, most likely because its service
+  // stopped. The next Scan connects again and lists the devices if it can.
+  void Reset();
 
  private:
   bool SdkReady();
