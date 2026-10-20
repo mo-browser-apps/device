@@ -10,8 +10,7 @@ that owns the device model, and a native C++ module that drives real keyboards a
 
 - Find connected QMK/VIA keyboards and Logitech mice, add them, and remove them.
 - See each device's connection, firmware, and a mouse's real battery level.
-- Change a keyboard's backlight effect, color, and brightness, and a mouse's DPI, live as the
-  sliders move.
+- Change a keyboard's backlight effect, color, and brightness, and a mouse's DPI.
 - Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
 - Keep added devices between launches.
 
