@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The supported platforms; see "Add a platform" in README.md.
+        # The supported platforms; see "Supported platforms" in README.md.
         os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
 

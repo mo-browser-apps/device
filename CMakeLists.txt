@@ -31,8 +31,8 @@ add_library(mobrowser_lib STATIC ${APP_SOURCES} ${GENERATED_SOURCES})
 mobrowser_configure_app_lib(mobrowser_lib)
 
 # Supported platforms. Each block compiles that platform's implementation of
-# src/native/platform/platform.h and sets its HIDAPI backend; see "Add a platform" in
-# README.md. Keep platform-specific dependencies, sources, and definitions inside these
+# src/native/platform/platform.h and sets its HIDAPI backend; see "Supported platforms"
+# in README.md. Keep platform-specific dependencies, sources, and definitions inside these
 # blocks.
 if (OS_MAC)
     target_sources(mobrowser_lib PRIVATE src/native/platform/mac.cc)
@@ -43,7 +43,7 @@ elseif (OS_LINUX)
     # The kernel hidraw backend only (needs libudev-dev), not libusb.
     set(HIDAPI_WITH_LIBUSB OFF)
 else ()
-    message(FATAL_ERROR "Unsupported platform: see \"Add a platform\" in README.md.")
+    message(FATAL_ERROR "Unsupported platform: see \"Supported platforms\" in README.md.")
 endif ()
 
 # HIDAPI talks to keyboards and mice over HID on every platform.

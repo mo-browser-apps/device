@@ -91,25 +91,6 @@ sudo cp src/native/platform/70-modevice.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-### Add a platform
-
-1. Create `src/native/platform/<platform>.cc` and implement every function in `platform.h`. Copy
-   the closest existing file and change what differs. Each function's comment says what to check,
-   such as whether the platform opens every top-level HID collection under its own path.
-2. Add an `elseif` block for it in [`CMakeLists.txt`](CMakeLists.txt) that compiles the file and
-   sets any HIDAPI backend options. Keep the platform's other dependencies in that block.
-3. If users need permission to open HID devices, ship that setup next to the file, as Linux does
-   with `70-modevice.rules`, and describe it above.
-4. Add the platform's runner to the `os` matrix in
-   [`.github/workflows/check.yml`](.github/workflows/check.yml). It checks and builds the app.
-5. Configure the platform under `app.bundle` in [`mobrowser.conf.json`](mobrowser.conf.json), and
-   add a build job to [`.github/workflows/ci.yml`](.github/workflows/ci.yml) to release it.
-6. Add a row to the table above. Mark it tested only once a keyboard and a mouse work on it.
-
-When a platform needs new behaviour, declare it in `platform.h` and implement it in every
-platform file, even when some of them do nothing. A missing function then fails the build
-instead of misbehaving on one platform.
-
 ## Connect real devices
 
 The main process owns the app's device model; native code is a thin hardware adapter. Keep the
