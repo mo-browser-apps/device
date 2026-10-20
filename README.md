@@ -25,9 +25,9 @@ that owns the device model, and a native C++ module that drives real keyboards a
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-The app supports QMK/VIA keyboards and Logitech mice connected through a Bolt receiver. On the
-first launch the list is empty; **Add device** shows what is connected. This is a reference demo,
-not production device software.
+The app supports QMK/VIA keyboards and Logitech mice connected through a Bolt receiver. When no
+real device has been added, it shows clearly labelled dummy devices; **Add device** shows connected
+hardware. This is a reference demo, not production device software.
 
 The demo requires no account or API key. Packaged versions contact GitHub Releases to check for
 updates, but device data and settings are not sent anywhere.
@@ -95,9 +95,8 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 ### Add a platform
 
 1. Create `src/native/platform/<platform>.cc` and implement every function in `platform.h`. Copy
-   the closest existing file and change what differs. Each function's comment says what to
-   check: for example, whether the platform opens every top-level HID collection under its own
-   path.
+   the closest existing file and change what differs. Each function's comment says what to check,
+   such as whether the platform opens every top-level HID collection under its own path.
 2. Add an `elseif` block for it in [`CMakeLists.txt`](CMakeLists.txt) that compiles the file and
    sets any HIDAPI backend options. Keep the platform's other dependencies in that block.
 3. If users need permission to open HID devices, ship that setup next to the file, as Linux does
