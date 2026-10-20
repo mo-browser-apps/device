@@ -57,3 +57,14 @@ FetchContent_Declare(hidapi
 )
 FetchContent_MakeAvailable(hidapi)
 target_link_libraries(mobrowser_lib PRIVATE hidapi::hidapi)
+
+option(MODEVICE_BUILD_TESTS "Build native device discovery regression tests" OFF)
+if (MODEVICE_BUILD_TESTS)
+    enable_testing()
+    add_executable(chroma_discovery_test
+            tests/native/chroma_discovery_test.cc
+            src/native/chroma_device.cc)
+    target_include_directories(chroma_discovery_test PRIVATE src/native)
+    target_link_libraries(chroma_discovery_test PRIVATE hidapi::hidapi)
+    add_test(NAME chroma_discovery COMMAND chroma_discovery_test)
+endif ()

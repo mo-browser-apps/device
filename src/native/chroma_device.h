@@ -2,14 +2,15 @@
 #define CHROMA_DEVICE_H_
 
 #include <chrono>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "platform/platform.h"
 
-// A Razer keyboard or mouse that is plugged in. Nothing is opened: the Razer Chroma SDK
-// does the I/O, and it lights every keyboard, or every mouse, as one.
+// A Razer keyboard or mouse. Lighting uses the Chroma SDK; supported receivers are
+// queried over HID to distinguish a connected mouse from an idle USB receiver.
 struct ChromaDevice {
   ChromaDeviceKind kind;
   unsigned short vendor_id;
@@ -42,6 +43,8 @@ class ChromaScanner {
   std::chrono::milliseconds retry_delay_;
   std::optional<std::chrono::steady_clock::time_point> retry_at_;
   bool ready_ = false;
+  // Keep the last confirmed receiver state when another client interrupts a query.
+  std::map<std::string, bool> receiver_connected_;
 };
 
 #endif  // CHROMA_DEVICE_H_
