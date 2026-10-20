@@ -115,46 +115,13 @@ no native changes:
 - On Linux, add a line for a new vendor ID to
   [`70-modevice.rules`](src/native/platform/70-modevice.rules).
 
-**A new kind of device**, such as another vendor's protocol or a headset, touches each layer once.
-Work from the hardware up, and run `npm run gen` after changing either `.proto` file:
-
-1. **Native driver**: add `src/native/<name>.h` and `.cc` with a device class and a scanner, like
-   [`hidpp_mouse.h`](src/native/hidpp_mouse.h). The scanner enumerates HIDAPI and opens what
-   answers; the device class has blocking reads and writes and marks itself `failed()` when I/O
-   fails. Neither needs locks: only the hardware thread calls them. Add the files to `APP_SOURCES`
-   in [`CMakeLists.txt`](CMakeLists.txt).
-2. **Native contract**: in [`src/native/proto/devices.proto`](src/native/proto/devices.proto),
-   add a `Connected<Name>` message with a `connection_id` and the raw hardware facts, a field for
-   it in `ConnectedDevices`, and one `Apply…` RPC that takes a complete setting. Keep app concepts,
-   such as names shown in the app or value ranges, out of it.
-3. **Hardware service**: in [`hardware_service.cc`](src/native/hardware_service.cc), add a map
-   and scanner to `Hardware`, the new devices to `Snapshot()` and `Scan()`, and an `Apply…`
-   handler that posts its write to the hardware thread.
-4. **Platform**: if the protocol behaves differently on some platform, add a function to
-   [`platform.h`](src/native/platform/platform.h) and implement it in every platform file. On
-   Linux, add the vendor to `70-modevice.rules`.
-5. **Main process mapping**: add `src/main/<name>.ts`, like [`logitech.ts`](src/main/logitech.ts),
-   that turns a `Connected<Name>` into the app's `Device` and `Settings`, and back into a raw
-   request.
-6. **Device model**: in [`device-state.ts`](src/main/device-state.ts), add the kind to the
-   `Connection` type, `connect()`, `applySettings()`, and `isValid()`. Add its write hook to
-   [`devices.ts`](src/main/devices.ts).
-7. **App contract**: in [`src/renderer/proto/devices.proto`](src/renderer/proto/devices.proto),
-   add a `<Name>Spec` to the `spec` oneof of `Device` and a `<Name>Settings` to the `kind` oneof of
-   `Settings`.
-8. **Interface**: add `<name>-device.ts` (sections and artwork behaviour) and `<name>-editor.tsx`
-   (controls) in `src/renderer/components/device/`. Choose them in
-   [`device-presentation.ts`](src/renderer/components/device/device-presentation.ts) and
-   [`control-editor.tsx`](src/renderer/components/device/control-editor.tsx), and add artwork in
-   [`device-art.tsx`](src/renderer/components/art/device-art.tsx).
-
-Keep the shared device screen responsible only for layout and navigation.
+A new device protocol requires changes to the native driver, IPC contracts, main-process mapping,
+and renderer. Run `npm run gen` after changing a `.proto` file.
 
 ## Download
 
 You can download the app from the [releases page](https://github.com/mo-browser-apps/device/releases).
-Releases are built for macOS only, code-signed and notarized by Apple. On Windows and Linux,
-[run from source](#run-from-source).
+macOS releases are code-signed and notarized by Apple; Windows releases are code-signed.
 
 ## License
 
