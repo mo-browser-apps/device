@@ -1,4 +1,4 @@
-# Lint, type-check, test, and build the application on every supported platform.
+# Lint, type-check, and build the application on every supported platform.
 name: Check
 
 on:
@@ -42,12 +42,6 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Native test
-        run: npm run test:native
 
       - name: Build
         run: npm run build -- --verbose

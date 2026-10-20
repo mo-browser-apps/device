@@ -25,9 +25,7 @@ that owns the device model, and a native C++ module that drives real keyboards a
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-Every device is real hardware: see
-[Example: QMK keyboards with VIA over USB](#example-qmk-keyboards-with-via-over-usb) and
-[Example: Logitech mice with a Bolt receiver](#example-logitech-mice-with-a-bolt-receiver). On the
+The app supports QMK/VIA keyboards and Logitech mice connected through a Bolt receiver. On the
 first launch the list is empty; **Add device** shows what is connected. This is a reference demo,
 not production device software.
 
@@ -126,100 +124,6 @@ The demo saves the added devices and their last known settings in
 [`src/main/devices.ts`](src/main/devices.ts), to show them while they are disconnected. Settings are
 always read from the hardware when a device connects, never restored onto it.
 
-### Example: QMK keyboards with VIA over USB
-
-Every keyboard running [QMK](https://qmk.fm/) firmware with
-[VIA](https://www.caniusevia.com/) enabled (Vial uses the same protocol) appears in **Add device**
-within a second of being plugged in. Once added, it is listed with a **Live device** badge; unplugged,
-it is shown as disconnected until it comes back. Its Lighting controls drive the physical backlight, and the
-sliders update it 10 times a second while they move:
-
-- **Effect**: Steady is the firmware's Solid Color and works on every keyboard. Pulse and Wave
-  are offered only for models whose effect list is known (see below).
-- **Hue** sets the backlight colour. It is hidden for single-colour backlights.
-- **Brightness** sets the backlight level.
-
-The app reads each keyboard's current lighting whenever it is plugged in.
-
-How it works:
-
-```
-React slider → useDeviceSettings().commit → IPC → src/main/devices.ts
-  → DeviceState.applySettings → native RPC HardwareService.ApplyLighting → ViaKeyboard → HIDAPI
-
-ViaScanner, HidppScanner → HardwareEventsService.Changed(complete snapshot) → DeviceState.reconcile
-  → IPC Watch → React device list
-```
-
-- [HIDAPI](https://github.com/libusb/hidapi) 0.15.0 is downloaded and statically linked by
-  [`CMakeLists.txt`](CMakeLists.txt) with `FetchContent`, with the backend for each
-  [supported platform](#supported-platforms).
-- [`src/native/via_keyboard.cc`](src/native/via_keyboard.cc) opens every HID interface with the VIA
-  usage page `0xFF60` and usage `0x61`, from any vendor, and skips those that do not answer or
-  report a VIA protocol older than 12. QMK does not say which lighting it has, so the app probes
-  the RGB matrix, RGB light, LED matrix, and backlight channels and uses the first one the firmware
-  handles. It then sends the VIA `custom_get_value` and `custom_set_value` commands on that
-  channel. Each open keyboard gets an opaque connection ID that changes whenever it is reopened.
-  One native thread owns every HID handle: it scans for devices once a second and runs the
-  main process's writes in between.
-- Effect numbers depend on the effects compiled into each firmware, so only Solid Color (1) is the
-  same everywhere. `KNOWN_MODELS` in [`src/main/via.ts`](src/main/via.ts) adds Pulse and Wave for the Keychron K10 Max (ANSI RGB) and K2 HE
-  (RGB, ANSI/ISO/JIS), as listed in Keychron's VIA definitions. Add an entry with the vendor and
-  product IDs and the effect numbers from a keyboard's VIA definition to enable them for it.
-- [`src/main/via.ts`](src/main/via.ts) names the keyboard after its USB product string and
-  converts the editor's hue (0–359°) and brightness (0–100%) to VIA's 0–255 range.
-  [`src/main/device-state.ts`](src/main/device-state.ts) adds the keyboards to the device list and
-  ignores a write that finishes after its keyboard was reopened.
-- `npm run test:native` builds [`src/native/test/`](src/native/test/CMakeLists.txt) with CMake
-  and runs [`via_test.cc`](src/native/test/via_test.cc), which checks the HID code against
-  simulated QMK firmware through a fake HIDAPI. `npm test` runs
-  [`src/main/devices.test.ts`](src/main/devices.test.ts) for the device model and VIA mapping.
-
-To try it, connect a keyboard by cable (on wireless models, set the mode switch to USB), then run
-`npm run dev`. The VIA app or Keychron Launcher can stay open at the same time.
-
-Limitations:
-
-- The app scans for keyboards once a second. An interface that does not answer, such as a
-  wireless receiver with no keyboard, is probed again only every 30 seconds or when plugged in
-  again.
-- Lighting changes are not saved to the keyboard's memory. Unplugging the keyboard restores its own
-  saved lighting.
-- Firmware effects that have no matching editor option are shown as Wave, or with no effect
-  selected when the keyboard has no Wave. Saturation is always set to full.
-- Further units of the same model get `-2`, `-3` appended to their device ID in the order they are
-  found. Tested on a Keychron K10 Max; the K2 HE entry follows Keychron's published firmware and
-  has not been tested on the hardware.
-- Key remapping and firmware other than QMK with VIA are not supported. Bluetooth and the
-  Keychron Link receiver are labelled as such, but only work if they answer VIA. Only the K10 Max
-  has its own artwork: `device-art/k10-max.webp` and its key overlay in
-  [`k10-max-layout.ts`](src/renderer/components/art/k10-max-layout.ts) are built from the same
-  key geometry in Keychron's QMK definition. Other keyboards show a generic compact keyboard,
-  whose overlay in
-  [`compact-keyboard-layout.ts`](src/renderer/components/art/compact-keyboard-layout.ts) only
-  approximates their keys.
-
-### Example: Logitech mice with a Bolt receiver
-
-A Logitech mouse paired with a Logi Bolt receiver appears in **Add device** within a few seconds of
-being awake. Once added, it shows its real battery level, and its Speed slider sets the sensor DPI
-live. [`src/native/hidpp_mouse.cc`](src/native/hidpp_mouse.cc) opens the receiver's HID++ interface
-(vendor `046D`, product `C548`, usage page `0xFF00`), asks each of its six slots for a HID++ 2.0
-device, and uses the Device Name (`0x0005`), Unified Battery (`0x1004`), and Adjustable DPI
-(`0x2201`) features. It reads the battery again every 3 seconds. On Windows, where the receiver's
-short reports and error replies arrive on a separate HID collection, it reads that collection
-too. `npm run test:native` also runs
-[`src/native/test/hidpp_test.cc`](src/native/test/hidpp_test.cc) against a simulated receiver.
-
-Limitations:
-
-- Only Bolt receivers, and only mice with the three features above. Tested with a Signature
-  M650 L. Every mouse shows the same generic compact mouse artwork.
-- A sleeping mouse is shown as disconnected; moving it brings it back.
-- Like the Logitech apps, a DPI set this way may be lost when the mouse is switched off. The app
-  reads it again whenever the mouse connects.
-- Buttons and scrolling are not configurable: that needs the app to handle the mouse's input.
-
 ### Add a device
 
 **Another model of a supported kind** (a VIA keyboard or a mouse behind a Bolt receiver) needs
@@ -240,8 +144,7 @@ Work from the hardware up, and run `npm run gen` after changing either `.proto` 
    [`hidpp_mouse.h`](src/native/hidpp_mouse.h). The scanner enumerates HIDAPI and opens what
    answers; the device class has blocking reads and writes and marks itself `failed()` when I/O
    fails. Neither needs locks: only the hardware thread calls them. Add the files to `APP_SOURCES`
-   in [`CMakeLists.txt`](CMakeLists.txt), plus a test against the fake HIDAPI in
-   [`src/native/test/`](src/native/test/CMakeLists.txt).
+   in [`CMakeLists.txt`](CMakeLists.txt).
 2. **Native contract**: in [`src/native/proto/devices.proto`](src/native/proto/devices.proto),
    add a `Connected<Name>` message with a `connection_id` and the raw hardware facts, a field for
    it in `ConnectedDevices`, and one `Apply…` RPC that takes a complete setting. Keep app concepts,
@@ -257,7 +160,7 @@ Work from the hardware up, and run `npm run gen` after changing either `.proto` 
    request.
 6. **Device model**: in [`device-state.ts`](src/main/device-state.ts), add the kind to the
    `Connection` type, `connect()`, `applySettings()`, and `isValid()`. Add its write hook to
-   [`devices.ts`](src/main/devices.ts) and cases to [`devices.test.ts`](src/main/devices.test.ts).
+   [`devices.ts`](src/main/devices.ts).
 7. **App contract**: in [`src/renderer/proto/devices.proto`](src/renderer/proto/devices.proto),
    add a `<Name>Spec` to the `spec` oneof of `Device` and a `<Name>Settings` to the `kind` oneof of
    `Settings`.

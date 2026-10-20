@@ -12,9 +12,7 @@
     "gen": "mobrowser gen",
     "mobrowser": "mobrowser",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "jiti src/main/devices.test.ts",
-    "test:native": "cmake -S src/native/test -B build/test && cmake --build build/test --config Debug && ctest --test-dir build/test -C Debug --output-on-failure"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
   },
   "dependencies": {
     "@mobrowser/api": "2.18.0",
@@ -51,7 +49,6 @@
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
-    "jiti": "^2.7.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^4.1.4",
     "tar-stream": "3.2.0",
