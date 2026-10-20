@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ipc } from '@/gen/ipc';
 import type { Device, Settings } from '@/gen/devices';
 
@@ -57,23 +57,13 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 }
 
 /**
- * How often a real device receives previews while a slider moves: 10 times a second,
- * which still looks continuous on the keyboard without flooding IPC and USB.
- */
-const LIVE_PREVIEW_INTERVAL_MS = 100;
-
-/**
  * Loads one device's settings from the main process, and again when it reconnects,
  * since a real keyboard restores its own saved lighting when plugged back in.
- * It previews changes locally and sends committed values back through IPC. A real
- * device also receives previews, throttled, so its lighting follows a moving slider.
+ * It previews changes locally and sends committed values back through IPC.
  */
 export function useDeviceSettings(device: Device) {
-  const { id: deviceId, connected, live } = device;
+  const { id: deviceId, connected } = device;
   const [settings, setSettings] = useState<Settings | null>(null);
-  const previewTimer = useRef<number | undefined>(undefined);
-  const pendingPreview = useRef<Settings | null>(null);
-  const lastPreviewAt = useRef(0);
 
   useEffect(() => {
     let isActive = true;
@@ -90,37 +80,9 @@ export function useDeviceSettings(device: Device) {
     };
   }, [deviceId, connected]);
 
-  useEffect(() => () => window.clearTimeout(previewTimer.current), []);
-
-  const previewSettings = useCallback(
-    (nextSettings: Settings) => {
-      setSettings(nextSettings);
-      if (!live) return;
-
-      // Send the first change at once, then the latest one at most every interval.
-      pendingPreview.current = nextSettings;
-      if (previewTimer.current !== undefined) return;
-      const send = () => {
-        previewTimer.current = undefined;
-        const pending = pendingPreview.current;
-        pendingPreview.current = null;
-        if (!pending) return;
-        lastPreviewAt.current = performance.now();
-        // Failures surface on commit, which sends the final value again.
-        void ipc.devices.ApplySettings(pending).catch(() => {});
-      };
-      const wait = lastPreviewAt.current + LIVE_PREVIEW_INTERVAL_MS - performance.now();
-      if (wait <= 0) send();
-      else previewTimer.current = window.setTimeout(send, wait);
-    },
-    [live],
-  );
+  const previewSettings = useCallback((nextSettings: Settings) => setSettings(nextSettings), []);
 
   const commitSettings = useCallback((nextSettings: Settings) => {
-    // The committed value replaces any preview still waiting to be sent.
-    window.clearTimeout(previewTimer.current);
-    previewTimer.current = undefined;
-    pendingPreview.current = null;
     setSettings(nextSettings);
     void ipc.devices.ApplySettings(nextSettings).catch((error: unknown) => {
       console.error('Could not apply device settings.', error);

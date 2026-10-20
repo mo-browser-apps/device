@@ -15,9 +15,6 @@ import { Bus, type ConnectedKeyboard, type RawLighting } from './gen/native/devi
  */
 const KNOWN_MODELS = [
   { vendorId: 0x3434, productId: 0x0aa0, id: 'keychron-k10-max', breathing: 2, wave: 5 }, // K10 Max ANSI RGB
-  { vendorId: 0x3434, productId: 0x0e20, id: 'keychron-k2-he', breathing: 2, wave: 5 }, // K2 HE ANSI RGB
-  { vendorId: 0x3434, productId: 0x0e21, id: 'keychron-k2-he', breathing: 2, wave: 5 }, // K2 HE ISO RGB
-  { vendorId: 0x3434, productId: 0x0e22, id: 'keychron-k2-he', breathing: 2, wave: 5 }, // K2 HE JIS RGB
   // A wireless receiver: it is plugged in by USB, but the keyboard is not.
   { vendorId: 0x3434, productId: 0xd030, id: 'keychron-link', breathing: 0, wave: 0, receiver: true },
 ];
