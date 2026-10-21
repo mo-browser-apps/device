@@ -76,6 +76,8 @@ export function checkBatteries(devices: DeviceList): void {
 
   for (const device of devices.devices) {
     currentDevices.add(device.id);
+    // Keep the alerted state while a paired device sleeps or disconnects.
+    if (!device.connected) continue;
 
     if (isLow(device)) {
       if (!lowBattery.has(device.id)) {
