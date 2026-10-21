@@ -1,0 +1,10 @@
+# Lets the logged-in user open the HID devices MoDevice drives. Install with:
+#   sudo cp src/native/platform/70-modevice.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+# then plug the devices in again.
+
+# Keychron keyboards and the Keychron Link receiver (VIA), over USB and Bluetooth.
+KERNEL=="hidraw*", ATTRS{idVendor}=="3434", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="0005:3434:*", TAG+="uaccess"
+# Logitech Bolt receiver (HID++).
+KERNEL=="hidraw*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c548", TAG+="uaccess"

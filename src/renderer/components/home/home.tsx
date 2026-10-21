@@ -1,8 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Settings, X } from 'lucide-react';
-import { LinkType, type Device } from '@/gen/devices';
+import type { Device } from '@/gen/devices';
 import { DeviceArt } from '@/components/art/device-art';
-import { DeviceBatteryStatus, DeviceConnectionIcon } from '@/components/device-status';
+import {
+  DeviceBatteryStatus,
+  DeviceConnectionIcon,
+  DeviceKindBadge,
+} from '@/components/device-status';
 import { RemoveDeviceDialog } from '@/components/device/remove-device-dialog';
 import { useCarousel } from '@/lib/use-carousel';
 import { BUTTON_OUTLINE, cn, FOCUS_RING } from '@/lib/utils';
@@ -68,8 +72,9 @@ function DeviceCard({
             <span>{device.model}</span>
             <DeviceConnectionIcon device={device} />
           </span>
-          <span className="flex min-h-4 items-center">
+          <span className="flex min-h-4 items-center gap-2">
             <DeviceBatteryStatus device={device} />
+            <DeviceKindBadge device={device} />
           </span>
         </span>
       </button>
@@ -208,64 +213,53 @@ export function Home({
         </div>
       </div>
 
-      {devices.length > 0 ? (
-        <div className="relative flex flex-1 items-center">
-          <div
-            id="device-carousel"
-            ref={carouselRef}
-            className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
-          >
-            <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
-              {devices.map((device) => (
-                <DeviceCard
-                  key={device.id}
-                  device={device}
-                  onOpen={() => openDevice(device.id)}
-                  onRemove={
-                    device.link === LinkType.WIRED ? undefined : () => setDeviceToRemove(device)
-                  }
-                />
-              ))}
-            </div>
+      <div className="relative flex flex-1 items-center">
+        <div
+          id="device-carousel"
+          ref={carouselRef}
+          className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
+        >
+          <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
+            {devices.map((device) => (
+              <DeviceCard
+                key={device.id}
+                device={device}
+                onOpen={() => openDevice(device.id)}
+                onRemove={device.live ? () => setDeviceToRemove(device) : undefined}
+              />
+            ))}
           </div>
-
-          {canScrollPrevious && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
-            />
-          )}
-
-          {canScrollNext && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
-            />
-          )}
-
-          {hasOverflow && (
-            <>
-              <CarouselControl
-                direction="previous"
-                disabled={!canScrollPrevious}
-                onClick={() => scrollByItem(-1)}
-              />
-              <CarouselControl
-                direction="next"
-                disabled={!canScrollNext}
-                onClick={() => scrollByItem(1)}
-              />
-            </>
-          )}
         </div>
-      ) : (
-        <div className="flex flex-1 flex-col items-center justify-center pb-12 text-center">
-          <p className="text-sm font-medium">No devices connected</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Add a nearby device to get started.
-          </p>
-        </div>
-      )}
+
+        {canScrollPrevious && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
+          />
+        )}
+
+        {canScrollNext && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
+          />
+        )}
+
+        {hasOverflow && (
+          <>
+            <CarouselControl
+              direction="previous"
+              disabled={!canScrollPrevious}
+              onClick={() => scrollByItem(-1)}
+            />
+            <CarouselControl
+              direction="next"
+              disabled={!canScrollNext}
+              onClick={() => scrollByItem(1)}
+            />
+          </>
+        )}
+      </div>
 
       {isAddDialogOpen && (
         <AddDeviceDialog

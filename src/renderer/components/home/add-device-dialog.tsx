@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
-import { LoaderCircle, RotateCw } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import { DeviceArt } from '@/components/art/device-art';
 import { connectionLabel } from '@/components/device-status';
 import { Modal } from '@/components/modal';
 import { discoverDevices, pairDevice } from '@/gateway/devices';
 import type { Device } from '@/gen/devices';
-import { BUTTON_OUTLINE, BUTTON_PRIMARY, cn } from '@/lib/utils';
+import { BUTTON_PRIMARY } from '@/lib/utils';
 
 interface AddDeviceDialogProps {
   onClose: () => void;
   onPaired: (deviceId: string) => void;
 }
 
+/** How often the dialog asks for connected devices while it is open. */
+const SEARCH_INTERVAL_MS = 1000;
+
 /**
- * Finds nearby devices and asks the main process to pair the selected one.
+ * Lists connected devices as they appear and asks the main process to pair the
+ * selected one.
  */
 export function AddDeviceDialog({
   onClose,
@@ -24,22 +28,20 @@ export function AddDeviceDialog({
   const [pairingDeviceId, setPairingDeviceId] = useState<string | null>(null);
   const isPairing = pairingDeviceId !== null;
 
-  const loadNearbyDevices = () => {
-    void discoverDevices()
-      .then(setNearbyDevices)
-      .catch(() => {
-        setNearbyDevices([]);
-        setErrorMessage('Could not search for devices.');
-      });
-  };
-
-  useEffect(loadNearbyDevices, []);
-
-  const searchAgain = () => {
-    setNearbyDevices(null);
-    setErrorMessage(null);
-    loadNearbyDevices();
-  };
+  useEffect(() => {
+    let isActive = true;
+    const search = () => {
+      void discoverDevices()
+        .then((devices) => isActive && setNearbyDevices(devices))
+        .catch(() => isActive && setErrorMessage('Could not search for devices.'));
+    };
+    search();
+    const timer = window.setInterval(search, SEARCH_INTERVAL_MS);
+    return () => {
+      isActive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const connectDevice = (device: Device) => {
     setPairingDeviceId(device.id);
@@ -49,24 +51,19 @@ export function AddDeviceDialog({
         onPaired(device.id);
         onClose();
       })
-      .catch(() => setErrorMessage(`Could not connect ${device.model}.`))
+      .catch(() => setErrorMessage(`Could not add ${device.model}.`))
       .finally(() => setPairingDeviceId(null));
   };
 
   return (
     <Modal
       title="Add device"
-      description="Choose a nearby device to connect."
+      description="Choose a connected device to add."
       busy={isPairing}
       onClose={onClose}
     >
       <div className="min-h-52 px-6 py-5">
-        {nearbyDevices === null ? (
-          <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />
-            Searching for devices…
-          </div>
-        ) : nearbyDevices.length > 0 ? (
+        {nearbyDevices && nearbyDevices.length > 0 ? (
           <ul className="flex flex-col gap-3">
             {nearbyDevices.map((device) => (
               <li
@@ -88,25 +85,21 @@ export function AddDeviceDialog({
                   disabled={isPairing}
                   className={BUTTON_PRIMARY}
                 >
-                  {pairingDeviceId === device.id ? 'Connecting…' : 'Connect'}
+                  {pairingDeviceId === device.id ? 'Adding…' : 'Add'}
                 </button>
               </li>
             ))}
           </ul>
         ) : (
           <div className="flex h-40 flex-col items-center justify-center text-center">
-            <p className="text-sm font-medium">No devices found</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Make sure the device is ready to connect.
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />
+              Searching for devices…
             </p>
-            <button
-              type="button"
-              onClick={searchAgain}
-              className={cn(BUTTON_OUTLINE, 'mt-4 text-muted-foreground hover:text-foreground')}
-            >
-              <RotateCw className="size-3.5" />
-              Search again
-            </button>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Plug in a VIA keyboard or a Razer device, or move a mouse paired with a Logi
+              Bolt receiver.
+            </p>
           </div>
         )}
 

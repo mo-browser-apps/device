@@ -1,6 +1,9 @@
 import type { Device } from '@/gen/devices';
 import { cn } from '@/lib/utils';
-import { KeyboardArt, type Lighting } from './keyboard-art';
+import { COMPACT_KEYBOARD_LAYOUT } from './compact-keyboard-layout';
+import { HUNTSMAN_LAYOUT } from './huntsman-layout';
+import { K10_MAX_LAYOUT } from './k10-max-layout';
+import { KeyboardArt, type KeyboardLayout, type Lighting } from './keyboard-art';
 import { MouseArt, type Callout, type MouseArtProfile } from './mouse-art';
 
 interface DeviceArtwork {
@@ -9,6 +12,7 @@ interface DeviceArtwork {
   alt: string;
   aspectRatio: string;
   mouseProfile?: MouseArtProfile;
+  keyboardLayout?: KeyboardLayout;
 }
 
 interface DeviceArtProps {
@@ -21,27 +25,60 @@ interface DeviceArtProps {
   className?: string;
 }
 
+/** Shown for any mouse without its own artwork. */
+const DEFAULT_MOUSE_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/travel-mouse.webp',
+  homeSrc: '/device-art/travel-mouse-home.webp',
+  alt: 'Compact wireless mouse',
+  aspectRatio: '3 / 2',
+  mouseProfile: 'travel',
+};
+
+/** Shown for any keyboard without its own artwork. */
+const DEFAULT_KEYBOARD_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/compact-keyboard.webp',
+  homeSrc: '/device-art/compact-keyboard-home.webp',
+  alt: 'Compact keyboard',
+  aspectRatio: '821 / 479',
+  keyboardLayout: COMPACT_KEYBOARD_LAYOUT,
+};
+
+const HUNTSMAN_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/razer-huntsman.webp',
+  homeSrc: '/device-art/razer-huntsman.webp',
+  alt: 'Razer Huntsman full-size keyboard',
+  aspectRatio: '1909 / 824',
+  keyboardLayout: HUNTSMAN_LAYOUT,
+};
+
+const MAMBA_WIRELESS_ARTWORK: DeviceArtwork = {
+  detailSrc: '/device-art/razer-mamba-wireless.webp',
+  homeSrc: '/device-art/razer-mamba-wireless-home.webp',
+  alt: 'Razer Mamba Wireless mouse',
+  aspectRatio: '3 / 2',
+};
+
 const ARTWORK_BY_MODEL_ID: Record<string, DeviceArtwork> = {
   'performance-mouse': {
     detailSrc: '/device-art/performance-mouse.webp',
     homeSrc: '/device-art/performance-mouse-home.webp',
-    alt: 'Graphite wireless performance mouse',
+    alt: 'Performance mouse',
     aspectRatio: '3 / 2',
     mouseProfile: 'performance',
   },
-  'travel-mouse': {
-    detailSrc: '/device-art/travel-mouse.webp',
-    homeSrc: '/device-art/travel-mouse-home.webp',
-    alt: 'Stone-gray compact travel mouse',
-    aspectRatio: '3 / 2',
-    mouseProfile: 'travel',
+  'keychron-k10-max': {
+    detailSrc: '/device-art/k10-max.webp',
+    homeSrc: '/device-art/k10-max.webp',
+    alt: 'Keychron K10 Max full-size keyboard',
+    aspectRatio: '2349 / 1022',
+    keyboardLayout: K10_MAX_LAYOUT,
   },
-  'compact-keyboard': {
-    detailSrc: '/device-art/compact-keyboard.webp',
-    homeSrc: '/device-art/compact-keyboard-home.webp',
-    alt: 'Graphite compact keyboard',
-    aspectRatio: '821 / 479',
-  },
+  'razer-mamba-wireless': MAMBA_WIRELESS_ARTWORK,
+  'razer-razer-mamba-wireless': MAMBA_WIRELESS_ARTWORK,
+  'razer-huntsman': HUNTSMAN_ARTWORK,
+  'razer-huntsman-eng': HUNTSMAN_ARTWORK,
+  'razer-razer-huntsman': HUNTSMAN_ARTWORK,
+  'razer-razer-huntsman-eng': HUNTSMAN_ARTWORK,
 };
 
 /**
@@ -56,8 +93,9 @@ export function DeviceArt({
   onControlSelect,
   className,
 }: DeviceArtProps) {
-  const artwork = ARTWORK_BY_MODEL_ID[device.modelId];
-  if (!artwork) return null;
+  const artwork =
+    ARTWORK_BY_MODEL_ID[device.modelId] ??
+    (device.keyboard ? DEFAULT_KEYBOARD_ARTWORK : DEFAULT_MOUSE_ARTWORK);
 
   const offlineClassName = !device.connected && 'grayscale opacity-45';
 
@@ -77,10 +115,11 @@ export function DeviceArt({
     );
   }
 
-  if (device.keyboard) {
+  if (device.keyboard && artwork.keyboardLayout) {
     return (
       <KeyboardArt
         spec={device.keyboard}
+        layout={artwork.keyboardLayout}
         src={artwork.detailSrc}
         alt={artwork.alt}
         aspect={artwork.aspectRatio}

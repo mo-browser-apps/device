@@ -1,24 +1,28 @@
 import type { MouseSettings, MouseSpec, Settings } from '@/gen/devices';
-import { Switch } from '@/components/switch';
-import { BindingEditor, SettingsSection, SettingsSlider } from './editor-controls';
+import {
+  BindingEditor,
+  BrightnessSlider,
+  HueSlider,
+  SettingsSection,
+  SettingsSlider,
+} from './editor-controls';
 import { MOUSE_ACTIONS, mouseControlLabel, resetMouseBindings } from './mouse-device';
 
 const DPI_STEP = 100;
-const SCROLL_SPEED_LABELS = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
 interface MouseEditorProps {
   settings: Settings;
   mouse: MouseSettings;
   spec: MouseSpec;
   selected: string | null;
-  segment: 'buttons' | 'movement';
+  segment: 'buttons' | 'movement' | 'lighting';
   disabled: boolean;
   onPreview: (settings: Settings) => void;
   onCommit: (settings: Settings) => void;
 }
 
 /**
- * Shows button assignments or movement settings for a mouse.
+ * Shows button assignments, movement, or lighting settings for a mouse.
  */
 export function MouseEditor({
   settings,
@@ -56,6 +60,24 @@ export function MouseEditor({
 
   const commitCurrentSettings = () => onCommit(settings);
 
+  if (segment === 'lighting') {
+    return (
+      <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
+        <HueSlider
+          hue={mouse.hue}
+          onPreview={(hue) => onPreview(withMouseChanges({ hue }))}
+          onCommit={commitCurrentSettings}
+        />
+
+        <BrightnessSlider
+          brightness={mouse.brightness}
+          onPreview={(brightness) => onPreview(withMouseChanges({ brightness }))}
+          onCommit={commitCurrentSettings}
+        />
+      </fieldset>
+    );
+  }
+
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
       <SettingsSection title="Pointer">
@@ -72,32 +94,6 @@ export function MouseEditor({
           onPreview={(dpi) => onPreview(withMouseChanges({ dpi }))}
           onCommit={commitCurrentSettings}
         />
-      </SettingsSection>
-
-      <SettingsSection title="Scrolling">
-        <SettingsSlider
-          label="Wheel speed"
-          display={SCROLL_SPEED_LABELS[mouse.scrollSpeed - 1] ?? `${mouse.scrollSpeed}`}
-          value={mouse.scrollSpeed}
-          min={1}
-          max={SCROLL_SPEED_LABELS.length}
-          step={1}
-          minLabel="Slower"
-          maxLabel="Faster"
-          onPreview={(scrollSpeed) => onPreview(withMouseChanges({ scrollSpeed }))}
-          onCommit={commitCurrentSettings}
-        />
-
-        <div className="flex items-center justify-between gap-4">
-          <span id="reverse-scroll" className="text-sm font-medium">
-            Reverse direction
-          </span>
-          <Switch
-            checked={mouse.naturalScroll}
-            labelId="reverse-scroll"
-            onChange={(naturalScroll) => onCommit(withMouseChanges({ naturalScroll }))}
-          />
-        </div>
       </SettingsSection>
     </fieldset>
   );

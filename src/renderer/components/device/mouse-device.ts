@@ -1,6 +1,6 @@
 import type { Binding, MouseSettings, MouseSpec } from '@/gen/devices';
 import { actionLabel, boundAction } from './controls';
-import type { DevicePresentation, Segment } from './device-presentation';
+import type { DevicePresentation, Segment, SegmentOption } from './device-presentation';
 
 const MOUSE_CONTROL_LABELS: Record<string, string> = {
   wheel: 'Wheel',
@@ -67,12 +67,14 @@ function buttonCallouts(spec: MouseSpec, settings: MouseSettings | undefined, se
  * Provides the sections and artwork behavior for a mouse.
  */
 export function mousePresentation(spec: MouseSpec): DevicePresentation {
+  const segments: SegmentOption[] = [];
+  if (spec.buttons.length > 0) segments.push(['buttons', 'Buttons']);
+  if (spec.maxDpi > 0) segments.push(['movement', 'Movement']);
+  if (spec.backlight) segments.push(['lighting', 'Lighting']);
+  segments.push(['info', 'Info']);
+
   return {
-    segments: [
-      ['buttons', 'Buttons'],
-      ['movement', 'Movement'],
-      ['info', 'Info'],
-    ],
+    segments,
     initialControl: spec.buttons[0] ?? null,
     artState: (settings, segment) => ({
       callouts: buttonCallouts(spec, settings?.mouse, segment),

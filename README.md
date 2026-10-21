@@ -2,18 +2,17 @@
 
 MōDevice is a small reference application for configuring mice and keyboards, built with
 [MōBrowser](https://teamdev.com/mobrowser/). It shows how a React interface communicates with a TypeScript main process
-and a native C++ module that simulates the device backend.
+that owns the device model, and a native C++ module that drives real keyboards and mice over HID.
 
 <a href="assets/screenshots/windows-devices.png"><img src="assets/screenshots/windows-devices.png" width="100%" alt="Device overview on Windows"></a>
 
 ## What the demo shows
 
-- View mice and keyboards with their connection, battery, and firmware information.
-- Find, add, and remove wireless devices.
-- Assign actions to mouse buttons and adjust pointer and scrolling behavior.
-- Remap keyboard keys and configure backlight effects, color, and brightness.
-- Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
-- Keep paired devices and settings between launches.
+- Discover and manage QMK/VIA keyboards and Logitech mice, plus Razer keyboards and mice on
+  Windows.
+- Configure keyboard mappings and lighting, mouse buttons and movement, and Razer static lighting.
+- Show live connection, firmware, and battery information while keeping devices and settings
+  between launches.
 
 <p align="center">
   <a href="assets/screenshots/macos-devices.png"><img src="assets/screenshots/macos-devices.png" width="49%" alt="Device overview on macOS"></a>
@@ -25,17 +24,21 @@ and a native C++ module that simulates the device backend.
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-All devices are simulated by an in-memory C++ backend. This app does not detect or change real
-peripherals connected to the computer. It is a reference demo, not production device software.
-
-The demo requires no account or API key. Packaged versions contact GitHub Releases to check for
-updates, but device data and settings are not sent anywhere.
+Razer controls are Windows-only and use the [Razer Chroma SDK](https://developer.razer.com/chroma/).
+The Mamba Wireless and Huntsman ENG have model-specific artwork; other detected Razer keyboards and
+mice use generic artwork with the same static lighting controls. The demo requires no account or
+API key. Device data and settings stay local; packaged builds contact GitHub Releases only to check
+for updates.
 
 ## Requirements
 
-- macOS 14 or later on Apple silicon, or Windows 10 or later on 64-bit systems.
+- macOS 14 or later on Apple silicon, Windows 10 or later on x64, or Linux on x64. See
+  [Supported platforms](#supported-platforms).
 - [Node.js](https://nodejs.org/en/download/) 20.20.2, 22.22.2, or 24.14.1 and later.
-- [MōBrowser](https://teamdev.com/mobrowser/) 2.13.0 or later.
+- [MōBrowser](https://teamdev.com/mobrowser/) 2.18.0 or later.
+- For Razer devices on Windows: [Razer Synapse](https://www.razer.com/synapse) with its
+  **Chroma Connect** module, which installs the Chroma SDK runtime (`RzChromaSDK64.dll`) and its
+  service. Without it, Razer devices are not listed. Chroma apps must be allowed in Synapse.
 
 ## Run from source
 
@@ -50,49 +53,71 @@ To create a production build:
 npm run build
 ```
 
+For a Mamba Wireless (2018), discovery checks whether the USB receiver has a
+responding mouse. An idle receiver is excluded, including when the mouse is connected
+by cable. Separate active mice remain separate devices. If the query fails or another
+app interrupts it, discovery keeps the last confirmed state until a later scan succeeds.
+Other Razer models still use USB enumeration.
+
 ## Project structure
 
-- `src/native/device_stack.*` contains the simulated devices and is the main starting point for a
-  real hardware integration.
-- `src/native/device_service.*` exposes the device stack to MōBrowser.
-- `src/main/devices.ts` passes device data between C++ and the interface and saves the demo state.
+- `src/main/device-state.ts` owns the device list and settings: pairing, validation, and the
+  keyboards and mice the native module reports.
+- `src/main/via.ts` maps VIA hardware to app devices: known models, effects, and value ranges.
+- `src/main/logitech.ts` maps Logitech mice to app devices.
+- `src/main/razer.ts` maps Razer keyboards and mice to app devices.
+- `src/main/devices.ts` connects the device state to the interface, the native module, and saved
+  preferences.
+- `src/native/hardware_service.*` serves the open keyboards and mice to the main process over
+  native RPC.
+- `src/native/via_keyboard.*` speaks the VIA protocol over HIDAPI.
+- `src/native/hidpp_mouse.*` speaks Logitech's HID++ 2.0 protocol over HIDAPI.
+- `src/native/chroma_device.*` finds Razer keyboards and mice over HIDAPI; the Chroma SDK lights
+  them.
+- `src/native/platform/` holds everything that differs per operating system: `platform.h` and
+  one implementation file per supported platform.
 - `src/renderer/gateway/devices.ts` is the interface's single entry point for device operations.
 - `src/renderer/components/device/` contains the shared device screen and the separate mouse and
   keyboard editors.
 - `src/renderer/public/device-art/` contains the product images shown in the app.
 
+## Supported platforms
+
+| Platform | Support |
+|---|---|
+| macOS 14+ | Apple silicon |
+| Windows 10+ | x64, including Razer Chroma |
+| Linux | x64; device access requires the included [`udev` rule](src/native/platform/70-modevice.rules) |
+
 ## Connect real devices
 
-Replace the simulated implementation in
-[`src/native/device_stack.cc`](src/native/device_stack.cc) with calls to your device SDK or system
-APIs. Keep the interface in [`src/native/device_stack.h`](src/native/device_stack.h) if its operations
-fit your integration.
+The main process owns the app's device model; native code is a thin hardware adapter. Keep the
+native contract coarse: one call lists the complete hardware state, one applies a complete setting,
+and a callback sends a complete snapshot whenever hardware comes or goes. Do not expose one RPC per
+SDK or HID command. See [`src/native/proto/devices.proto`](src/native/proto/devices.proto).
 
-The demo saves paired device IDs and settings in [`src/main/devices.ts`](src/main/devices.ts). If
-your devices or SDK already store this data, remove that persistence and keep one source of truth.
+The demo saves the added devices and their last known settings in
+[`src/main/devices.ts`](src/main/devices.ts), to show them while they are disconnected. Settings are
+always read from the hardware when a device connects, never restored onto it. Razer devices are
+the exception: the Chroma SDK cannot read them, so the native module reports the color it last
+wrote, or a default.
 
-### Add capabilities and device types
+### Add a device
 
-For another mouse or keyboard, reuse the existing screens where possible.
+**Another model of a supported kind** (a VIA keyboard, a mouse behind a Bolt receiver, or a Razer
+keyboard or mouse) needs no native changes:
 
-- `src/native/device_stack.cc` reports the controls and value ranges supported by each device.
-- `device-art.tsx` connects each `modelId` to its artwork, while
-  `src/renderer/public/device-art/` stores the image files.
-- `mouse-device.ts` and `keyboard-device.ts` define the sections, actions, and labels shown for each
-  device type.
-- `mouse-editor.tsx` and `keyboard-editor.tsx` render the controls used to change device settings.
+- For a VIA keyboard, add its vendor and product IDs and effect numbers to `KNOWN_MODELS` in
+  [`src/main/via.ts`](src/main/via.ts). Without an entry it still works with Steady only.
+- A Razer keyboard or mouse is found by its USB vendor ID and lit through the Chroma SDK as is.
+- Optionally, add its artwork to `src/renderer/public/device-art/` and connect its `modelId` in
+  [`device-art.tsx`](src/renderer/components/art/device-art.tsx). Without it, the device shows
+  the default artwork for its kind.
+- On Linux, add a line for a new vendor ID to
+  [`70-modevice.rules`](src/native/platform/70-modevice.rules).
 
-For a different device category, give it its own capabilities, settings, editor, and artwork. Keep
-the shared device screen responsible only for layout and navigation.
-
-- `src/native/proto/devices.proto` and `src/renderer/proto/devices.proto` describe the capabilities
-  and settings shared between the app layers.
-- A new device module in `src/renderer/components/device/` describes the sections and artwork
-  behavior for the device type.
-- A new editor module in the same folder renders its settings controls.
-- `device-presentation.ts` chooses the matching device module, and `control-editor.tsx` chooses its
-  editor.
-- `device-art.tsx` renders the matching artwork from `src/renderer/public/device-art/`.
+A new device protocol requires changes to the native driver, IPC contracts, main-process mapping,
+and renderer. Run `npm run gen` after changing a `.proto` file.
 
 ## Download
 

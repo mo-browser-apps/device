@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { LinkType, type Device } from '@/gen/devices';
+import type { Device } from '@/gen/devices';
 import { connectionLabel } from '@/components/device-status';
 import { BUTTON_OUTLINE, cn } from '@/lib/utils';
 import { SettingsSection } from './editor-controls';
@@ -10,7 +10,7 @@ interface DeviceInfoProps {
 }
 
 /**
- * Shows the device details reported by the native stack and offers removal when allowed.
+ * Shows the device details reported by the main process and offers removal.
  */
 export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
   const details: [label: string, value: string][] = [
@@ -25,10 +25,11 @@ export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
     );
   }
   if (device.mouse) {
-    details.push(
-      ['Remappable buttons', String(device.mouse.buttons.length)],
-      ['Sensor', `${device.mouse.minDpi}–${device.mouse.maxDpi} DPI`],
-    );
+    details.push(['Remappable buttons', String(device.mouse.buttons.length)]);
+    if (device.mouse.maxDpi > 0) {
+      details.push(['Sensor', `${device.mouse.minDpi}–${device.mouse.maxDpi} DPI`]);
+    }
+    details.push(['Lighting', device.mouse.backlight ? 'Supported' : 'Not supported']);
   }
 
   return (
@@ -44,7 +45,7 @@ export function DeviceInfo({ device, onRemove }: DeviceInfoProps) {
         </dl>
       </SettingsSection>
 
-      {device.link !== LinkType.WIRED && (
+      {device.live && (
         <button
           type="button"
           onClick={onRemove}

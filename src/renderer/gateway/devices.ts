@@ -3,7 +3,7 @@ import { ipc } from '@/gen/ipc';
 import type { Device, Settings } from '@/gen/devices';
 
 /**
- * Requests the devices that the native stack currently offers for pairing.
+ * Requests the devices that the main process currently offers for pairing.
  */
 export async function discoverDevices(): Promise<Device[]> {
   return (await ipc.devices.Discover({})).devices;
@@ -57,10 +57,12 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
 }
 
 /**
- * Loads one device's settings from the main process.
+ * Loads one device's settings from the main process, and again when it reconnects,
+ * since a real keyboard restores its own saved lighting when plugged back in.
  * It previews changes locally and sends committed values back through IPC.
  */
-export function useDeviceSettings(deviceId: string) {
+export function useDeviceSettings(device: Device) {
+  const { id: deviceId, connected, connectionId } = device;
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export function useDeviceSettings(deviceId: string) {
     return () => {
       isActive = false;
     };
-  }, [deviceId]);
+  }, [deviceId, connected, connectionId]);
 
   const commitSettings = useCallback((nextSettings: Settings) => {
     setSettings(nextSettings);

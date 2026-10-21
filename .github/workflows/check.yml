@@ -1,4 +1,4 @@
-# Lint, type-check, and build the application.
+# Lint, type-check, and build the application on every supported platform.
 name: Check
 
 on:
@@ -10,8 +10,13 @@ on:
 
 jobs:
   check:
-    name: Check
-    runs-on: ubuntu-latest
+    name: Check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # The supported platforms; see "Supported platforms" in README.md.
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +28,11 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      # HIDAPI's Linux hidraw backend links against libudev.
+      - name: Install libudev
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
       - name: Generate
         run: npm run gen

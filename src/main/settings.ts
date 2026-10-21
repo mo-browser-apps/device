@@ -1,8 +1,8 @@
 import { app, ipc, prefs, BrowserWindow, Notification, Theme } from '@mobrowser/api';
-import { native } from './gen/native';
 import { AppSettings } from './gen/app';
 import { AppServiceDescriptor } from './gen/ipc_service';
-import type { Device, DeviceList } from './gen/native/devices';
+import type { Device, DeviceList } from './gen/devices';
+import { listDevices } from './devices';
 
 const THEME_KEY = 'app.theme';
 const LOW_BATTERY_ALERTS_KEY = 'app.lowBatteryAlerts';
@@ -57,7 +57,13 @@ function notifyLowBattery(device: Device): void {
  * Reports whether a device should currently show a low-battery alert.
  */
 function isLow(device: Device): boolean {
-  return device.connected && device.hasBattery && !device.charging && device.battery <= LOW_BATTERY;
+  return (
+    device.live &&
+    device.connected &&
+    device.hasBattery &&
+    !device.charging &&
+    device.battery <= LOW_BATTERY
+  );
 }
 
 /**
@@ -70,6 +76,8 @@ export function checkBatteries(devices: DeviceList): void {
 
   for (const device of devices.devices) {
     currentDevices.add(device.id);
+    // Keep the alerted state while a paired device sleeps or disconnects.
+    if (!device.connected) continue;
 
     if (isLow(device)) {
       if (!lowBattery.has(device.id)) {
@@ -121,7 +129,7 @@ export function startSettings(win: BrowserWindow): void {
       if (!request.lowBatteryAlerts) {
         lowBattery.clear();
       } else if (!alertsWereOn) {
-        checkBatteries(await native.deviceStack.List({}));
+        checkBatteries(listDevices());
       }
       return {};
     },

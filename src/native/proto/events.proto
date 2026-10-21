@@ -3,8 +3,9 @@ syntax = "proto3";
 import "devices.proto";
 import "google/protobuf/empty.proto";
 
-// Native-to-main callbacks emitted by the device stack.
-service DeviceEventsService {
-  // Carries the complete managed-device snapshot after a change.
-  rpc Changed(DeviceList) returns (google.protobuf.Empty);
+// Native-to-main callbacks.
+service HardwareEventsService {
+  // Carries the complete set of open devices after a device is opened or closed, or a
+  // mouse's battery changes.
+  rpc Changed(ConnectedDevices) returns (google.protobuf.Empty);
 }

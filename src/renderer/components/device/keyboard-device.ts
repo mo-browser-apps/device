@@ -72,7 +72,8 @@ export function resetKeyBindings(bindings: Binding[]): Binding[] {
  * Provides the sections and artwork behavior for a keyboard.
  */
 export function keyboardPresentation(spec: KeyboardSpec): DevicePresentation {
-  const segments: SegmentOption[] = [['keys', 'Keys']];
+  const segments: SegmentOption[] = [];
+  if (spec.keys.length > 0) segments.push(['keys', 'Keys']);
   if (spec.backlight) segments.push(['lighting', 'Lighting']);
   segments.push(['info', 'Info']);
 

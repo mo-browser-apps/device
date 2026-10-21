@@ -135,7 +135,7 @@ export function SettingsView({
             <SettingsSection title="Notifications">
               <SettingRow
                 title="Low battery alerts"
-                description={`Notify when a wireless device reaches ${LOW_BATTERY}%.`}
+                description={`Notify when a connected hardware device reaches ${LOW_BATTERY}%.`}
                 renderControl={(labelId) => (
                   <Switch
                     checked={settings.lowBatteryAlerts}

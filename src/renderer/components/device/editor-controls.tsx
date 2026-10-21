@@ -86,6 +86,77 @@ export function SettingsSlider({
   );
 }
 
+/**
+ * Draws the color range behind a hue slider.
+ */
+const HUE_TRACK_STYLE: CSSProperties = {
+  background: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360]
+    .map((hue) => `hsl(${hue} 95% 55%)`)
+    .join(', ')})`,
+};
+
+interface LightingSliderProps {
+  onPreview: (value: number) => void;
+  onCommit: () => void;
+}
+
+/**
+ * Chooses the hue of a device's lighting, from 0 to 359 degrees, and shows it.
+ */
+export function HueSlider({
+  hue,
+  onPreview,
+  onCommit,
+}: LightingSliderProps & { hue: number }) {
+  return (
+    <SettingsSection title="Colour">
+      <SettingsSlider
+        label="Hue"
+        display={
+          <span
+            aria-hidden="true"
+            className="inline-block size-3.5 rounded-full border border-border/60 align-middle"
+            style={{ background: `hsl(${hue} 95% 55%)` }}
+          />
+        }
+        value={hue}
+        min={0}
+        max={359}
+        step={1}
+        trackStyle={HUE_TRACK_STYLE}
+        onPreview={onPreview}
+        onCommit={onCommit}
+      />
+    </SettingsSection>
+  );
+}
+
+/**
+ * Chooses the brightness of a device's lighting, from off to 100 percent.
+ */
+export function BrightnessSlider({
+  brightness,
+  onPreview,
+  onCommit,
+}: LightingSliderProps & { brightness: number }) {
+  return (
+    <SettingsSection title="Brightness">
+      <SettingsSlider
+        label="Level"
+        display={`${brightness}%`}
+        value={brightness}
+        min={0}
+        max={100}
+        step={1}
+        minLabel="Off"
+        maxLabel="Bright"
+        onPreview={onPreview}
+        onCommit={onCommit}
+      />
+    </SettingsSection>
+  );
+}
+
 interface RadioOptionProps {
   group: string;
   value: string;

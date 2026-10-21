@@ -124,11 +124,36 @@ export function DeviceBatteryStatus({ device, className }: DeviceStatusProps) {
 }
 
 /**
+ * Marks whether a listed device is physical hardware or a simulation.
+ */
+export function DeviceKindBadge({ device, className }: DeviceStatusProps) {
+  return (
+    <span
+      className={cn(
+        'flex items-center gap-1.5 rounded-full border border-border/60 px-2 py-0.5',
+        'text-xs font-medium text-muted-foreground',
+        className,
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          'size-1.5 rounded-full',
+          device.live && device.connected ? 'bg-status-charging' : 'bg-muted-foreground/35',
+        )}
+      />
+      {device.live ? 'Live device' : 'Dummy device'}
+    </span>
+  );
+}
+
+/**
  * Combines the connection and battery indicators used on a device screen.
  */
 export function DeviceStatus({ device, className }: DeviceStatusProps) {
   return (
     <span className={cn('flex items-center gap-4', className)}>
+      <DeviceKindBadge device={device} />
       <DeviceConnectionIcon device={device} className="[&_svg]:size-5" />
       <DeviceBatteryStatus device={device} className="gap-2 text-sm [&_svg]:size-5" />
     </span>

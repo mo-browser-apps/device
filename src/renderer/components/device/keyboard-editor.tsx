@@ -1,10 +1,10 @@
-import type { CSSProperties } from 'react';
-import type { KeyboardSettings, Settings } from '@/gen/devices';
+import type { KeyboardSettings, KeyboardSpec, Settings } from '@/gen/devices';
 import {
   BindingEditor,
+  BrightnessSlider,
+  HueSlider,
   RadioOption,
   SettingsSection,
-  SettingsSlider,
 } from './editor-controls';
 import {
   KEY_ACTIONS,
@@ -13,18 +13,10 @@ import {
   resetKeyBindings,
 } from './keyboard-device';
 
-/**
- * Draws the color range behind the keyboard hue slider.
- */
-const HUE_TRACK_STYLE: CSSProperties = {
-  background: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360]
-    .map((hue) => `hsl(${hue} 95% 55%)`)
-    .join(', ')})`,
-};
-
 interface KeyboardEditorProps {
   settings: Settings;
   keyboard: KeyboardSettings;
+  spec: KeyboardSpec;
   selected: string | null;
   segment: 'keys' | 'lighting';
   disabled: boolean;
@@ -38,6 +30,7 @@ interface KeyboardEditorProps {
 export function KeyboardEditor({
   settings,
   keyboard,
+  spec,
   selected,
   segment,
   disabled,
@@ -69,12 +62,13 @@ export function KeyboardEditor({
   }
 
   const commitCurrentSettings = () => onCommit(settings);
+  const effects = KEYBOARD_EFFECTS.filter(([effect]) => spec.effects.includes(effect));
 
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-10 disabled:opacity-50">
       <SettingsSection title="Effect">
         <div className="flex flex-col">
-          {KEYBOARD_EFFECTS.map(([effect, label]) => (
+          {effects.map(([effect, label]) => (
             <RadioOption
               key={effect}
               group="effect"
@@ -87,40 +81,19 @@ export function KeyboardEditor({
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Colour">
-        <SettingsSlider
-          label="Hue"
-          display={
-            <span
-              aria-hidden="true"
-              className="inline-block size-3.5 rounded-full border border-border/60 align-middle"
-              style={{ background: `hsl(${keyboard.hue} 95% 55%)` }}
-            />
-          }
-          value={keyboard.hue}
-          min={0}
-          max={359}
-          step={1}
-          trackStyle={HUE_TRACK_STYLE}
+      {spec.color && (
+        <HueSlider
+          hue={keyboard.hue}
           onPreview={(hue) => onPreview(withKeyboardChanges({ hue }))}
           onCommit={commitCurrentSettings}
         />
-      </SettingsSection>
+      )}
 
-      <SettingsSection title="Brightness">
-        <SettingsSlider
-          label="Level"
-          display={`${keyboard.brightness}%`}
-          value={keyboard.brightness}
-          min={0}
-          max={100}
-          step={1}
-          minLabel="Off"
-          maxLabel="Bright"
-          onPreview={(brightness) => onPreview(withKeyboardChanges({ brightness }))}
-          onCommit={commitCurrentSettings}
-        />
-      </SettingsSection>
+      <BrightnessSlider
+        brightness={keyboard.brightness}
+        onPreview={(brightness) => onPreview(withKeyboardChanges({ brightness }))}
+        onCommit={commitCurrentSettings}
+      />
     </fieldset>
   );
 }

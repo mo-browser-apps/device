@@ -1,8 +1,6 @@
-#include "device_service.h"
-#include "device_stack.h"
+#include "hardware_service.h"
 
-// Creates the native device stack and keeps it available for RPC calls.
+// Starts the service for real keyboards and mice.
 void launch() {
-  static DeviceStack stack;
-  RegisterDeviceStackService(stack);
+  StartHardwareService();
 }
