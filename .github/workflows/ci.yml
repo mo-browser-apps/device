@@ -279,7 +279,56 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set application version
+      - name: Azure login for code signing
+        uses: azure/login@v3
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      # MōBrowser must sign the application itself through `signCommand`: a signed
+      # executable refuses to start unless packaging also produced the signed
+      # `resources/app.bin.cat` catalog, and that catalog is created only when
+      # `signCommand` is set. Signing the binaries after the build does not work.
+      - name: Set up Windows code signing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $signDir = Join-Path $env:RUNNER_TEMP 'sign'
+          New-Item -ItemType Directory -Force $signDir | Out-Null
+
+          # The Azure Artifact Signing client provides the signtool dlib.
+          $clientVersion = '1.0.95'
+          $clientZip = Join-Path $signDir 'client.zip'
+          Invoke-WebRequest `
+            "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/$clientVersion" `
+            -OutFile $clientZip
+          Expand-Archive $clientZip -DestinationPath (Join-Path $signDir 'client')
+          $dlib = Join-Path $signDir 'client\bin\x64\Azure.CodeSigning.Dlib.dll'
+          if (-not (Test-Path $dlib)) { throw "Azure.CodeSigning.Dlib.dll not found in the signing client" }
+
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
+            Sort-Object FullName |
+            Select-Object -Last 1
+          if (-not $signtool) { throw 'signtool.exe not found in the Windows SDK' }
+
+          @{
+            Endpoint = $env:AZURE_SIGNING_ENDPOINT
+            CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT_NAME
+            CertificateProfileName = $env:AZURE_CERTIFICATE_PROFILE_NAME
+            ExcludeCredentials = @('ManagedIdentityCredential')
+          } | ConvertTo-Json | Set-Content (Join-Path $signDir 'metadata.json') -Encoding ascii
+
+          # A wrapper keeps paths with spaces out of `signCommand`.
+          @"
+          @echo off
+          "$($signtool.FullName)" sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "$dlib" /dmdf "$signDir\metadata.json" "%~1"
+          "@ | Set-Content (Join-Path $signDir 'sign.cmd') -Encoding ascii
+
+          "WINDOWS_SIGN_COMMAND=cmd /c $signDir\sign.cmd @@BINARY_PATH@@" >> $env:GITHUB_ENV
+
+      - name: Set application version and signing command
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version }}
@@ -297,73 +346,51 @@ jobs:
 
           node -e '
             const fs = require("node:fs");
-            const [file, major, minor, patch] = process.argv.slice(1);
+            const [file, major, minor, patch, signCommand] = process.argv.slice(1);
             const conf = JSON.parse(fs.readFileSync(file, "utf8"));
             conf.app.version = { major, minor, patch };
+            conf.app.bundle.Windows.signCommand = signCommand;
             fs.writeFileSync(file, JSON.stringify(conf, null, 2) + "\n");
-          ' mobrowser.conf.json "$major" "$minor" "$patch"
+          ' mobrowser.conf.json "$major" "$minor" "$patch" "$WINDOWS_SIGN_COMMAND"
 
           echo "Application version set to $version"
 
-      - name: Build application
+      - name: Build and sign application
         run: npm run build -- --verbose
 
-      - name: Azure login for code signing
-        uses: azure/login@v3
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Sign application binaries
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT_NAME }}
-          certificate-profile-name: ${{ env.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\build\dist\win-x64\bin
-          files-folder-filter: exe,dll
-          files-folder-recurse: true
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-
-      - name: Build installer and auto-update packages
+      - name: Build and sign installer and auto-update packages
         run: npm run pack -- --verbose
-
-      - name: Sign installer
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT_NAME }}
-          certificate-profile-name: ${{ env.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\build\dist\win-x64\pack
-          files-folder-filter: exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
 
       - name: Verify application and installer
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
 
+          $app = 'build/dist/win-x64/bin/MoDevice.exe'
+          $catalog = 'build/dist/win-x64/bin/resources/app.bin.cat'
           $installers = @(Get-ChildItem build/dist/win-x64/pack -Filter *.exe)
           $nupkgs = @(Get-ChildItem build/dist/win-x64/pack -Filter *.nupkg)
-          $manifest = Join-Path build/dist/win-x64/pack releases.win.json
+          $manifest = 'build/dist/win-x64/pack/releases.win.json'
 
-          $apps = @(Get-ChildItem build/dist/win-x64/bin -Filter *.exe -Recurse)
-
+          if (-not (Test-Path $app)) { throw 'The application executable is missing' }
+          if (-not (Test-Path $catalog)) { throw 'resources/app.bin.cat is missing: the build did not sign the application' }
           if ($installers.Count -ne 1) { throw "Expected exactly one installer; found $($installers.Count)" }
           if ($nupkgs.Count -lt 1) { throw 'Expected at least one .nupkg for auto-update' }
           if (-not (Test-Path $manifest)) { throw 'releases.win.json is missing' }
-          if ($apps.Count -lt 1) { throw 'Expected the application executable in bin' }
 
-          # A .nupkg is a zip archive and carries no Authenticode signature; its exe files are checked here.
-          foreach ($file in @($installers[0].FullName) + ($apps | ForEach-Object FullName)) {
+          # The runtime requires the catalog and the executable to carry the same certificate.
+          # A .nupkg is a zip archive and carries no Authenticode signature.
+          $thumbprints = @()
+          foreach ($file in @($app, $catalog, $installers[0].FullName)) {
             $signature = Get-AuthenticodeSignature $file
             if ($signature.Status -ne 'Valid') { throw "Signature of $file is $($signature.Status)" }
+            $thumbprints += $signature.SignerCertificate.Thumbprint
           }
+          if (($thumbprints | Sort-Object -Unique).Count -ne 1) {
+            throw "The executable, catalog, and installer are signed with different certificates: $($thumbprints -join ', ')"
+          }
+
+          Write-Host "Signed with certificate thumbprint $($thumbprints[0])"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
