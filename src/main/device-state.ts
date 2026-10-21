@@ -255,8 +255,13 @@ export class DeviceState {
    */
   private connect(connection: Connection): void {
     const modelId = modelIdOf(connection);
+    const previousModelId = connection.keyboard
+      ? `via-${connection.keyboard.vendorId.toString(16).padStart(4, '0')}-${connection.keyboard.productId.toString(16).padStart(4, '0')}`
+      : modelId;
     const entry = this.entries.find(
-      (unit) => unit.device.modelId === modelId && !unit.device.connected,
+      (unit) =>
+        (unit.device.modelId === modelId || unit.device.modelId === previousModelId) &&
+        !unit.device.connected,
     );
     let deviceId = entry?.device.id ?? modelId;
     for (let unit = 2; !entry && this.find(deviceId); unit++) deviceId = `${modelId}-${unit}`;
