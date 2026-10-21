@@ -93,7 +93,15 @@ function glowStyle(effect: LightEffect, keyLayout: KeyLayout): CSSProperties {
 /**
  * Draws the decorative label and glow for one key.
  */
-function KeyFace({ lighting, keyLayout }: { lighting: Lighting | null; keyLayout: KeyLayout }) {
+function KeyFace({
+  lighting,
+  keyLayout,
+  label = true,
+}: {
+  lighting: Lighting | null;
+  keyLayout: KeyLayout;
+  label?: boolean;
+}) {
   return (
     <span
       style={{ ...keyLayout.style, ...(lighting ? glowStyle(lighting.effect, keyLayout) : {}) }}
@@ -105,7 +113,7 @@ function KeyFace({ lighting, keyLayout }: { lighting: Lighting | null; keyLayout
           'animate-[key-glow_ease-in-out_infinite] motion-reduce:animate-none',
       )}
     >
-      {keyLayout.label}
+      {label && keyLayout.label}
     </span>
   );
 }
@@ -283,7 +291,9 @@ export function KeyboardArt({
             className="will-change-transform"
             layout={layout}
             keys={keys}
-            renderKey={(key) => <KeyFace key={key.id} lighting={activeLighting} keyLayout={key} />}
+            renderKey={(key) => (
+              <KeyFace key={key.id} lighting={activeLighting} keyLayout={key} label={false} />
+            )}
           />
           {layout.mark && <KeyboardMark mark={layout.mark} lighting={activeLighting} />}
           <span
@@ -292,17 +302,16 @@ export function KeyboardArt({
           />
         </span>
       ) : (
-        <>
-          <KeyLayer
-            aria-hidden
-            className="pointer-events-none"
-            layout={layout}
-            keys={keys}
-            renderKey={(key) => <KeyFace key={key.id} lighting={null} keyLayout={key} />}
-          />
-          {layout.mark && <KeyboardMark mark={layout.mark} lighting={null} />}
-        </>
+        layout.mark && <KeyboardMark mark={layout.mark} lighting={null} />
       )}
+
+      <KeyLayer
+        aria-hidden
+        className="pointer-events-none"
+        layout={layout}
+        keys={keys}
+        renderKey={(key) => <KeyFace key={key.id} lighting={null} keyLayout={key} />}
+      />
 
       {onControlSelect && (
         <KeyLayer
