@@ -286,6 +286,14 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
+      # The GitHub OIDC assertion behind the login expires after five minutes, while
+      # the native build runs longer than that before the first file is signed. An
+      # access token for the signing service is fetched now, while the assertion is
+      # still valid, and stays in the Azure CLI cache for about an hour.
+      - name: Cache an Azure access token for signing
+        shell: pwsh
+        run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
+
       # MōBrowser must sign the application itself through `signCommand`: a signed
       # executable refuses to start unless packaging also produced the signed
       # `resources/app.bin.cat` catalog, and that catalog is created only when
