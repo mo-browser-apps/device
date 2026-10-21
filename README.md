@@ -8,13 +8,11 @@ that owns the device model, and a native C++ module that drives real keyboards a
 
 ## What the demo shows
 
-- Find connected QMK/VIA keyboards, Logitech mice, and, on Windows, Razer keyboards and mice;
-  add them, and remove them.
-- See each device's connection, firmware, and a mouse's real battery level.
-- Change a keyboard's backlight effect, color, and brightness, and a mouse's DPI.
-- Change the color and brightness of a Razer keyboard or mouse through the Razer Chroma SDK.
-- Change the app theme, launch it at login, manage updates, and enable low-battery alerts.
-- Keep added devices between launches.
+- Discover and manage QMK/VIA keyboards and Logitech mice, plus Razer keyboards and mice on
+  Windows.
+- Configure keyboard mappings and lighting, mouse buttons and movement, and Razer static lighting.
+- Show live connection, firmware, and battery information while keeping devices and settings
+  between launches.
 
 <p align="center">
   <a href="assets/screenshots/macos-devices.png"><img src="assets/screenshots/macos-devices.png" width="49%" alt="Device overview on macOS"></a>
@@ -26,13 +24,11 @@ that owns the device model, and a native C++ module that drives real keyboards a
   <a href="assets/screenshots/macos-settings.png"><img src="assets/screenshots/macos-settings.png" width="49%" alt="App settings"></a>
 </p>
 
-The app supports QMK/VIA keyboards, Logitech mice connected through a Bolt receiver, and, on
-Windows, Razer keyboards and mice lit through the [Razer Chroma SDK](https://developer.razer.com/chroma/).
-When no real device has been added, it shows clearly labelled dummy devices; **Add device** shows
-connected hardware. This is a reference demo, not production device software.
-
-The demo requires no account or API key. Packaged versions contact GitHub Releases to check for
-updates, but device data and settings are not sent anywhere.
+Razer controls are Windows-only and use the [Razer Chroma SDK](https://developer.razer.com/chroma/).
+The Mamba Wireless and Huntsman ENG have model-specific artwork; other detected Razer keyboards and
+mice use generic artwork with the same static lighting controls. The demo requires no account or
+API key. Device data and settings stay local; packaged builds contact GitHub Releases only to check
+for updates.
 
 ## Requirements
 
