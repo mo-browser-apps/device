@@ -69,12 +69,19 @@ export function fromVia(value: number, range: number): number {
 /**
  * Turns the editor's lighting into the raw values the keyboard's firmware understands.
  */
-export function toRawLighting(keyboard: KeyboardSettings, model: ViaModel): RawLighting {
-  let effect = VIA_SOLID;
-  if (keyboard.effect === LightEffect.BREATHING && model.breathingEffect) {
-    effect = model.breathingEffect;
+export function toRawLighting(
+  keyboard: KeyboardSettings,
+  model: ViaModel,
+  currentEffect: LightEffect,
+): RawLighting {
+  let effect = keyboard.rawEffect;
+  if (keyboard.effect !== currentEffect || (effect === VIA_OFF && keyboard.brightness > 0)) {
+    effect = VIA_SOLID;
+    if (keyboard.effect === LightEffect.BREATHING && model.breathingEffect) {
+      effect = model.breathingEffect;
+    }
+    if (keyboard.effect === LightEffect.WAVE && model.waveEffect) effect = model.waveEffect;
   }
-  if (keyboard.effect === LightEffect.WAVE && model.waveEffect) effect = model.waveEffect;
   return {
     effect,
     hue: toVia(keyboard.hue, 360),
@@ -99,9 +106,8 @@ export function viaKeyboard(
   if (keyboard.hasEffect && model.waveEffect) effects.push(LightEffect.WAVE);
 
   const raw = keyboard.lighting ?? { effect: VIA_OFF, hue: 0, saturation: 0, brightness: 0 };
-  // Firmware effects the editor cannot show are listed as the animated "Wave". When the
-  // keyboard has no Wave, no option is selected, and choosing Steady still applies.
-  let effect = LightEffect.WAVE;
+  // An effect the editor cannot show leaves every option unselected until one is chosen.
+  let effect = LightEffect.UNRECOGNIZED;
   // Effect 0 means the backlight is off; it is shown as Steady at zero brightness.
   if (raw.effect === VIA_SOLID || raw.effect === VIA_OFF) effect = LightEffect.STATIC;
   if (model.breathingEffect && raw.effect === model.breathingEffect) {
@@ -130,6 +136,7 @@ export function viaKeyboard(
         effect,
         hue: Math.min(fromVia(raw.hue, 360), 359),
         brightness: raw.effect === VIA_OFF ? 0 : fromVia(raw.brightness, 100),
+        rawEffect: raw.effect,
       },
     },
   };

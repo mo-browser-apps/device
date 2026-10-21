@@ -63,6 +63,7 @@ function isValid({ device, settings: current }: Entry, settings: Settings): bool
       // An effect the editor cannot offer stays valid while the keyboard shows it.
       (keyboardSpec.effects.includes(keyboard.effect) ||
         keyboard.effect === current.keyboard?.effect) &&
+      isInRange(keyboard.rawEffect, 0, 255) &&
       isInRange(keyboard.hue, 0, 359) &&
       isInRange(keyboard.brightness, 0, 100) &&
       keyboard.bindings.every((binding) => keyboardSpec.keys.includes(binding.control))
@@ -184,10 +185,19 @@ export class DeviceState {
     // A failed write closes the device, or every Razer device after a failed Chroma
     // write; the native module then reports it gone.
     if (connection.keyboard) {
+      const raw = toRawLighting(
+        settings.keyboard!,
+        viaModel(connection.keyboard),
+        entry.settings.keyboard!.effect,
+      );
       await this.hooks.applyLighting(
         connection.connectionId,
-        toRawLighting(settings.keyboard!, viaModel(connection.keyboard)),
+        raw,
       );
+      settings = {
+        ...settings,
+        keyboard: { ...settings.keyboard!, rawEffect: raw.effect },
+      };
     } else if (connection.chroma) {
       await this.hooks.applyLighting(connection.connectionId, chromaRawLighting(settings));
     } else {

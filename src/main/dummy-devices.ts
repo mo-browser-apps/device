@@ -172,6 +172,7 @@ export function dummyDevices(): DummyDevice[] {
           effect: LightEffect.STATIC,
           hue: 35,
           brightness: 70,
+          rawEffect: 1,
         },
       },
     },

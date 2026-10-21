@@ -93,6 +93,8 @@ message KeyboardSettings {
   int32 hue = 3;
   // Percentage from 0 to 100.
   int32 brightness = 4;
+  // The firmware effect, retained when the editor cannot represent it.
+  int32 raw_effect = 5;
 }
 
 message Settings {
