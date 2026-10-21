@@ -59,9 +59,6 @@ by cable. Separate active mice remain separate devices. If the query fails or an
 app interrupts it, discovery keeps the last confirmed state until a later scan succeeds.
 Other Razer models still use USB enumeration.
 
-Native discovery regression tests are described in
-[`tests/native/README.md`](tests/native/README.md).
-
 ## Project structure
 
 - `src/main/device-state.ts` owns the device list and settings: pairing, validation, and the
