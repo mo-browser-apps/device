@@ -52,6 +52,8 @@ class HidppReceiver {
   HidppReceiver(const HidppReceiver&) = delete;
   HidppReceiver& operator=(const HidppReceiver&) = delete;
 
+  bool failed() const { return failed_; }
+
   // Sends one long HID++ request to a paired device and returns its reply's parameters.
   std::optional<std::array<uint8_t, 16>> Request(uint8_t index, uint8_t feature,
                                                  uint8_t function,
@@ -60,6 +62,7 @@ class HidppReceiver {
                                     static_cast<uint8_t>((function << 4) | kSoftwareId)};
     std::copy(params.begin(), params.end(), request + 4);
     if (hid_write(device_, request, sizeof(request)) != static_cast<int>(sizeof(request))) {
+      failed_ = true;
       return std::nullopt;
     }
 
@@ -73,7 +76,10 @@ class HidppReceiver {
       if (remaining.count() <= 0) return std::nullopt;
       uint8_t reply[kLongLength] = {};
       const int read = Read(reply, static_cast<int>(remaining.count()));
-      if (read < 0) return std::nullopt;
+      if (read < 0) {
+        failed_ = true;
+        return std::nullopt;
+      }
       if (read == 0 || reply[1] != index) continue;
       const bool error = (reply[0] == kShortReport && reply[2] == kHidpp10Error) ||
                          (reply[0] == kLongReport && reply[2] == kHidpp20Error);
@@ -98,6 +104,7 @@ class HidppReceiver {
 
   hid_device* device_;
   hid_device* short_device_;
+  bool failed_ = false;
 };
 
 std::optional<HidppMouse::Params> HidppMouse::Request(uint8_t feature, uint8_t function,
@@ -184,6 +191,10 @@ std::optional<std::vector<HidppScanner::Found>> HidppScanner::Scan() {
   next_scan_ = now + interval_;
 
   std::vector<Found> found;
+
+  std::erase_if(receivers_, [](const auto& receiver) { return receiver.second->failed(); });
+  std::erase_if(open_,
+                [&](const auto& open) { return !receivers_.contains(open.first.first); });
 
   // ponytail: Bolt receivers only.
   std::set<std::string> present;
