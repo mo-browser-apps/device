@@ -352,11 +352,15 @@ jobs:
           $nupkgs = @(Get-ChildItem build/dist/win-x64/pack -Filter *.nupkg)
           $manifest = Join-Path build/dist/win-x64/pack releases.win.json
 
+          $apps = @(Get-ChildItem build/dist/win-x64/bin -Filter *.exe -Recurse)
+
           if ($installers.Count -ne 1) { throw "Expected exactly one installer; found $($installers.Count)" }
           if ($nupkgs.Count -lt 1) { throw 'Expected at least one .nupkg for auto-update' }
           if (-not (Test-Path $manifest)) { throw 'releases.win.json is missing' }
+          if ($apps.Count -lt 1) { throw 'Expected the application executable in bin' }
 
-          foreach ($file in @($installers[0].FullName) + ($nupkgs | ForEach-Object FullName)) {
+          # A .nupkg is a zip archive and carries no Authenticode signature; its exe files are checked here.
+          foreach ($file in @($installers[0].FullName) + ($apps | ForEach-Object FullName)) {
             $signature = Get-AuthenticodeSignature $file
             if ($signature.Status -ne 'Valid') { throw "Signature of $file is $($signature.Status)" }
           }
