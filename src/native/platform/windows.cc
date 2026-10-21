@@ -3,6 +3,9 @@
 
 #include <hidapi.h>
 
+#include <algorithm>
+#include <cctype>
+
 #include "platform.h"
 
 namespace {
@@ -71,6 +74,13 @@ Function Resolve(HMODULE library, const char* name) {
   return reinterpret_cast<Function>(GetProcAddress(library, name));
 }
 
+size_t FindPathPart(const std::string& path, const std::string& part) {
+  std::string lowercase = path;
+  std::transform(lowercase.begin(), lowercase.end(), lowercase.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return lowercase.find(part);
+}
+
 }  // namespace
 
 bool InitHid() {
@@ -79,10 +89,10 @@ bool InitHid() {
 
 // Windows opens each top-level collection under its own path, such as
 // "\\?\hid#vid_046d&pid_c548&mi_02&col02#..." for long reports and "...&col01#..." for
-// short ones. HIDAPI lowercases the path.
+// short ones. Windows does not guarantee the path's letter case.
 std::string HidppShortReportPath(const std::string& long_report_path) {
   std::string path = long_report_path;
-  const size_t collection = path.find("&col02");
+  const size_t collection = FindPathPart(path, "&col02");
   if (collection == std::string::npos) return {};
   path.replace(collection, 6, "&col01");
   return path;
@@ -92,7 +102,7 @@ std::string HidppShortReportPath(const std::string& long_report_path) {
 // "\\?\hid#vid_1532&pid_0227&mi_00&col02#...".
 std::string HidInterfacePath(const std::string& collection_path) {
   std::string path = collection_path;
-  const size_t collection = path.find("&col");
+  const size_t collection = FindPathPart(path, "&col");
   if (collection != std::string::npos) path.erase(collection, 6);
   return path;
 }
