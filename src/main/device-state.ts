@@ -89,7 +89,11 @@ function restoreEntry(json: unknown): Entry | undefined {
   ) {
     return undefined;
   }
-  const entry = { device: { ...device, connected: false }, settings, paired: true };
+  const entry = {
+    device: { ...device, connected: false, connectionId: 0 },
+    settings,
+    paired: true,
+  };
   return isValid(entry, settings) ? entry : undefined;
 }
 
@@ -244,7 +248,7 @@ export class DeviceState {
         continue;
       }
       this.live.delete(deviceId);
-      entry.device = { ...entry.device, connected: false };
+      entry.device = { ...entry.device, connected: false, connectionId: 0 };
       if (entry.paired) pairedLeft = true;
       else this.entries.splice(this.entries.indexOf(entry), 1);
       changed = true;

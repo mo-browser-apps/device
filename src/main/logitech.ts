@@ -30,6 +30,7 @@ export function logitechMouse(
       battery: mouse.battery,
       charging: mouse.charging,
       live: true,
+      connectionId: mouse.connectionId,
       mouse: { buttons: [], minDpi: mouse.minDpi, maxDpi: mouse.maxDpi, backlight: false },
     },
     settings: {

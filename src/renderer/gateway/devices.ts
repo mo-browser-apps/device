@@ -62,7 +62,7 @@ export function useDevices(): { devices: Device[] | null; failed: boolean } {
  * It previews changes locally and sends committed values back through IPC.
  */
 export function useDeviceSettings(device: Device) {
-  const { id: deviceId, connected } = device;
+  const { id: deviceId, connected, connectionId } = device;
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export function useDeviceSettings(device: Device) {
     return () => {
       isActive = false;
     };
-  }, [deviceId, connected]);
+  }, [deviceId, connected, connectionId]);
 
   const commitSettings = useCallback((nextSettings: Settings) => {
     setSettings(nextSettings);

@@ -95,6 +95,7 @@ function mouse(seed: MouseSeed): DummyDevice {
       battery: seed.battery,
       charging: seed.charging,
       live: false,
+      connectionId: 0,
       mouse: {
         buttons: bindings.map(({ control }) => control),
         minDpi: seed.minDpi,
@@ -158,6 +159,7 @@ export function dummyDevices(): DummyDevice[] {
         battery: 0,
         charging: false,
         live: false,
+        connectionId: 0,
         keyboard: {
           keys: REMAPPABLE_KEYS,
           backlight: true,

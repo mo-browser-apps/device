@@ -88,6 +88,7 @@ export function chromaDevice(
     battery: 0,
     charging: false,
     live: true,
+    connectionId: device.connectionId,
   };
 
   if (isKeyboard) {

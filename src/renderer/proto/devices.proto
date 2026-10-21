@@ -53,6 +53,8 @@ message Device {
   bool charging = 10;
   // True for physical hardware driven by the native module, not the simulation.
   bool live = 12;
+  // Changes whenever physical hardware reconnects; zero while disconnected or simulated.
+  uint32 connection_id = 13;
 
   // Hardware capabilities and device category.
   oneof spec {
