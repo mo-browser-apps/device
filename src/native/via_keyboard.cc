@@ -66,7 +66,8 @@ std::shared_ptr<ViaKeyboard> ViaKeyboard::Open(const hid_device_info& info) {
     return nullptr;
   }
 
-  std::shared_ptr<ViaKeyboard> keyboard(new ViaKeyboard(device, MakeHardware(info)));
+  std::shared_ptr<ViaKeyboard> keyboard(
+      new ViaKeyboard(device, info.path, MakeHardware(info)));
   Report report{kGetProtocolVersion};
   if (!keyboard->Transact(report)) {
     return nullptr;
@@ -85,7 +86,7 @@ std::shared_ptr<ViaKeyboard> ViaKeyboard::Open(const hid_device_info& info) {
 }
 
 ViaKeyboard::~ViaKeyboard() {
-  hid_close(device_);
+  if (device_) hid_close(device_);
 }
 
 bool ViaKeyboard::Transact(Report& report) {
@@ -157,10 +158,18 @@ std::optional<ViaKeyboard::Lighting> ViaKeyboard::ReadLighting() {
 }
 
 bool ViaKeyboard::WriteLighting(const Lighting& lighting) {
-  const bool ok = !failed_ &&
-                  (!channel_->effect || SetValue(kEffect, lighting.effect)) &&
-                  (!channel_->color || SetValue(kColor, lighting.hue, lighting.saturation)) &&
-                  SetValue(kBrightness, lighting.brightness);
+  if (failed_) return false;
+  const auto write = [&] {
+    return (!channel_->effect || SetValue(kEffect, lighting.effect)) &&
+           (!channel_->color || SetValue(kColor, lighting.hue, lighting.saturation)) &&
+           SetValue(kBrightness, lighting.brightness);
+  };
+  bool ok = write();
+  if (!ok) {
+    hid_close(device_);
+    device_ = hid_open_path(path_.c_str());
+    ok = device_ && write();
+  }
   if (!ok) failed_ = true;
   return ok;
 }

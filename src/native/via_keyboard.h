@@ -84,8 +84,8 @@ class ViaKeyboard {
  private:
   using Report = std::array<uint8_t, 32>;
 
-  ViaKeyboard(hid_device_* device, Hardware hardware)
-      : device_(device), hardware_(std::move(hardware)) {}
+  ViaKeyboard(hid_device_* device, std::string path, Hardware hardware)
+      : device_(device), path_(std::move(path)), hardware_(std::move(hardware)) {}
 
   // Sends one VIA report and replaces it with the keyboard's reply.
   bool Transact(Report& report);
@@ -93,6 +93,7 @@ class ViaKeyboard {
   bool SetValue(uint8_t value_id, uint8_t first, uint8_t second = 0);
 
   hid_device_* device_;
+  std::string path_;
   Hardware hardware_;
   const Channel* channel_ = nullptr;
   int protocol_version_ = 0;
