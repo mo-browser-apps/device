@@ -80,8 +80,6 @@ export function useDeviceSettings(device: Device) {
     };
   }, [deviceId, connected]);
 
-  const previewSettings = useCallback((nextSettings: Settings) => setSettings(nextSettings), []);
-
   const commitSettings = useCallback((nextSettings: Settings) => {
     setSettings(nextSettings);
     void ipc.devices.ApplySettings(nextSettings).catch((error: unknown) => {
@@ -89,5 +87,5 @@ export function useDeviceSettings(device: Device) {
     });
   }, []);
 
-  return { settings, preview: previewSettings, commit: commitSettings };
+  return { settings, preview: setSettings, commit: commitSettings };
 }

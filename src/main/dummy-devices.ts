@@ -107,8 +107,6 @@ function mouse(seed: MouseSeed): DummyDevice {
       mouse: {
         bindings,
         dpi: seed.dpi,
-        scrollSpeed: 3,
-        naturalScroll: false,
         hue: 0,
         brightness: 0,
       },

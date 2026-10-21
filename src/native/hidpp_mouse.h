@@ -11,8 +11,6 @@
 #include <utility>
 #include <vector>
 
-struct hid_device_;
-
 // A Logitech Bolt receiver's HID++ interface, shared by the mice paired with it.
 class HidppReceiver;
 

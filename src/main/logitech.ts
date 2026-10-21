@@ -37,8 +37,6 @@ export function logitechMouse(
       mouse: {
         bindings: [],
         dpi: mouse.dpi,
-        scrollSpeed: 3,
-        naturalScroll: false,
         hue: 0,
         brightness: 0,
       },

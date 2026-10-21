@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { LightEffect, type KeyboardSettings, type KeyboardSpec } from '@/gen/devices';
 import { keyboardControlLabel } from '@/components/device/keyboard-device';
 import { cn } from '@/lib/utils';
@@ -258,7 +258,7 @@ export function KeyboardArt({
 }: KeyboardArtProps) {
   const selectableKeys = new Set(spec.keys);
   const activeLighting = lighting && lighting.brightness > 0 ? lighting : null;
-  const keys = placeKeys(layout.keys);
+  const keys = useMemo(() => placeKeys(layout.keys), [layout.keys]);
 
   return (
     <span className={cn('relative block w-full', className)} style={{ aspectRatio: aspect }}>

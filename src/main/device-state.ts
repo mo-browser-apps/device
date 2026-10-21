@@ -40,8 +40,6 @@ export interface DeviceStateHooks {
   save(saved: SavedDevices): void;
 }
 
-const MAX_SCROLL_SPEED = 5;
-
 function isInRange(value: number, min: number, max: number): boolean {
   return Number.isInteger(value) && value >= min && value <= max;
 }
@@ -55,7 +53,6 @@ function isValid({ device, settings: current }: Entry, settings: Settings): bool
   if (spec && mouse && !keyboard) {
     return (
       isInRange(mouse.dpi, spec.minDpi, spec.maxDpi) &&
-      isInRange(mouse.scrollSpeed, 1, MAX_SCROLL_SPEED) &&
       (!spec.backlight ||
         (isInRange(mouse.hue, 0, 359) && isInRange(mouse.brightness, 0, 100))) &&
       mouse.bindings.every((binding) => spec.buttons.includes(binding.control))

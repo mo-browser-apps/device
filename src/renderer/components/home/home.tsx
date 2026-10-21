@@ -213,62 +213,53 @@ export function Home({
         </div>
       </div>
 
-      {devices.length > 0 ? (
-        <div className="relative flex flex-1 items-center">
-          <div
-            id="device-carousel"
-            ref={carouselRef}
-            className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
-          >
-            <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
-              {devices.map((device) => (
-                <DeviceCard
-                  key={device.id}
-                  device={device}
-                  onOpen={() => openDevice(device.id)}
-                  onRemove={device.live ? () => setDeviceToRemove(device) : undefined}
-                />
-              ))}
-            </div>
+      <div className="relative flex flex-1 items-center">
+        <div
+          id="device-carousel"
+          ref={carouselRef}
+          className="w-full snap-x snap-proximity overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden"
+        >
+          <div className="flex w-max min-w-full justify-center gap-4 px-12 pb-12">
+            {devices.map((device) => (
+              <DeviceCard
+                key={device.id}
+                device={device}
+                onOpen={() => openDevice(device.id)}
+                onRemove={device.live ? () => setDeviceToRemove(device) : undefined}
+              />
+            ))}
           </div>
-
-          {canScrollPrevious && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
-            />
-          )}
-
-          {canScrollNext && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
-            />
-          )}
-
-          {hasOverflow && (
-            <>
-              <CarouselControl
-                direction="previous"
-                disabled={!canScrollPrevious}
-                onClick={() => scrollByItem(-1)}
-              />
-              <CarouselControl
-                direction="next"
-                disabled={!canScrollNext}
-                onClick={() => scrollByItem(1)}
-              />
-            </>
-          )}
         </div>
-      ) : (
-        <div className="flex flex-1 flex-col items-center justify-center pb-12 text-center">
-          <p className="text-sm font-medium">No devices added</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Choose Add device to find your keyboard or mouse.
-          </p>
-        </div>
-      )}
+
+        {canScrollPrevious && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-linear-to-r from-background via-background/85 to-transparent"
+          />
+        )}
+
+        {canScrollNext && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-linear-to-l from-background via-background/85 to-transparent"
+          />
+        )}
+
+        {hasOverflow && (
+          <>
+            <CarouselControl
+              direction="previous"
+              disabled={!canScrollPrevious}
+              onClick={() => scrollByItem(-1)}
+            />
+            <CarouselControl
+              direction="next"
+              disabled={!canScrollNext}
+              onClick={() => scrollByItem(1)}
+            />
+          </>
+        )}
+      </div>
 
       {isAddDialogOpen && (
         <AddDeviceDialog

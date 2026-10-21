@@ -111,7 +111,7 @@ export function chromaDevice(
     },
     settings: {
       deviceId: id,
-      mouse: { bindings: [], dpi: 0, scrollSpeed: 3, naturalScroll: false, hue, brightness },
+      mouse: { bindings: [], dpi: 0, hue, brightness },
     },
   };
 }
