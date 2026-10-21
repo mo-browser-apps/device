@@ -83,30 +83,11 @@ Other Razer models still use USB enumeration.
 
 ## Supported platforms
 
-| Platform | Platform file | HIDAPI backend | Razer Chroma SDK | Device access | CI checks | Release | Tested with devices |
-|---|---|---|---|---|---|---|---|
-| macOS 14+, Apple silicon | [`mac.cc`](src/native/platform/mac.cc) | IOHIDManager | No | Nothing to set up | Yes | Yes, signed and notarized | Yes |
-| Windows 10+, x64 | [`windows.cc`](src/native/platform/windows.cc) | WinAPI | Yes, loaded at run time | Nothing to set up | Yes | No | Razer devices only |
-| Linux, x64 | [`linux.cc`](src/native/platform/linux.cc) | hidraw (needs `libudev-dev` to build) | No | Install [`70-modevice.rules`](src/native/platform/70-modevice.rules) | Yes | No | No |
-
-All device code is shared. Only the functions declared in
-[`src/native/platform/platform.h`](src/native/platform/platform.h) differ per platform, and
-[`CMakeLists.txt`](CMakeLists.txt) compiles one implementation of them. Building on any other
-platform stops with an error that points here.
-
-The Razer Chroma SDK exists for Windows only. `windows.cc` loads its runtime from the system
-directory when the app runs, so nothing from the SDK is needed to build, and the other platforms
-report that the SDK is unavailable. The SDK lights every Razer keyboard, or every Razer mouse, as
-one, and cannot read what a device shows: the app starts from a default color and keeps the last
-color written while it runs.
-
-On Linux, HID devices are readable only by root until a udev rule grants access. Run this once,
-then plug the devices in again:
-
-```bash
-sudo cp src/native/platform/70-modevice.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-```
+| Platform | Support |
+|---|---|
+| macOS 14+ | Apple silicon |
+| Windows 10+ | x64, including Razer Chroma |
+| Linux | x64; device access requires the included [`udev` rule](src/native/platform/70-modevice.rules) |
 
 ## Connect real devices
 
