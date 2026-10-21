@@ -298,7 +298,11 @@ export function KeyboardArt({
           {layout.mark && <KeyboardMark mark={layout.mark} lighting={activeLighting} />}
           <span
             className="absolute inset-0 mix-blend-multiply will-change-[background-color]"
-            style={{ backgroundColor: `hsl(${activeLighting.hue} 100% 55%)` }}
+            style={{
+              backgroundColor: spec.color
+                ? `hsl(${activeLighting.hue} 100% 55%)`
+                : 'white',
+            }}
           />
         </span>
       ) : (
