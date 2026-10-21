@@ -72,10 +72,10 @@ export function fromVia(value: number, range: number): number {
 export function toRawLighting(
   keyboard: KeyboardSettings,
   model: ViaModel,
-  currentEffect: LightEffect,
+  current: KeyboardSettings,
 ): RawLighting {
   let effect = keyboard.rawEffect;
-  if (keyboard.effect !== currentEffect || (effect === VIA_OFF && keyboard.brightness > 0)) {
+  if (keyboard.effect !== current.effect || (effect === VIA_OFF && keyboard.brightness > 0)) {
     effect = VIA_SOLID;
     if (keyboard.effect === LightEffect.BREATHING && model.breathingEffect) {
       effect = model.breathingEffect;
@@ -85,8 +85,8 @@ export function toRawLighting(
   return {
     effect,
     hue: toVia(keyboard.hue, 360),
-    // Full saturation keeps hue changes clearly visible.
-    saturation: 255,
+    // Choosing a hue makes it visible; brightness-only changes preserve white or pastel colors.
+    saturation: keyboard.hue === current.hue ? keyboard.saturation : 255,
     brightness: toVia(keyboard.brightness, 100),
   };
 }
@@ -137,6 +137,7 @@ export function viaKeyboard(
         hue: Math.min(fromVia(raw.hue, 360), 359),
         brightness: raw.effect === VIA_OFF ? 0 : fromVia(raw.brightness, 100),
         rawEffect: raw.effect,
+        saturation: raw.saturation,
       },
     },
   };

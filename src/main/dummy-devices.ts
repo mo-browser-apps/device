@@ -173,6 +173,7 @@ export function dummyDevices(): DummyDevice[] {
           hue: 35,
           brightness: 70,
           rawEffect: 1,
+          saturation: 255,
         },
       },
     },

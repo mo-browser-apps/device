@@ -64,6 +64,7 @@ function isValid({ device, settings: current }: Entry, settings: Settings): bool
       (keyboardSpec.effects.includes(keyboard.effect) ||
         keyboard.effect === current.keyboard?.effect) &&
       isInRange(keyboard.rawEffect, 0, 255) &&
+      isInRange(keyboard.saturation, 0, 255) &&
       isInRange(keyboard.hue, 0, 359) &&
       isInRange(keyboard.brightness, 0, 100) &&
       keyboard.bindings.every((binding) => keyboardSpec.keys.includes(binding.control))
@@ -188,7 +189,7 @@ export class DeviceState {
       const raw = toRawLighting(
         settings.keyboard!,
         viaModel(connection.keyboard),
-        entry.settings.keyboard!.effect,
+        entry.settings.keyboard!,
       );
       await this.hooks.applyLighting(
         connection.connectionId,
@@ -196,7 +197,11 @@ export class DeviceState {
       );
       settings = {
         ...settings,
-        keyboard: { ...settings.keyboard!, rawEffect: raw.effect },
+        keyboard: {
+          ...settings.keyboard!,
+          rawEffect: raw.effect,
+          saturation: raw.saturation,
+        },
       };
     } else if (connection.chroma) {
       await this.hooks.applyLighting(connection.connectionId, chromaRawLighting(settings));

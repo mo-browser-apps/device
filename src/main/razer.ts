@@ -99,7 +99,14 @@ export function chromaDevice(
       },
       settings: {
         deviceId: id,
-        keyboard: { bindings: [], effect: LightEffect.STATIC, hue, brightness, rawEffect: 1 },
+        keyboard: {
+          bindings: [],
+          effect: LightEffect.STATIC,
+          hue,
+          brightness,
+          rawEffect: 1,
+          saturation: 255,
+        },
       },
     };
   }
