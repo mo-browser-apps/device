@@ -196,6 +196,7 @@ export class DeviceState {
     // Skip results for a device that was reconnected meanwhile: it has been read again.
     if (this.live.get(deviceId)?.connectionId === connection.connectionId) {
       entry.settings = settings;
+      if (entry.paired) this.save();
     }
   }
 
