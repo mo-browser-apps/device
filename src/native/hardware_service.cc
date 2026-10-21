@@ -171,6 +171,7 @@ ConnectedDevices Snapshot(const Hardware& hardware) {
     entry->set_dpi(connection.dpi);
     entry->set_min_dpi(connection.mouse->min_dpi());
     entry->set_max_dpi(connection.mouse->max_dpi());
+    entry->set_hardware_id(connection.mouse->hardware_id());
   }
   for (const auto& [id, device] : hardware.chroma_devices) {
     ConnectedChromaDevice* entry = snapshot.add_chroma_devices();

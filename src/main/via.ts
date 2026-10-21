@@ -127,6 +127,7 @@ export function viaKeyboard(
       charging: false,
       live: true,
       connectionId: keyboard.connectionId,
+      hardwareId: '',
       // Lighting only: key remapping is not implemented for the real keyboard.
       keyboard: { keys: [], backlight: true, color: keyboard.hasColor, effects },
     },

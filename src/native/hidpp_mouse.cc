@@ -3,6 +3,7 @@
 #include <hidapi.h>
 
 #include <algorithm>
+#include <cctype>
 #include <set>
 
 #include "platform/platform.h"
@@ -38,13 +39,25 @@ constexpr int kReplyTimeoutMs = 500;
 // How long each read waits on one collection when the receiver has two.
 constexpr int kSplitReadSliceMs = 10;
 
+std::string ReceiverId(const hid_device_info& info) {
+  std::string id;
+  for (const wchar_t* c = info.serial_number; c && *c; ++c) {
+    id += *c < 0x80 ? static_cast<char>(*c) : '?';
+  }
+  if (!id.empty()) return id;
+  id = info.path;
+  std::transform(id.begin(), id.end(), id.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return id;
+}
+
 }  // namespace
 
 class HidppReceiver {
  public:
   // short_device is the collection with short reports, or nullptr when device has them.
-  HidppReceiver(hid_device* device, hid_device* short_device)
-      : device_(device), short_device_(short_device) {}
+  HidppReceiver(hid_device* device, hid_device* short_device, std::string hardware_id)
+      : device_(device), short_device_(short_device), hardware_id_(std::move(hardware_id)) {}
   ~HidppReceiver() {
     hid_close(device_);
     if (short_device_) hid_close(short_device_);
@@ -53,6 +66,9 @@ class HidppReceiver {
   HidppReceiver& operator=(const HidppReceiver&) = delete;
 
   bool failed() const { return failed_; }
+  std::string DeviceId(uint8_t index) const {
+    return hardware_id_ + ":" + std::to_string(index);
+  }
 
   // Sends one long HID++ request to a paired device and returns its reply's parameters.
   std::optional<std::array<uint8_t, 16>> Request(uint8_t index, uint8_t feature,
@@ -104,6 +120,7 @@ class HidppReceiver {
 
   hid_device* device_;
   hid_device* short_device_;
+  std::string hardware_id_;
   bool failed_ = false;
 };
 
@@ -207,7 +224,8 @@ std::optional<std::vector<HidppScanner::Found>> HidppScanner::Scan() {
         const std::string short_path = HidppShortReportPath(info->path);
         hid_device* short_device =
             short_path.empty() ? nullptr : hid_open_path(short_path.c_str());
-        receivers_[info->path] = std::make_shared<HidppReceiver>(device, short_device);
+        receivers_[info->path] =
+            std::make_shared<HidppReceiver>(device, short_device, ReceiverId(*info));
       }
     }
   }
@@ -228,7 +246,8 @@ std::optional<std::vector<HidppScanner::Found>> HidppScanner::Scan() {
         open_.erase(open);
       }
 
-      std::shared_ptr<HidppMouse> mouse(new HidppMouse(receiver, index));
+      std::shared_ptr<HidppMouse> mouse(
+          new HidppMouse(receiver, index, receiver->DeviceId(index)));
       if (!mouse->Open()) continue;
       std::optional<HidppMouse::Battery> battery = mouse->ReadBattery();
       std::optional<int> dpi = mouse->ReadDpi();

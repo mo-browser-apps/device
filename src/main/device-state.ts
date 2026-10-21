@@ -277,11 +277,18 @@ export class DeviceState {
     const previousModelId = connection.keyboard
       ? `via-${connection.keyboard.vendorId.toString(16).padStart(4, '0')}-${connection.keyboard.productId.toString(16).padStart(4, '0')}`
       : modelId;
-    const entry = this.entries.find(
+    const candidates = this.entries.filter(
       (unit) =>
         (unit.device.modelId === modelId || unit.device.modelId === previousModelId) &&
         !unit.device.connected,
     );
+    const hardwareId = connection.mouse?.hardwareId;
+    const entry = hardwareId
+      ? (candidates.find((unit) => unit.device.hardwareId === hardwareId) ??
+        (candidates.length === 1 && !candidates[0].device.hardwareId
+          ? candidates[0]
+          : undefined))
+      : candidates[0];
     let deviceId = entry?.device.id ?? modelId;
     for (let unit = 2; !entry && this.find(deviceId); unit++) deviceId = `${modelId}-${unit}`;
 

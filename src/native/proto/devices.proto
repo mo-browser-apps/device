@@ -58,6 +58,8 @@ message ConnectedMouse {
   int32 dpi = 6;
   int32 min_dpi = 7;
   int32 max_dpi = 8;
+  // Stable receiver path and paired slot, opaque outside the main process.
+  string hardware_id = 9;
 }
 
 // What a Razer device is to the Chroma SDK, which lights every keyboard, or every

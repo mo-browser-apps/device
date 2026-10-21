@@ -55,6 +55,8 @@ message Device {
   bool live = 12;
   // Changes whenever physical hardware reconnects; zero while disconnected or simulated.
   uint32 connection_id = 13;
+  // Stable physical identity when the device protocol provides one; never displayed.
+  string hardware_id = 14;
 
   // Hardware capabilities and device category.
   oneof spec {

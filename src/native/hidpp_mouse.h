@@ -32,6 +32,7 @@ class HidppMouse {
   HidppMouse& operator=(const HidppMouse&) = delete;
 
   const std::string& name() const { return name_; }
+  const std::string& hardware_id() const { return hardware_id_; }
   // The HID++ protocol version, such as "4.5".
   const std::string& protocol() const { return protocol_; }
   int min_dpi() const { return min_dpi_; }
@@ -52,8 +53,8 @@ class HidppMouse {
   friend class HidppScanner;
   using Params = std::array<uint8_t, 16>;
 
-  HidppMouse(std::shared_ptr<HidppReceiver> receiver, uint8_t index)
-      : receiver_(std::move(receiver)), index_(index) {}
+  HidppMouse(std::shared_ptr<HidppReceiver> receiver, uint8_t index, std::string hardware_id)
+      : receiver_(std::move(receiver)), index_(index), hardware_id_(std::move(hardware_id)) {}
 
   // Reads everything the app needs; false if the mouse does not answer or lacks a feature.
   bool Open();
@@ -64,6 +65,7 @@ class HidppMouse {
 
   std::shared_ptr<HidppReceiver> receiver_;
   uint8_t index_;
+  std::string hardware_id_;
   std::string name_;
   std::string protocol_;
   uint8_t battery_feature_ = 0;
