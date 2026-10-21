@@ -46,30 +46,6 @@ export function startDevices(): void {
   );
   checkBatteries(state.list());
 
-  ipc.registerService(DevicesServiceDescriptor, {
-    async List() {
-      return state.list();
-    },
-    async Discover() {
-      return state.discover();
-    },
-    async Pair({ id }: DeviceId) {
-      state.pair(id);
-      return {};
-    },
-    async Forget({ id }: DeviceId) {
-      state.forget(id);
-      return {};
-    },
-    async GetSettings({ id }: DeviceId) {
-      return state.getSettings(id);
-    },
-    async ApplySettings(request: Settings) {
-      await state.applySettings(request);
-      return {};
-    },
-  });
-
   let notified = false;
   native.registerService(HardwareEventsServiceDescriptor, {
     async Changed(devices: ConnectedDevices) {
@@ -78,9 +54,41 @@ export function startDevices(): void {
       return {};
     },
   });
-  native.hardware
+  const devicesReady = native.hardware
     .List({})
     // A notification that arrived first carries a newer snapshot.
-    .then((devices) => notified || state.reconcile(devices))
-    .catch((error: unknown) => console.warn('Could not list connected devices.', error));
+    .then((devices) => notified || state.reconcile(devices));
+  void devicesReady.catch((error: unknown) =>
+    console.warn('Could not list connected devices.', error),
+  );
+
+  ipc.registerService(DevicesServiceDescriptor, {
+    async List() {
+      await devicesReady;
+      return state.list();
+    },
+    async Discover() {
+      await devicesReady;
+      return state.discover();
+    },
+    async Pair({ id }: DeviceId) {
+      await devicesReady;
+      state.pair(id);
+      return {};
+    },
+    async Forget({ id }: DeviceId) {
+      await devicesReady;
+      state.forget(id);
+      return {};
+    },
+    async GetSettings({ id }: DeviceId) {
+      await devicesReady;
+      return state.getSettings(id);
+    },
+    async ApplySettings(request: Settings) {
+      await devicesReady;
+      await state.applySettings(request);
+      return {};
+    },
+  });
 }
