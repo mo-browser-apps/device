@@ -317,16 +317,35 @@ jobs:
             Endpoint = $env:AZURE_SIGNING_ENDPOINT
             CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT_NAME
             CertificateProfileName = $env:AZURE_CERTIFICATE_PROFILE_NAME
-            ExcludeCredentials = @('ManagedIdentityCredential')
+            # The same credential chain azure/artifact-signing-action uses: only the
+            # environment, workload identity, and Azure CLI credentials remain, so the
+            # client cannot fall back to an interactive sign-in and hang.
+            ExcludeCredentials = @(
+              'ManagedIdentityCredential'
+              'SharedTokenCacheCredential'
+              'VisualStudioCredential'
+              'VisualStudioCodeCredential'
+              'AzurePowerShellCredential'
+              'AzureDeveloperCliCredential'
+              'InteractiveBrowserCredential'
+            )
           } | ConvertTo-Json | Set-Content (Join-Path $signDir 'metadata.json') -Encoding ascii
 
-          # A wrapper keeps paths with spaces out of `signCommand`.
+          # A wrapper keeps paths with spaces out of `signCommand` and gives up after
+          # ten minutes instead of blocking the build forever.
           @"
-          @echo off
-          "$($signtool.FullName)" sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "$dlib" /dmdf "$signDir\metadata.json" "%~1"
-          "@ | Set-Content (Join-Path $signDir 'sign.cmd') -Encoding ascii
+          `$ErrorActionPreference = 'Stop'
+          `$arguments = @('sign', '/v', '/debug', '/fd', 'SHA256', '/tr', 'http://timestamp.acs.microsoft.com', '/td', 'SHA256', '/dlib', '$dlib', '/dmdf', '$signDir\metadata.json', `$args[0])
+          `$process = Start-Process -FilePath '$($signtool.FullName)' -ArgumentList `$arguments -NoNewWindow -PassThru
+          if (-not `$process.WaitForExit(600000)) {
+            `$process.Kill()
+            Write-Error "signtool did not finish within 10 minutes for `$(`$args[0])"
+            exit 1
+          }
+          exit `$process.ExitCode
+          "@ | Set-Content (Join-Path $signDir 'sign.ps1') -Encoding ascii
 
-          "WINDOWS_SIGN_COMMAND=cmd /c $signDir\sign.cmd @@BINARY_PATH@@" >> $env:GITHUB_ENV
+          "WINDOWS_SIGN_COMMAND=pwsh -NoProfile -File $signDir\sign.ps1 @@BINARY_PATH@@" >> $env:GITHUB_ENV
 
       - name: Set application version and signing command
         shell: bash
