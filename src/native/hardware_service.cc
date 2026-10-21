@@ -229,7 +229,20 @@ class HardwareServiceImpl : public HardwareService {
         std::move(*done).Reject("Keyboard is not connected: " + std::to_string(id));
         return;
       }
-      if (!live->second.keyboard->WriteLighting(lighting)) {
+      ViaKeyboard::Lighting updated = lighting;
+      if (const auto current = live->second.keyboard->ReadLighting()) {
+        updated = *current;
+        const ViaKeyboard::Lighting& previous = live->second.lighting;
+        if (lighting.effect != previous.effect) updated.effect = lighting.effect;
+        if (lighting.hue != previous.hue) updated.hue = lighting.hue;
+        if (lighting.saturation != previous.saturation) {
+          updated.saturation = lighting.saturation;
+        }
+        if (lighting.brightness != previous.brightness) {
+          updated.brightness = lighting.brightness;
+        }
+      }
+      if (!live->second.keyboard->WriteLighting(updated)) {
         // Most likely unplugged; the next scan reopens it under a new ID if it is still
         // there.
         hardware.keyboards.erase(live);
@@ -237,6 +250,8 @@ class HardwareServiceImpl : public HardwareService {
         std::move(*done).Reject("Cannot write lighting to keyboard: " + std::to_string(id));
         return;
       }
+      // Keep the last settings requested by the app as the comparison baseline. Values
+      // changed with the keyboard's own controls remain untouched by later app writes.
       live->second.lighting = lighting;
       std::move(*done).Complete(Empty());
     });
