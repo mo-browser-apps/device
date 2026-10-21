@@ -166,7 +166,7 @@ std::optional<HidppMouse::Battery> HidppMouse::ReadBattery() {
 std::optional<int> HidppMouse::ReadDpi() {
   std::optional<Params> dpi = Request(dpi_feature_, 2, {0});
   if (!dpi) return std::nullopt;
-  return ((*dpi)[1] << 8) | (*dpi)[2];
+  return std::clamp(((*dpi)[1] << 8) | (*dpi)[2], min_dpi_, max_dpi_);
 }
 
 bool HidppMouse::WriteDpi(int dpi) {
