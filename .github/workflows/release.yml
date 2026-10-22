@@ -181,9 +181,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build release package
-        run: npm run build -- --verbose
-
       - name: Azure login (for code signing)
         if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
         uses: azure/login@v3
@@ -192,37 +189,70 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign Windows binaries (optional)
+      # The OIDC assertion behind the login expires after five minutes, and the build
+      # runs longer than that before the first file is signed. Fetch an access token
+      # for the signing service now; the Azure CLI caches it for about an hour.
+      - name: Cache an Azure access token for signing
         if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT_NAME }}
-          certificate-profile-name: ${{ env.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\build\dist\win-x64\bin
-          files-folder-filter: exe,dll
-          files-folder-recurse: true
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
+        shell: pwsh
+        run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
+
+      # MōBrowser must sign the application itself through `signCommand`: a signed
+      # executable refuses to start unless packaging also produced the signed
+      # `resources/app.bin.cat` catalog, and that catalog is created only when
+      # `signCommand` is set. Signing the binaries after the build does not work.
+      - name: Configure signCommand (optional)
+        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $signDir = Join-Path $env:RUNNER_TEMP 'sign'
+          New-Item -ItemType Directory -Force $signDir | Out-Null
+
+          # The Azure Artifact Signing client provides the signtool dlib.
+          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/1.0.95' `
+            -OutFile (Join-Path $signDir 'client.zip')
+          Expand-Archive (Join-Path $signDir 'client.zip') -DestinationPath (Join-Path $signDir 'client')
+          $dlib = Join-Path $signDir 'client\bin\x64\Azure.CodeSigning.Dlib.dll'
+
+          $signtool = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
+            Sort-Object FullName | Select-Object -Last 1).FullName
+
+          @{
+            Endpoint = $env:AZURE_SIGNING_ENDPOINT
+            CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT_NAME
+            CertificateProfileName = $env:AZURE_CERTIFICATE_PROFILE_NAME
+            # Same credential chain as azure/artifact-signing-action, so the client
+            # never falls back to an interactive sign-in and hangs.
+            ExcludeCredentials = @(
+              'ManagedIdentityCredential', 'SharedTokenCacheCredential',
+              'VisualStudioCredential', 'VisualStudioCodeCredential',
+              'AzurePowerShellCredential', 'AzureDeveloperCliCredential',
+              'InteractiveBrowserCredential'
+            )
+          } | ConvertTo-Json | Set-Content (Join-Path $signDir 'metadata.json') -Encoding ascii
+
+          # A wrapper keeps paths with spaces out of `signCommand`.
+          @"
+          & '$signtool' sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib '$dlib' /dmdf '$signDir\metadata.json' `$args[0]
+          exit `$LASTEXITCODE
+          "@ | Set-Content (Join-Path $signDir 'sign.ps1') -Encoding ascii
+
+          $conf = Get-Content mobrowser.conf.json -Raw | ConvertFrom-Json
+          $conf.app.bundle.Windows.signCommand = "pwsh -NoProfile -File $signDir\sign.ps1 @@BINARY_PATH@@"
+          $conf | ConvertTo-Json -Depth 20 | Set-Content mobrowser.conf.json -Encoding utf8
+
+      # MōBrowser verifies each signature with Windows PowerShell. A step that runs
+      # under pwsh hands it a PSModulePath without the built-in modules, and
+      # Get-AuthenticodeSignature then fails to load, so these steps run under cmd.
+      - name: Build release package
+        shell: cmd
+        run: npm run build -- --verbose
 
       - name: Build installer and auto-update packages
         id: pack
-        shell: pwsh
+        shell: cmd
         run: npm run pack -- --verbose
-
-      - name: Sign installer (optional)
-        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT_NAME }}
-          certificate-profile-name: ${{ env.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\build\dist\win-x64\pack
-          files-folder-filter: exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
