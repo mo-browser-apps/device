@@ -58,7 +58,7 @@
       },
       "Windows": {
         "icon": "assets/app.ico",
-        "signCommand": "",
+        "signCommand": "${WIN_SIGN_COMMAND}",
         "installer": {
           "exe": {
             "name": "",

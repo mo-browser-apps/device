@@ -1,5 +1,4 @@
-# Build production artifacts on macOS (arm64 and Intel), Windows, and Linux, then draft a
-# GitHub Release.
+# Build production artifacts on macOS (arm64 and Intel) and Windows, then draft a GitHub Release.
 #
 # Requires a committed package-lock.json (npm ci).
 name: Release
@@ -189,69 +188,46 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
-      # The OIDC assertion behind the login expires after five minutes, and the build
-      # runs longer than that before the first file is signed. Fetch an access token
-      # for the signing service now; the Azure CLI caches it for about an hour.
-      - name: Cache an Azure access token for signing
-        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
-        shell: pwsh
-        run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
-
-      # MōBrowser must sign the application itself through `signCommand`: a signed
-      # executable refuses to start unless packaging also produced the signed
-      # `resources/app.bin.cat` catalog, and that catalog is created only when
-      # `signCommand` is set. Signing the binaries after the build does not work.
-      - name: Configure signCommand (optional)
-        if: env.AZURE_SIGNING_ACCOUNT_NAME != ''
+      - name: Prepare Windows code signing (optional)
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $signDir = Join-Path $env:RUNNER_TEMP 'sign'
-          New-Item -ItemType Directory -Force $signDir | Out-Null
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ACCOUNT_NAME)) {
+            Write-Host "Skipping Windows code signing (no AZURE_SIGNING_ACCOUNT_NAME secret). Build will produce unsigned binaries."
+            exit 0
+          }
+          # Download the Microsoft Artifact Signing Client NuGet package to get Azure.CodeSigning.Dlib.dll.
+          # The DLIB is the Azure Artifact Signing integration for signtool.exe.
+          # See: https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations
+          nuget install Microsoft.ArtifactSigning.Client -OutputDirectory "$env:RUNNER_TEMP\tsigning" -ExcludeVersion -NonInteractive
+          $dlib = Get-ChildItem "$env:RUNNER_TEMP\tsigning\Microsoft.ArtifactSigning.Client\bin\x64\Azure.CodeSigning.Dlib.dll" |
+            Select-Object -First 1
+          if (-not $dlib) {
+            throw "Azure.CodeSigning.Dlib.dll not found after installing Microsoft.ArtifactSigning.Client."
+          }
+          # Write the metadata file that the DLIB reads at signing time.
+          $metadataPath = Join-Path $env:RUNNER_TEMP "metadata.json"
+          [ordered]@{
+            Endpoint                = $env:AZURE_SIGNING_ENDPOINT
+            CodeSigningAccountName  = $env:AZURE_SIGNING_ACCOUNT_NAME
+            CertificateProfileName  = $env:AZURE_CERTIFICATE_PROFILE_NAME
+          } | ConvertTo-Json | Set-Content -Path $metadataPath
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+            Sort-Object { $_.FullName } -Descending |
+            Select-Object -First 1
+          if (-not $signtool) {
+            throw "signtool.exe not found."
+          }
+          $signCmd = "`"$($signtool.FullName)`" sign /v /fd SHA256 /tr `"http://timestamp.acs.microsoft.com`" /td SHA256 /dlib `"$($dlib.FullName)`" /dmdf `"$metadataPath`" `"@@BINARY_PATH@@`""
+          Add-Content -Path $env:GITHUB_ENV -Value "WIN_SIGN_COMMAND<<EOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $signCmd
+          Add-Content -Path $env:GITHUB_ENV -Value "EOF"
 
-          # The Azure Artifact Signing client provides the signtool dlib.
-          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/1.0.95' `
-            -OutFile (Join-Path $signDir 'client.zip')
-          Expand-Archive (Join-Path $signDir 'client.zip') -DestinationPath (Join-Path $signDir 'client')
-          $dlib = Join-Path $signDir 'client\bin\x64\Azure.CodeSigning.Dlib.dll'
-
-          $signtool = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
-            Sort-Object FullName | Select-Object -Last 1).FullName
-
-          @{
-            Endpoint = $env:AZURE_SIGNING_ENDPOINT
-            CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT_NAME
-            CertificateProfileName = $env:AZURE_CERTIFICATE_PROFILE_NAME
-            # Same credential chain as azure/artifact-signing-action, so the client
-            # never falls back to an interactive sign-in and hangs.
-            ExcludeCredentials = @(
-              'ManagedIdentityCredential', 'SharedTokenCacheCredential',
-              'VisualStudioCredential', 'VisualStudioCodeCredential',
-              'AzurePowerShellCredential', 'AzureDeveloperCliCredential',
-              'InteractiveBrowserCredential'
-            )
-          } | ConvertTo-Json | Set-Content (Join-Path $signDir 'metadata.json') -Encoding ascii
-
-          # A wrapper keeps paths with spaces out of `signCommand`.
-          @"
-          & '$signtool' sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib '$dlib' /dmdf '$signDir\metadata.json' `$args[0]
-          exit `$LASTEXITCODE
-          "@ | Set-Content (Join-Path $signDir 'sign.ps1') -Encoding ascii
-
-          $conf = Get-Content mobrowser.conf.json -Raw | ConvertFrom-Json
-          $conf.app.bundle.Windows.signCommand = "pwsh -NoProfile -File $signDir\sign.ps1 @@BINARY_PATH@@"
-          $conf | ConvertTo-Json -Depth 20 | Set-Content mobrowser.conf.json -Encoding utf8
-
-      # MōBrowser verifies each signature with Windows PowerShell. A step that runs
-      # under pwsh hands it a PSModulePath without the built-in modules, and
-      # Get-AuthenticodeSignature then fails to load, so these steps run under cmd.
       - name: Build release package
-        shell: cmd
         run: npm run build -- --verbose
 
       - name: Build installer and auto-update packages
         id: pack
-        shell: cmd
+        shell: pwsh
         run: npm run pack -- --verbose
 
       - name: Upload Windows artifact
@@ -264,34 +240,6 @@ jobs:
             build/dist/win-x64/pack/releases.win.json
           if-no-files-found: error
 
-  build-linux:
-    environment: production
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build release package
-        run: npm run build -- --verbose
-
-      # Linux production builds have no installer yet; ship the bin tree for distribution or CI.
-      - name: Pack Linux binaries
-        run: tar -czvf linux-x64-bin.tar.gz -C build/dist/linux-x64/bin .
-
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-linux-x64
-          path: linux-x64-bin.tar.gz
-          if-no-files-found: error
-
   release:
     name: Create GitHub Release draft
     runs-on: ubuntu-latest
@@ -299,7 +247,6 @@ jobs:
     needs:
       - build-macos
       - build-windows
-      - build-linux
 
     steps:
       - name: Download all artifacts
@@ -320,7 +267,6 @@ jobs:
             dist/artifacts-win-x64/**/*.exe
             dist/artifacts-win-x64/**/*.nupkg
             dist/artifacts-win-x64/**/releases.win.json
-            dist/artifacts-linux-x64/**/*.tar.gz
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           draft: true
