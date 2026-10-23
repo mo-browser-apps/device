@@ -219,12 +219,16 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value $signCmd
           Add-Content -Path $env:GITHUB_ENV -Value "EOF"
 
+      # MōBrowser verifies each signature with Windows PowerShell. A step that runs under
+      # pwsh hands it a PSModulePath without the built-in modules, and
+      # Get-AuthenticodeSignature then fails to load, so these steps run under cmd.
       - name: Build release package
+        shell: cmd
         run: npm run build -- --verbose
 
       - name: Build installer and auto-update packages
         id: pack
-        shell: pwsh
+        shell: cmd
         run: npm run pack -- --verbose
 
       - name: Upload Windows artifact
