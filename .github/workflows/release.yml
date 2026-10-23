@@ -133,8 +133,8 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    # To securely authenticate GitHub Actions with Azure using federated credentials we need
-    # an environment-based approach that can be triggered by any event (including version tags).
+    # The Artifact Signing client authenticates with the service principal's client secret
+    # (see AZURE_CLIENT_SECRET below); the `production` environment scopes the secrets.
     environment: production
     runs-on: windows-latest
 
@@ -149,6 +149,10 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       # Azure Active Directory tenant ID of the service principal.
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # Client secret of the service principal. Together with the client and tenant IDs it
+      # lets the Artifact Signing dlib authenticate through EnvironmentCredential from
+      # inside `npm run build` and `npm run pack`, with no Azure CLI session.
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       # Azure subscription ID of the service principal.
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
@@ -167,6 +171,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ENDPOINT))          { $missing += "AZURE_SIGNING_ENDPOINT" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID))                 { $missing += "AZURE_CLIENT_ID" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_TENANT_ID))                 { $missing += "AZURE_TENANT_ID" }
+          if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_SECRET))             { $missing += "AZURE_CLIENT_SECRET" }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_SUBSCRIPTION_ID))             { $missing += "AZURE_SUBSCRIPTION_ID" }
           if ($missing.Count -gt 0) {
             Write-Error "AZURE_SIGNING_ACCOUNT_NAME is set but the following required secrets are missing: $($missing -join ', ')"
