@@ -59,6 +59,8 @@ jobs:
       MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
       # App-specific password generated at appleid.apple.com for notarization.
       MAC_APPLE_PASSWORD: ${{ secrets.MAC_APPLE_PASSWORD }}
+      # Shared private key used to sign auto-update packages on every platform.
+      CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY: ${{ secrets.CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +68,10 @@ jobs:
       - name: Verify macOS signing secrets
         run: |
           set -euo pipefail
+          if [ -z "${CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY:-}" ]; then
+            echo "CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY is required to sign auto-update packages."
+            exit 1
+          fi
           if [ -z "${MAC_CERTIFICATE:-}" ]; then
             echo "MAC_CERTIFICATE not set — code signing will be skipped."
             exit 0
@@ -165,6 +171,8 @@ jobs:
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       # Azure subscription ID of the service principal.
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # Shared private key used to sign auto-update packages on every platform.
+      CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY: ${{ secrets.CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -172,6 +180,10 @@ jobs:
       - name: Verify Windows signing secrets
         shell: pwsh
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY)) {
+            Write-Error "CI_MOBROWSER_AUTOUPDATE_SIGNING_KEY is required to sign auto-update packages."
+            exit 1
+          }
           if ([string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ACCOUNT_NAME)) {
             Write-Host "AZURE_SIGNING_ACCOUNT_NAME not set — code signing will be skipped."
             exit 0
