@@ -4,10 +4,10 @@
     "version": {
       "major": "1",
       "minor": "1",
-      "patch": "0"
+      "patch": "1"
     },
     "author": "TeamDev",
-    "copyright": "Copyright © 2026 TeamDev",
+    "copyright": "Copyright \u00a9 2026 TeamDev",
     "description": "Configure your mice and keyboards.",
     "locales": [
       "en-US"
@@ -58,7 +58,7 @@
       },
       "Windows": {
         "icon": "assets/app.ico",
-        "signCommand": "",
+        "signCommand": "${WIN_SIGN_COMMAND}",
         "installer": {
           "exe": {
             "name": "",
